@@ -512,20 +512,6 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const revChg=prevYr&&prevYr.revenue?((fRev-prevYr.revenue)/prevYr.revenue*100):null;
       const expData=[['Comisión',fComm,'#E11D48'],['Electricidad',fDuke,'#F59E0B'],['Agua',fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],['Mantenimiento',fMaint,'#10B981'],['Otros',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
       const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>({m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:s.revenue||0,net:s.net||0,libre:(s.net||0)-mMort}));
-      // Waterfall data for bar chart
-      const wfData=[
-        {name:'Ingresos',value:fRev,fill:'#2563EB'},
-        {name:'Comisión PM',value:-fComm,fill:'#F43F5E'},
-        {name:'Electricidad',value:-fDuke,fill:'#F59E0B'},
-        {name:'HOA',value:-fHoa,fill:'#8B5CF6'},
-        {name:'Agua+Maint',value:-(fWater+fMaint),fill:'#06B6D4'},
-        {name:'Otros Op.',value:-fVendor,fill:'#64748B'},
-        {name:'Net Admin.',value:fNet,fill:'#059669'},
-        ...(mMort>0?[{name:'Hipoteca',value:-fMortP,fill:'#DC2626'}]:[]),
-        ...(insExp>0?[{name:'Seguro',value:-insExp,fill:'#EA580C'}]:[]),
-        ...(taxExp>0?[{name:'Impuestos',value:-taxExp,fill:'#9333EA'}]:[]),
-        {name:'UTILIDAD',value:fUtil,fill:fUtil>=0?'#059669':'#DC2626'},
-      ].filter(d=>Math.abs(d.value)>0);
 
       return <>
       <div className="hidden print-header"><div style={{display:'flex',justifyContent:'space-between'}}><div><h1 style={{fontSize:'18px',fontWeight:800,margin:0}}>{prop.name}</h1><p style={{fontSize:'9px',color:'#64748B',margin:'3px 0'}}>{prop.address}, {prop.city} {prop.state} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div><div style={{fontSize:'18px',fontWeight:900,color:'#1E3A5F'}}>OD</div></div></div>
@@ -580,35 +566,79 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
       </div>
 
-      {/* ── ROW 2: Waterfall (how money flows) + Expense donut ── */}
+      {/* ── ROW 2: Money Cascade + Cost Breakdown ── */}
       <div className="grid grid-cols-12 gap-4 mb-4">
-        <div className="col-span-8 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-1">Flujo del Dinero — De ingreso bruto a utilidad libre</h3>
-          <p className="text-[10px] text-slate-400 mb-3">Incluye costos de operación (los descuenta el administrador) + costos del propietario (hipoteca, seguro, impuestos)</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={wfData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false}/>
-              <XAxis type="number" tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>fm(Math.abs(v))}/>
-              <YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#475569',fontWeight:600}} width={100}/>
-              <Tooltip formatter={v=>[fm(Math.abs(v)),v>=0?'Ingreso':'Costo']} contentStyle={{fontSize:12}}/>
-              <Bar dataKey="value" radius={[0,4,4,0]}>{wfData.map((d,i)=><Cell key={i} fill={d.fill}/>)}</Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="col-span-4 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Distribución de Costos</h3>
-          <div className="mb-3">
-            <div className="text-[9px] font-bold text-slate-400 uppercase mb-1">Operación (descuenta el admin.)</div>
-            {expData.length>0&&<ResponsiveContainer width="100%" height={100}><PieChart><Pie data={expData} cx="50%" cy="50%" innerRadius={25} outerRadius={45} paddingAngle={2} dataKey="value">{expData.map((e,i)=><Cell key={i} fill={e.fill}/>)}</Pie></PieChart></ResponsiveContainer>}
-            <div className="space-y-1 mt-1">{expData.map(e=><div key={e.name} className="flex items-center justify-between text-[10px]"><div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{background:e.fill}}/><span className="text-slate-500">{e.name}</span></div><span className="font-bold text-slate-600">{fm(e.value)}</span></div>)}</div>
+        {/* Visual money cascade */}
+        <div className="col-span-7 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-4">Flujo del Dinero{partial?` (${n} meses)`:''}</h3>
+          <div className="space-y-2">
+            {/* Revenue */}
+            <div className="flex items-center gap-3"><div className="w-full bg-blue-100 rounded-lg relative" style={{height:'36px'}}><div className="absolute inset-0 bg-blue-500 rounded-lg" style={{width:'100%'}}/><div className="absolute inset-0 flex items-center justify-between px-3"><span className="text-[11px] font-bold text-white">Ingreso bruto</span><span className="text-[11px] font-extrabold text-white">{fm(fRev)}</span></div></div></div>
+            {/* Arrow down */}
+            <div className="flex items-center gap-2 pl-4"><div className="text-[9px] font-bold text-slate-400 uppercase">Menos costos de operación</div><div className="flex-1 border-t border-dashed border-slate-200"/></div>
+            {/* OpEx items */}
+            <div className="pl-4 space-y-1">
+              {[[`Comisión PM (${prop.managerCommission||15}%)`,fComm,'bg-rose-400'],[`Electricidad`,fDuke,'bg-amber-400'],['HOA',fHoa,'bg-purple-400'],['Agua + Mantenimiento',fWater+fMaint,'bg-cyan-400'],['Vendor / Otros',fVendor,'bg-slate-400']].filter(([_,v])=>v>0).map(([l,v,bg])=>
+                <div key={l} className="flex items-center gap-3"><div className="w-full bg-slate-50 rounded-lg relative" style={{height:'26px'}}><div className={`absolute inset-y-0 left-0 ${bg} rounded-lg opacity-80`} style={{width:Math.max(3,v/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-3"><span className="text-[10px] text-slate-600">{l}</span><span className="text-[10px] font-bold text-slate-700">-{fm(v)} <span className="text-slate-400">({(v/fRev*100).toFixed(0)}%)</span></span></div></div></div>
+              )}
+            </div>
+            {/* Net from admin */}
+            <div className="flex items-center gap-3 mt-1"><div className="w-full bg-emerald-100 rounded-lg relative" style={{height:'36px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500 rounded-lg" style={{width:(fNet/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-3"><span className="text-[11px] font-bold text-emerald-800">Lo que te paga el administrador</span><span className="text-[11px] font-extrabold text-emerald-800">{fm(fNet)} <span className="text-emerald-600 font-normal">({fMargin.toFixed(0)}%)</span></span></div></div></div>
+            {/* Owner costs */}
+            {ownerCosts>0&&<>
+              <div className="flex items-center gap-2 pl-4"><div className="text-[9px] font-bold text-slate-400 uppercase">Menos costos del propietario</div><div className="flex-1 border-t border-dashed border-slate-200"/></div>
+              <div className="pl-4 space-y-1">
+                {fMortP>0&&<div className="flex items-center gap-3"><div className="w-full bg-slate-50 rounded-lg relative" style={{height:'26px'}}><div className="absolute inset-y-0 left-0 bg-red-400 rounded-lg opacity-80" style={{width:Math.max(3,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-3"><span className="text-[10px] text-slate-600">Hipoteca ({fm(mMort)}/mes)</span><span className="text-[10px] font-bold text-slate-700">-{fm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div></div>}
+                {insExp>0&&<div className="flex items-center gap-3"><div className="w-full bg-slate-50 rounded-lg relative" style={{height:'26px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 rounded-lg opacity-80" style={{width:Math.max(3,insExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-3"><span className="text-[10px] text-slate-600">Seguro</span><span className="text-[10px] font-bold text-slate-700">-{fm(insExp)}</span></div></div></div>}
+                {taxExp>0&&<div className="flex items-center gap-3"><div className="w-full bg-slate-50 rounded-lg relative" style={{height:'26px'}}><div className="absolute inset-y-0 left-0 bg-purple-400 rounded-lg opacity-80" style={{width:Math.max(3,taxExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-3"><span className="text-[10px] text-slate-600">Impuestos</span><span className="text-[10px] font-bold text-slate-700">-{fm(taxExp)}</span></div></div></div>}
+              </div>
+            </>}
+            {/* Final utility */}
+            <div className="flex items-center gap-3 mt-1"><div className={`w-full rounded-lg relative border-2 ${fUtil>=0?'bg-emerald-50 border-emerald-300':'bg-rose-50 border-rose-300'}`} style={{height:'40px'}}><div className={`absolute inset-y-0 left-0 rounded-lg ${fUtil>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(3,Math.abs(fUtil)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-3"><span className={`text-[11px] font-extrabold ${fUtil>=0?'text-emerald-800':'text-rose-800'}`}>UTILIDAD LIBRE</span><span className={`text-[13px] font-black ${fUtil>=0?'text-emerald-700':'text-rose-700'}`}>{fm(fUtil)} <span className="text-xs font-bold">({fm(fUtilMo)}/mes)</span></span></div></div></div>
           </div>
-          {(fMortP>0||insExp>0||taxExp>0)&&<div className="border-t border-slate-100 pt-3 mt-2">
-            <div className="text-[9px] font-bold text-slate-400 uppercase mb-2">Propietario (pagas tú)</div>
-            <div className="space-y-1.5">
-              {fMortP>0&&<div className="flex items-center justify-between text-[10px]"><div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-red-500"/><span className="text-slate-500">Hipoteca</span></div><span className="font-bold text-red-600">{fm(fMortP)}</span></div>}
-              {fMortP>0&&<div className="text-[9px] text-slate-400 pl-3.5">{fm(mMort)}/mes × {n} meses</div>}
-              {insExp>0&&<div className="flex items-center justify-between text-[10px]"><div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-orange-500"/><span className="text-slate-500">Seguro</span></div><span className="font-bold text-orange-600">{fm(insExp)}</span></div>}
-              {taxExp>0&&<div className="flex items-center justify-between text-[10px]"><div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-purple-500"/><span className="text-slate-500">Impuestos</span></div><span className="font-bold text-purple-600">{fm(taxExp)}</span></div>}
+        </div>
+
+        {/* Right: Health + Quick stats */}
+        <div className="col-span-5 space-y-3">
+          {/* Health score */}
+          <div className={`rounded-2xl p-4 border shadow-sm ${fUtil>=0&&fMargin>40?'bg-emerald-50 border-emerald-200':fUtil<0?'bg-rose-50 border-rose-200':'bg-amber-50 border-amber-200'}`}>
+            <div className="flex items-center gap-2 mb-2">
+              {fUtil>=0&&fMargin>40?<CheckCircle size={18} className="text-emerald-500"/>:<AlertTriangle size={18} className={fUtil<0?'text-rose-500':'text-amber-500'}/>}
+              <span className={`text-xs font-bold uppercase tracking-wider ${fUtil>=0&&fMargin>40?'text-emerald-700':fUtil<0?'text-rose-700':'text-amber-700'}`}>{fUtil>=0&&fMargin>40?'Propiedad Saludable':fUtil<0?'Requiere Atención':'En Observación'}</span>
+            </div>
+            <div className="space-y-1.5 text-[11px]">
+              <div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${fMargin>50?'bg-emerald-500':fMargin>40?'bg-amber-500':'bg-rose-500'}`}/><span className="text-slate-600">Margen operativo {fMargin.toFixed(0)}% {fMargin>50?'— Bueno':fMargin>40?'— Aceptable':'— Bajo'}</span></div>
+              {fDscr>0&&<div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${fDscr>1.25?'bg-emerald-500':fDscr>1?'bg-amber-500':'bg-rose-500'}`}/><span className="text-slate-600">Cobertura deuda {fDscr.toFixed(2)}x {fDscr>1.25?'— Holgado':fDscr>1?'— Justo':'— No cubre'}</span></div>}
+              <div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${fOpEx/fRev<0.5?'bg-emerald-500':fOpEx/fRev<0.6?'bg-amber-500':'bg-rose-500'}`}/><span className="text-slate-600">Costos operación {(fOpEx/fRev*100).toFixed(0)}% del ingreso</span></div>
+              {revChg!==null&&<div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${revChg>=0?'bg-emerald-500':'bg-rose-500'}`}/><span className="text-slate-600">Revenue {revChg>=0?'▲':'▼'}{Math.abs(revChg).toFixed(0)}% vs año anterior</span></div>}
+            </div>
+          </div>
+
+          {/* Cost split donut */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">¿A dónde se va cada dólar de ingreso?</h3>
+            {(()=>{
+              const total=fOpEx+ownerCosts+Math.max(0,fUtil);
+              const slices=[
+                {name:'Operación',value:fOpEx,color:'#F43F5E',pct:(fOpEx/fRev*100)},
+                ...(fMortP>0?[{name:'Hipoteca',value:fMortP,color:'#DC2626',pct:(fMortP/fRev*100)}]:[]),
+                ...(insExp>0?[{name:'Seguro',value:insExp,color:'#EA580C',pct:(insExp/fRev*100)}]:[]),
+                ...(taxExp>0?[{name:'Impuestos',value:taxExp,color:'#9333EA',pct:(taxExp/fRev*100)}]:[]),
+                {name:'Utilidad',value:Math.max(0,fUtil),color:'#059669',pct:(Math.max(0,fUtil)/fRev*100)},
+              ];
+              return <>
+                <ResponsiveContainer width="100%" height={100}><PieChart><Pie data={slices} cx="50%" cy="50%" innerRadius={28} outerRadius={45} paddingAngle={2} dataKey="value">{slices.map((s,i)=><Cell key={i} fill={s.color}/>)}</Pie></PieChart></ResponsiveContainer>
+                <div className="space-y-1 mt-2">{slices.map(s=><div key={s.name} className="flex items-center justify-between text-[10px]"><div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{background:s.color}}/><span className="text-slate-500">{s.name}</span></div><span className="font-bold text-slate-600">{s.pct.toFixed(0)}% · {fm(s.value)}</span></div>)}</div>
+              </>;
+            })()}
+          </div>
+
+          {/* Best & worst months */}
+          {monthRank.length>0&&<div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Mejor y Peor Mes (histórico)</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-emerald-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-emerald-600 font-bold">MEJOR</div><div className="text-sm font-extrabold text-emerald-700">{monthRank[0].month}</div><div className="text-[10px] text-emerald-500">{fm(monthRank[0].avg)} avg</div></div>
+              <div className="bg-rose-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-rose-600 font-bold">PEOR</div><div className="text-sm font-extrabold text-rose-700">{monthRank[monthRank.length-1].month}</div><div className="text-[10px] text-rose-500">{fm(monthRank[monthRank.length-1].avg)} avg</div></div>
             </div>
           </div>}
         </div>
