@@ -61,16 +61,21 @@ function Tbl({cols,rows,onDel,dc,onEdit}) {
 const Tip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div className="bg-slate-800 rounded-xl px-4 py-3 shadow-xl border border-slate-700"><div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1.5">{label}</div>{payload.map((p,i)=><div key={i} className="text-xs" style={{color:p.color}}>{p.name}: <b className="text-white">{fm(p.value)}</b></div>)}</div>};
 
 // Semáforo KPI component
-function KPI({label,value,sub,color='blue',trend,alert}) {
+function KPI({label,value,sub,color='blue',trend,alert,help}) {
+  const [showHelp,setShowHelp]=useState(false);
   const bdr={blue:'border-l-blue-500',green:'border-l-emerald-500',red:'border-l-rose-500',purple:'border-l-purple-500',amber:'border-l-amber-500',cyan:'border-l-cyan-500'};
   const alertBg={red:'bg-rose-50',yellow:'bg-amber-50',green:'bg-emerald-50'};
-  return <div className={`bg-white rounded-2xl p-4 border-l-4 ${bdr[color]||bdr.blue} shadow-sm hover:shadow-md transition-all ${alert?alertBg[alert]:''}`}>
+  return <div className={`bg-white rounded-2xl p-4 border-l-4 ${bdr[color]||bdr.blue} shadow-sm hover:shadow-md transition-all ${alert?alertBg[alert]:''} relative print-avoid`}>
     <div className="flex items-center justify-between mb-1"><span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{label}</span>
-      {alert==='red'&&<AlertTriangle size={14} className="text-rose-500"/>}
-      {alert==='green'&&<CheckCircle size={14} className="text-emerald-500"/>}
+      <div className="flex items-center gap-1">
+        {alert==='red'&&<AlertTriangle size={14} className="text-rose-500"/>}
+        {alert==='green'&&<CheckCircle size={14} className="text-emerald-500"/>}
+        {help&&<button onMouseEnter={()=>setShowHelp(true)} onMouseLeave={()=>setShowHelp(false)} onClick={()=>setShowHelp(!showHelp)} className="text-slate-300 hover:text-blue-400 transition no-print"><span className="text-[10px] font-bold">?</span></button>}
+      </div>
     </div>
     <div className="text-xl font-extrabold text-slate-800 tracking-tight">{value}</div>
     {(sub||trend)&&<div className="flex items-center gap-1.5 mt-1">{trend&&<span className={`text-[11px] font-bold flex items-center gap-0.5 ${trend.dir==='up'?'text-emerald-600':'text-rose-500'}`}>{trend.dir==='up'?<ArrowUpRight size={11}/>:<ArrowDownRight size={11}/>}{trend.text}</span>}{sub&&<span className="text-[10px] text-slate-400">{sub}</span>}</div>}
+    {showHelp&&help&&<div className="absolute z-30 bottom-full left-0 mb-2 bg-slate-800 text-white text-[11px] p-3 rounded-xl shadow-xl max-w-[260px] leading-relaxed">{help}<div className="absolute -bottom-1 left-4 w-2 h-2 bg-slate-800 rotate-45"/></div>}
   </div>;
 }
 
@@ -148,21 +153,28 @@ async function parsePDF(file) {
   let maintenance = findRow('Maintenance Fee');
   if (!maintenance) maintenance = findRow('Maintenance');
 
-  // Duke Energy — very flexible matching
+  // Duke Energy — ultra flexible matching
   let duke = 0;
-  rows.forEach(r => {
+  const dukeRows = rows.filter(r => {
     const rt = r.text.toLowerCase();
-    if (rt.includes('duke') || (rt.includes('electric') && !rt.includes('commission'))) {
-      const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
-      if (amounts && amounts.length > 0) {
-        const val = parseFloat(amounts[0].replace(/[$,]/g, ''));
-        if (val > 0 && val < 1500) duke += val;
-      }
+    return rt.includes('duke') || rt.includes('electric') || rt.includes('power bill') || rt.includes('utility');
+  }).filter(r => !r.text.toLowerCase().includes('commission'));
+  dukeRows.forEach(r => {
+    // Get all numbers with decimals (skip account numbers which don't have .XX)
+    const amounts = r.text.match(/\$\s*([\d,]+\.\d{2})|([\d,]+\.\d{2})/g);
+    if (amounts) {
+      const val = parseFloat(amounts[0].replace(/[$,\s]/g, ''));
+      if (val > 0 && val < 1500) duke += val;
     }
   });
-  if (!duke) duke = findRow('Duke');
-  if (!duke) duke = findRow('Electric');
-  if (!duke) duke = findRow('Electricity');
+  // Fallback: search full text with regex
+  if (!duke) {
+    const dukeRx = fullText.match(/(?:duke|electric|electricity|power)\s*(?:energy)?\s*[^$\d]*?\$?\s*([\d,]+\.\d{2})/gi);
+    if (dukeRx) {
+      const m = dukeRx[0].match(/([\d,]+\.\d{2})/);
+      if (m) duke = parseFloat(m[1].replace(',',''));
+    }
+  }
   if (!duke) duke = findRow('OUC');
   if (!duke) duke = findRow('FPL');
 
@@ -286,7 +298,7 @@ function Onboarding({userId,onComplete}) {
 function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProperty,onLogout,onAddProperty,userEmail}) {
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
-  const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
+  const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);
   const [vf,setVf]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setVf(x=>({...x,[k]:v})),[]);
   const [rf,setRf]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRf(x=>({...x,[k]:v})),[]);
@@ -425,9 +437,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const relAnnual=useMemo(()=>annual.filter(y=>y.n>=6||y.year===curYear),[annual,curYear]);
   const relMonthly=useMemo(()=>{const r={};Object.keys(monthly).forEach(y=>{const yr=parseInt(y);const a=annual.find(x=>x.year===yr);if(a&&(a.n>=6||yr===curYear))r[y]=monthly[y]});return r},[monthly,annual,curYear]);
 
-  const mortCalc=useCallback((ex=0)=>{if(!mort.balance||!mort.rate||!mort.monthlyPayment)return[];let b=mort.balance;const mr=mort.rate/100/12;const sc=[];let ti=0;for(let i=1;i<=mort.termYears*12&&b>0;i++){const int=b*mr;const pr=Math.min(mort.monthlyPayment-int+ex,b);b=Math.max(0,b-pr);ti+=int;if(i%12===0||b===0)sc.push({yr:Math.ceil(i/12),mo:i,bal:b,ti})}return sc},[mort]);
-  const sNE=useMemo(()=>mortCalc(0),[mortCalc]);
-  const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0),[mortCalc,extraP]);
+  const mortCalc=useCallback((exMonth=0,exAnnual=0)=>{if(!mort.balance||!mort.rate||!mort.monthlyPayment)return[];let b=mort.balance;const mr=mort.rate/100/12;const sc=[];let ti=0;for(let i=1;i<=mort.termYears*12&&b>0;i++){const int=b*mr;let extra=exMonth;if(i%12===0)extra+=exAnnual;const pr=Math.min(mort.monthlyPayment-int+extra,b);b=Math.max(0,b-pr);ti+=int;if(i%12===0||b===0)sc.push({yr:Math.ceil(i/12),mo:i,bal:b,ti})}return sc},[mort]);
+  const sNE=useMemo(()=>mortCalc(0,0),[mortCalc]);
+  const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>partners.find(p=>p.id===id)?.name||id;const pCl=id=>partners.find(p=>p.id===id)?.color||'#94a3b8';
   const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'repairs',icon:<Wrench size={18}/>,l:'Reparaciones'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Valorización'},{id:'pipeline',icon:<Clock size={18}/>,l:'Pipeline'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
@@ -512,20 +524,20 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         return <>
       {/* Row 1: Core Financial */}
       <div className="grid grid-cols-5 gap-3 mb-3">
-        <KPI label={`Revenue ${dashYear!=='all'?dashYear:'Total'}`} value={fm(fRev)} sub={fy?fy.n+' meses':relStmts.length+' stmts'} color="blue" trend={yoyTrend}/>
-        <KPI label="NOI" value={fm(fNoi)} sub="Revenue - OpEx" color={fNoi>0?'green':'red'} alert={fNoi<0?'red':fNoi>fRev*0.4?'green':'yellow'}/>
-        <KPI label="Cash Flow" value={fm(fCF)} sub={mort.balance>0?'NOI - Mortgage':'= NOI'} color={fCF>0?'green':'red'} alert={fCF<0?'red':'green'}/>
-        <KPI label="Cash-on-Cash" value={fCoc.toFixed(1)+'%'} sub="CF / Capital" color={fCoc>8?'green':fCoc>4?'amber':'red'} alert={fCoc>8?'green':fCoc<0?'red':null}/>
-        <KPI label="Margen" value={fMargin.toFixed(1)+'%'} sub="Net / Revenue" color={fMargin>50?'green':fMargin>40?'amber':'red'} alert={fMargin<40?'red':fMargin>50?'green':null}/>
+        <KPI label={`Revenue ${dashYear!=='all'?dashYear:'Total'}`} value={fm(fRev)} sub={fy?fy.n+' meses':relStmts.length+' stmts'} color="blue" trend={yoyTrend} help="Ingreso bruto total de la propiedad. Incluye renta, cleaning fees y otros cargos antes de descontar comisiones y gastos."/>
+        <KPI label="NOI" value={fm(fNoi)} sub="Revenue - OpEx" color={fNoi>0?'green':'red'} alert={fNoi<0?'red':fNoi>fRev*0.4?'green':'yellow'} help="Net Operating Income = Revenue menos todos los gastos operativos (comisión PM, electricidad, agua, HOA, mantenimiento). NO incluye el pago de hipoteca. Es la rentabilidad pura de la operación."/>
+        <KPI label="Cash Flow" value={fm(fCF)} sub={mort.balance>0?'NOI - Mortgage':'= NOI'} color={fCF>0?'green':'red'} alert={fCF<0?'red':'green'} help="Lo que realmente le queda al propietario. Es el NOI menos el pago anual de hipoteca. Si es positivo, la propiedad se paga sola. Si es negativo, el owner pone dinero de su bolsillo."/>
+        <KPI label="Cash-on-Cash" value={fCoc.toFixed(1)+'%'} sub="CF / Capital" color={fCoc>8?'green':fCoc>4?'amber':'red'} alert={fCoc>8?'green':fCoc<0?'red':null} help="Retorno sobre tu inversión real. Cash Flow anual dividido por el capital total que invertiste (down payment + aportes). Un 8%+ es excelente para real estate."/>
+        <KPI label="Margen" value={fMargin.toFixed(1)+'%'} sub="Net / Revenue" color={fMargin>50?'green':fMargin>40?'amber':'red'} alert={fMargin<40?'red':fMargin>50?'green':null} help="Cuántos centavos quedan de cada dólar de revenue después de todos los gastos operativos. Menos de 40% es preocupante — revisa tus costos."/>
       </div>
       {/* Row 2: Investment + Property Value */}
       <div className="grid grid-cols-6 gap-3 mb-4">
-        <KPI label="Valor de Mercado" value={fm(marketValue)} sub={latestVal?'Actualizado '+fmDate(latestVal.date):'= Precio compra'} color="cyan"/>
-        <KPI label="Equity Real" value={fm(realEquity)} sub={realLTV>0?'LTV: '+realLTV.toFixed(0)+'%':'Sin hipoteca'} color="green"/>
-        <KPI label="ADR Promedio" value={fm(fADR)} sub="/noche estimado" color="blue"/>
-        <KPI label="Cap Rate Real" value={fCapR.toFixed(2)+'%'} sub="NOI / Valor Mercado" color={fCapR>6?'green':fCapR>4?'amber':'red'}/>
-        <KPI label="Expense Ratio" value={fExpR.toFixed(1)+'%'} sub="OpEx / Revenue" color={fExpR<50?'green':fExpR<60?'amber':'red'}/>
-        {annualMortgage>0?<KPI label="DSCR" value={fNoi>0?(fNoi/annualMortgage).toFixed(2):'N/A'} sub={fNoi/annualMortgage>1.25?'Saludable — cubre deuda':fNoi/annualMortgage>1?'Ajustado':'No cubre deuda'} color={fNoi/annualMortgage>1.25?'green':fNoi/annualMortgage>1?'amber':'red'} alert={fNoi/annualMortgage<1?'red':fNoi/annualMortgage>1.25?'green':null}/>:<KPI label="Capital Invertido" value={fm(totCont)} sub={partners.length+' socio(s)'} color="purple"/>}
+        <KPI label="Valor de Mercado" value={fm(marketValue)} sub={latestVal?'Actualizado '+fmDate(latestVal.date):'= Precio compra'} color="cyan" help="Valor comercial estimado de la propiedad hoy. Puedes actualizarlo en la sección de Valorización con datos de Zillow, Redfin, un avalúo o tu propia estimación."/>
+        <KPI label="Equity Real" value={fm(realEquity)} sub={realLTV>0?'LTV: '+realLTV.toFixed(0)+'%':'Sin hipoteca'} color="green" help="Tu patrimonio neto en esta propiedad = Valor de Mercado menos lo que debes de hipoteca. Es lo que recibirías si vendieras hoy (antes de impuestos y costos de cierre)."/>
+        <KPI label="ADR Promedio" value={fm(fADR)} sub="/noche estimado" color="blue" help="Average Daily Rate = precio promedio por noche. Se calcula dividiendo el revenue total entre el número estimado de noches (meses × 30)."/>
+        <KPI label="Cap Rate Real" value={fCapR.toFixed(2)+'%'} sub="NOI / Valor Mercado" color={fCapR>6?'green':fCapR>4?'amber':'red'} help="Capitalización = NOI dividido por el valor de mercado actual. Mide la rentabilidad del ACTIVO independiente de cómo lo financiaste. Usa valor de mercado (no precio de compra) para reflejar la realidad."/>
+        <KPI label="Expense Ratio" value={fExpR.toFixed(1)+'%'} sub="OpEx / Revenue" color={fExpR<50?'green':fExpR<60?'amber':'red'} help="Qué porcentaje del revenue se va en gastos operativos (OpEx = comisión, utilities, HOA, mantenimiento). Menos de 50% es saludable. Más de 60% indica que los costos están fuera de control."/>
+        {annualMortgage>0?<KPI label="DSCR" value={fNoi>0?(fNoi/annualMortgage).toFixed(2):'N/A'} sub={fNoi/annualMortgage>1.25?'Saludable — cubre deuda':fNoi/annualMortgage>1?'Ajustado':'No cubre deuda'} color={fNoi/annualMortgage>1.25?'green':fNoi/annualMortgage>1?'amber':'red'} alert={fNoi/annualMortgage<1?'red':fNoi/annualMortgage>1.25?'green':null} help="Debt Service Coverage Ratio = NOI dividido por el pago anual de hipoteca. Mide si la propiedad genera suficiente para cubrir la deuda. Los bancos quieren ver >1.25. Si es menor a 1, la propiedad no se paga sola."/>:<KPI label="Capital Invertido" value={fm(totCont)} sub={partners.length+' socio(s)'} color="purple" help="Suma total de aportes de capital de todos los socios: down payment, aportes extraordinarios, y gastos capitalizados."/>}
       </div>
       </>;})()}
 
@@ -545,6 +557,30 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {cashFlow>0&&margin>50&&expRatio<50&&<div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 mb-4 flex items-center gap-3 print-avoid">
         <CheckCircle size={18} className="text-emerald-500 shrink-0"/>
         <div className="text-xs text-emerald-700"><b>Propiedad saludable:</b> Cash flow positivo ({fm(cashFlow)}), margen del {margin.toFixed(1)}%, expense ratio controlado ({expRatio.toFixed(0)}%){annualMortgage>0&&noi/annualMortgage>1.25?`, DSCR ${(noi/annualMortgage).toFixed(2)}`:''}</div>
+      </div>}
+
+      {/* MONEY FLOW: How each dollar flows */}
+      {revenue>0&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4 print-avoid">
+        <h3 className="text-sm font-bold text-slate-700 mb-1">💸 ¿A dónde va cada dólar?</h3>
+        <p className="text-[10px] text-slate-400 mb-4">Flujo del dinero desde el ingreso bruto hasta lo que realmente queda para el propietario</p>
+        <div className="flex items-stretch gap-1">
+          {[
+            {label:'Revenue',val:revenue,color:'bg-blue-500',pct:100},
+            {label:'→ PM Comisión',val:stmtComm,color:'bg-rose-400',pct:revenue?(stmtComm/revenue*100):0},
+            {label:'→ Electricidad',val:stmtDuke,color:'bg-amber-400',pct:revenue?(stmtDuke/revenue*100):0},
+            {label:'→ HOA',val:stmtHoa,color:'bg-purple-400',pct:revenue?(stmtHoa/revenue*100):0},
+            {label:'→ Agua + Maint',val:stmtWater+stmtMaint,color:'bg-cyan-400',pct:revenue?((stmtWater+stmtMaint)/revenue*100):0},
+            {label:'→ Otros gastos',val:stmtVendor+totExp,color:'bg-slate-400',pct:revenue?((stmtVendor+totExp)/revenue*100):0},
+            ...(annualMortgage>0?[{label:'→ Hipoteca',val:annualMortgage,color:'bg-red-500',pct:revenue?(annualMortgage/revenue*100):0}]:[]),
+            {label:'= NET Owner',val:cashFlow,color:cashFlow>=0?'bg-emerald-500':'bg-rose-600',pct:revenue?Math.abs(cashFlow/revenue*100):0,bold:true},
+          ].filter(x=>x.val>0||x.bold).map((x,i)=>(
+            <div key={i} className="flex-1 text-center">
+              <div className="text-[9px] font-semibold text-slate-500 mb-1 truncate">{x.label}</div>
+              <div className={`${x.color} rounded-lg text-white py-2 text-xs font-bold ${x.bold?'ring-2 ring-offset-1 ring-emerald-400':''}`} style={{minHeight:Math.max(32,Math.min(80,x.pct*0.8))+'px',display:'flex',alignItems:'center',justifyContent:'center'}}>{fm(x.val)}</div>
+              <div className="text-[9px] text-slate-400 mt-0.5">{x.pct.toFixed(0)}%</div>
+            </div>
+          ))}
+        </div>
       </div>}
 
       {/* CHARTS ROW 1: Revenue & Net annual + Revenue mensual */}
@@ -773,12 +809,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {mort.balance>0?<>
         <div className="grid grid-cols-5 gap-3 mb-6"><KPI label="Balance" value={fm(mort.balance)} color="red"/><KPI label="Tasa" value={mort.rate+'%'} sub={mort.termYears+' años'} color="amber"/><KPI label="Pago Mensual" value={fm(mort.monthlyPayment)} color="blue"/><KPI label="Total Intereses" value={sNE.length>0?fm(sNE[sNE.length-1].ti):'$0'} sub="sin pagos extra" color="purple"/><KPI label="Equity" value={fm(equity)} sub={'LTV: '+ltv.toFixed(0)+'%'} color="green"/></div>
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-4"><h3 className="text-base font-extrabold text-slate-800 mb-1">💰 Simulador de Pagos Anticipados</h3><p className="text-xs text-slate-400 mb-5">¿Cuánto extra al principal cada mes?</p>
-          <div className="max-w-xs mb-6"><Inp label="Pago extra mensual" value={extraP} onChange={setExtraP} prefix="$" type="number"/></div>
+          <div className="max-w-md mb-6"><div className="grid grid-cols-2 gap-3"><Inp label="Extra MENSUAL al principal" value={extraP} onChange={setExtraP} prefix="$" type="number" placeholder="Ej: 200"/><Inp label="Extra ANUAL al principal" value={extraPA} onChange={setExtraPA} prefix="$" type="number" placeholder="Ej: 5,000"/></div><p className="text-[10px] text-slate-400 mt-2">El pago mensual extra se aplica cada mes. El pago anual se aplica una vez al año al final de cada año.</p></div>
           {sE.length>0&&sNE.length>0&&<><div className="grid grid-cols-3 gap-4 mb-6">
             <div className="bg-emerald-50 rounded-2xl p-5 text-center border border-emerald-100"><div className="text-[10px] text-emerald-600 font-bold uppercase">Se paga en</div><div className="text-3xl font-extrabold text-emerald-700 mt-1">{Math.ceil(sE[sE.length-1].mo/12)} años</div><div className="text-xs text-emerald-500">vs {Math.ceil(sNE[sNE.length-1].mo/12)} sin extra</div></div>
             <div className="bg-blue-50 rounded-2xl p-5 text-center border border-blue-100"><div className="text-[10px] text-blue-600 font-bold uppercase">Ahorro</div><div className="text-3xl font-extrabold text-blue-700 mt-1">{fm(sNE[sNE.length-1].ti-sE[sE.length-1].ti)}</div></div>
             <div className="bg-amber-50 rounded-2xl p-5 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Meses Menos</div><div className="text-3xl font-extrabold text-amber-700 mt-1">{sNE[sNE.length-1].mo-sE[sE.length-1].mo}</div></div>
-          </div><ResponsiveContainer width="100%" height={260}><AreaChart data={sNE.map((d,i)=>({yr:'Año '+d.yr,sin:d.bal,con:sE[i]?.bal||0}))}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="yr" tick={{fontSize:9,fill:'#94a3b8'}} interval={4}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Area dataKey="sin" name="Sin extra" stroke="#DC2626" fill="rgba(220,38,38,.05)"/><Area dataKey="con" name={`$${extraP||0}/mes extra`} stroke="#059669" fill="rgba(5,150,105,.05)"/></AreaChart></ResponsiveContainer></>}
+          </div><ResponsiveContainer width="100%" height={260}><AreaChart data={sNE.map((d,i)=>({yr:'Año '+d.yr,sin:d.bal,con:sE[i]?.bal||0}))}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="yr" tick={{fontSize:9,fill:'#94a3b8'}} interval={4}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Area dataKey="sin" name="Sin extra" stroke="#DC2626" fill="rgba(220,38,38,.05)"/><Area dataKey="con" name={`$${extraP||0}/mes${extraPA?` + $${extraPA}/año`:''} extra`} stroke="#059669" fill="rgba(5,150,105,.05)"/></AreaChart></ResponsiveContainer></>}
         </div>
         <button onClick={()=>{setMc({bal:String(mort.balance||''),rate:String(mort.rate||''),term:String(mort.termYears||30),pay:String(mort.monthlyPayment||''),start:mort.startDate||''});setModal('editMort')}} className="text-sm text-blue-600 font-semibold hover:text-blue-800 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-50 transition"><Settings size={15}/> Editar datos de hipoteca</button>
       </>:<div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm max-w-lg">
