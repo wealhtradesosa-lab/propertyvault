@@ -1,0 +1,16 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Properties - only owner can read/write
+    match /properties/{propertyId} {
+      allow read, write: if request.auth != null && request.auth.uid == resource.data.ownerId;
+      allow create: if request.auth != null;
+      
+      // Subcollections - only property owner can access
+      match /{subcollection}/{docId} {
+        allow read, write: if request.auth != null && 
+          get(/databases/$(database)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
+      }
+    }
+  }
+}
