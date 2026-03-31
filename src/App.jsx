@@ -284,13 +284,51 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div><div className="text-sm font-bold text-emerald-700">Propiedad Saludable</div><div className="text-xs text-emerald-600">Cash flow positivo ({fm(cashFlow)}), margen del {margin.toFixed(1)}%. Buen rendimiento.</div></div>
       </div>}
 
-      {/* CHARTS ROW */}
-      {annual.length>0&&<div className="grid grid-cols-3 gap-4 mb-4">
+      {/* CHARTS ROW 1: Revenue Annual + Health Score + Rankings */}
+      {annual.length>0&&<div className="grid grid-cols-4 gap-4 mb-4">
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm col-span-2"><h3 className="text-sm font-bold text-slate-700 mb-4">📊 Revenue vs Net — Anual</h3>
-          <ResponsiveContainer width="100%" height={220}><ComposedChart data={annual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[6,6,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[6,6,0,0]}/><Line dataKey="hoa" name="HOA" stroke="#7C3AED" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
+          <ResponsiveContainer width="100%" height={200}><ComposedChart data={annual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[6,6,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[6,6,0,0]}/><Line dataKey="hoa" name="HOA" stroke="#7C3AED" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
         </div>
+        {/* Property Health Score */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <h3 className="text-sm font-bold text-slate-700 mb-3">🏥 Salud de la Propiedad</h3>
+          {(()=>{let score=0;if(margin>50)score+=25;else if(margin>40)score+=15;if(cashFlow>0)score+=25;else if(noi>0)score+=10;if(coc>8)score+=25;else if(coc>4)score+=15;if(expRatio<50)score+=25;else if(expRatio<60)score+=15;const label=score>=80?'Excelente':score>=60?'Buena':score>=40?'Regular':'Crítica';const color=score>=80?'emerald':score>=60?'blue':score>=40?'amber':'rose';
+            return<div className="text-center">
+              <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full border-4 ${score>=80?'border-emerald-500 bg-emerald-50':score>=60?'border-blue-500 bg-blue-50':score>=40?'border-amber-500 bg-amber-50':'border-rose-500 bg-rose-50'} mb-2`}><span className={`text-2xl font-black ${score>=80?'text-emerald-600':score>=60?'text-blue-600':score>=40?'text-amber-600':'text-rose-600'}`}>{score}</span></div>
+              <div className={`text-sm font-extrabold ${score>=80?'text-emerald-600':score>=60?'text-blue-600':score>=40?'text-amber-600':'text-rose-600'}`}>{label}</div>
+              <div className="text-[10px] text-slate-400 mt-1">de 100 pts</div>
+              <div className="mt-3 space-y-1 text-left">
+                {[['Margen',margin>50,margin>40],['Cash Flow',cashFlow>0,noi>0],['CoC Return',coc>8,coc>4],['Eficiencia',expRatio<50,expRatio<60]].map(([l,g,y])=>
+                  <div key={l} className="flex items-center gap-2 text-[10px]"><div className={`w-2 h-2 rounded-full ${g?'bg-emerald-500':y?'bg-amber-500':'bg-rose-500'}`}/><span className="text-slate-500">{l}</span></div>
+                )}
+              </div>
+            </div>
+          })()}
+        </div>
+        {/* Ranking */}
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">🏆 Ranking Meses</h3>
           {monthRank.length>0?<div className="space-y-1">{monthRank.map((r,i)=><div key={r.month} className={`flex items-center justify-between py-1.5 px-3 rounded-lg text-xs ${i<3?'bg-emerald-50 font-bold':i>=monthRank.length-3?'bg-rose-50':'bg-slate-50'}`}><div className="flex items-center gap-2"><span className="text-slate-400 w-4 text-right">{i+1}</span><span className={i<3?'text-emerald-700':i>=monthRank.length-3?'text-rose-600':'text-slate-600'}>{r.month}</span></div><span className={i<3?'text-emerald-600':i>=monthRank.length-3?'text-rose-500':'text-slate-500'}>{fm(r.avg)}</span></div>)}</div>:<p className="text-xs text-slate-400 text-center py-8">Necesita 12 meses de datos</p>}
+        </div>
+      </div>}
+
+      {/* CHARTS ROW 2: Monthly YoY + Expense Donut + Monthly Net Timeline */}
+      {annual.length>0&&<div className="grid grid-cols-3 gap-4 mb-4">
+        {/* Monthly YoY Revenue */}
+        {Object.keys(monthly).length>0&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">📅 Revenue Mensual YoY</h3>
+          <ResponsiveContainer width="100%" height={180}><BarChart data={M.map((m,i)=>{const e={month:m};Object.keys(monthly).forEach(y=>{e['r'+y]=monthly[y].rev[i]});return e})}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="month" tick={{fontSize:9,fill:'#94a3b8'}}/><YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>fm(v).replace('$','')}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:9}}/>{Object.keys(monthly).sort().map((y,i)=><Bar key={y} dataKey={'r'+y} name={y} fill={C[i%C.length]} radius={[3,3,0,0]}/>)}</BarChart></ResponsiveContainer>
+        </div>}
+        {/* Expense Donut */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">🧩 Distribución de Gastos</h3>
+          {(()=>{const last=annual[annual.length-1];const data=[{name:'Comisión',value:last.commission},{name:'Electricidad',value:last.duke},{name:'HOA',value:last.hoa},{name:'Maint',value:last.maintenance},{name:'Agua',value:last.water},{name:'Otros',value:last.vendor}].filter(d=>d.value>0);
+            return data.length>0?<ResponsiveContainer width="100%" height={180}><PieChart><Pie data={data} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>{data.map((_,i)=><Cell key={i} fill={C[i%C.length]}/>)}</Pie><Tooltip formatter={v=>fm(v)}/></PieChart></ResponsiveContainer>:<p className="text-xs text-slate-400 text-center py-8">Sin datos</p>
+          })()}
+        </div>
+        {/* Monthly Net Income Timeline */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">📈 Net Mensual ({annual[annual.length-1].year})</h3>
+          {(()=>{const yr=annual[annual.length-1].year;const md=monthly[yr];if(!md)return<p className="text-xs text-slate-400 text-center py-8">Sin datos</p>;
+            const data=M.map((m,i)=>({month:m,net:md.net[i]}));
+            return<ResponsiveContainer width="100%" height={180}><BarChart data={data}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="month" tick={{fontSize:9,fill:'#94a3b8'}}/><YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>fm(v).replace('$','')}/><Tooltip content={<Tip/>}/><Bar dataKey="net" name="Net" radius={[4,4,0,0]}>{data.map((d,i)=><Cell key={i} fill={d.net>=0?'#059669':'#DC2626'}/>)}</Bar></BarChart></ResponsiveContainer>
+          })()}
         </div>
       </div>}
 
@@ -298,6 +336,34 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {annual.length>0&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4"><h3 className="text-sm font-bold text-slate-700 mb-4">📋 P&L — Estado de Resultados</h3>
         <Tbl cols={[{label:'Año',render:r=><span className="font-extrabold text-slate-800">{r.year}{r.n<12?` (${r.n}m)`:''}</span>},{label:'Revenue',r:true,render:r=><span className="text-blue-600 font-bold">{fm(r.revenue)}</span>},{label:'Comisión',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},{label:'Electricidad',r:true,render:r=>fm(r.duke)},{label:'HOA',r:true,render:r=><span className={r.n>=12&&r.hoa/r.n>600?'text-amber-600 font-semibold':''}>{fm(r.hoa)}</span>},{label:'Maint',r:true,render:r=>fm(r.maintenance)},{label:'Agua',r:true,render:r=>fm(r.water)},{label:'Otros',r:true,render:r=>fm(r.vendor)},{label:'Net',r:true,render:r=><span className="font-extrabold text-emerald-600">{fm(r.net)}</span>},{label:'Margen',r:true,render:r=>{const m=r.revenue?r.net/r.revenue*100:0;return<span className={`font-bold ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(1)}%</span>}}]} rows={annual}/>
       </div>}
+
+      {/* COST STRUCTURE — Monthly Fixed Costs */}
+      {annual.length>0&&(()=>{const last=annual[annual.length-1];const n=last.n||1;return<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4">
+        <h3 className="text-sm font-bold text-slate-700 mb-1">💡 Estructura de Costos Mensuales ({last.year})</h3>
+        <p className="text-[10px] text-slate-400 mb-4">Lo que cuesta operar esta propiedad cada mes, en promedio</p>
+        <div className="grid grid-cols-6 gap-2 mb-3">
+          {[['Comisión PM',last.commission/n,'💼','blue'],['Electricidad',last.duke/n,'⚡','amber'],['HOA',last.hoa/n,'🏢','purple'],['Mantenimiento',last.maintenance/n,'🔧','cyan'],['Agua',last.water/n,'💧','blue'],['Otros',last.vendor/n,'🛠️','slate']].map(([l,v,ic,cl])=>
+            <div key={l} className={`rounded-xl p-3 text-center bg-${cl==='slate'?'slate':'blue'}-50/50 border border-slate-100`}>
+              <div className="text-lg mb-1">{ic}</div>
+              <div className="text-base font-extrabold text-slate-800">{fm(v)}</div>
+              <div className="text-[9px] text-slate-500 font-semibold">{l}</div>
+              <div className="text-[9px] text-slate-400">{last.revenue?((v*n/last.revenue)*100).toFixed(1)+'% rev':''}</div>
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-between bg-slate-50 rounded-xl p-3 border border-slate-100">
+          <div className="text-xs text-slate-500 font-semibold">Costo operativo mensual total</div>
+          <div className="text-lg font-extrabold text-slate-800">{fm((last.commission+last.duke+last.hoa+last.maintenance+last.water+last.vendor)/n)}/mes</div>
+        </div>
+        {mort.balance>0&&<div className="flex items-center justify-between bg-amber-50 rounded-xl p-3 border border-amber-100 mt-2">
+          <div className="text-xs text-amber-600 font-semibold">+ Pago de Hipoteca</div>
+          <div className="text-lg font-extrabold text-amber-700">{fm(mort.monthlyPayment)}/mes</div>
+        </div>}
+        <div className={`flex items-center justify-between rounded-xl p-3 border mt-2 ${cashFlow>=0?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}>
+          <div className={`text-xs font-bold ${cashFlow>=0?'text-emerald-600':'text-rose-600'}`}>= Revenue necesario para break-even</div>
+          <div className={`text-lg font-extrabold ${cashFlow>=0?'text-emerald-700':'text-rose-700'}`}>{fm(((last.commission+last.duke+last.hoa+last.maintenance+last.water+last.vendor)/n)+(mort.monthlyPayment||0))}/mes</div>
+        </div>
+      </div>})()}
 
       {/* PARTNER BALANCE */}
       {partners.length>1&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4"><h3 className="text-sm font-bold text-slate-700 mb-4">👥 Balance entre Socios</h3>
