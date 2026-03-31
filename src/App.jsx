@@ -477,6 +477,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {/* ═══ DASHBOARD ═══ */}
     {/* ═══ DASHBOARD ═══ */}
     {/* ═══ DASHBOARD ═══ */}
+    {/* ═══ DASHBOARD ═══ */}
     {view==='dashboard'&&(()=>{
       const fy=dashYear==='all'?null:annual.find(y=>y.year===dashYear);
       const fStmts=dashYear==='all'?stmts:stmts.filter(s=>s.year===dashYear);
@@ -490,244 +491,156 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const fWater=fy?fy.water:stmtWater;
       const fVendor=fy?fy.vendor:stmtVendor;
       const fOpEx=fComm+fDuke+fHoa+fMaint+fWater+fVendor;
-      const fNoi=fRev-fOpEx;
       const mMort=mort.monthlyPayment||0;
       const fMortP=mMort*n;
-      const insExp=expenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+(e.amount||0),0);
-      const taxExp=expenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+(e.amount||0),0);
-      const repExp=repairs.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
-      const ownerCosts=fMortP+insExp+taxExp+repExp;
-      const fUtil=fNet-fMortP-insExp-taxExp-repExp;
+      const fUtil=fNet-fMortP;
       const fUtilMo=n>0?fUtil/n:0;
-      const fMargin=fRev>0?(fNet/fRev*100):0;
       const partial=n>0&&n<12;
       const proyAnual=partial?(fUtil/n)*12:fUtil;
-      const fCapR=marketValue>0?((partial?fNoi/n*12:fNoi)/marketValue*100):0;
+      const fMargin=fRev>0?(fNet/fRev*100):0;
+      const fCapR=marketValue>0?((partial?(fRev-fOpEx)/n*12:(fRev-fOpEx))/marketValue*100):0;
       const fCoc=totCont>0?(proyAnual/totCont*100):0;
-      const fDscr=mMort>0?((partial?fNoi/n*12:fNoi)/(mMort*12)):0;
-      const estNights=n>0?Math.round(fRev/(n>0?fRev/n/150*30:1)):0;
-      const adr=fRev>0&&n>0?fRev/(n*22):0;
-      const sorted=[...fStmts].sort((a,b)=>b.year*100+b.month-a.year*100-a.month);
-      const prevYear=dashYear!=='all'&&annual.find(y=>y.year===dashYear-1);
+      const adr=n>0?fRev/(n*30):0;
+      const prevYr=dashYear!=='all'?annual.find(y=>y.year===dashYear-1):null;
+      const revChg=prevYr&&prevYr.revenue?((fRev-prevYr.revenue)/prevYr.revenue*100):null;
+      // Expense donut data
+      const expData=[['Comisión',fComm,'#E11D48'],['Electricidad',fDuke,'#F59E0B'],['Agua',fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],['Mantenimiento',fMaint,'#10B981'],['Otros',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
+      // Monthly chart data
+      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>({m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:s.revenue||0,net:s.net||0,libre:(s.net||0)-mMort}));
 
       return <>
       {/* Print header */}
-      <div className="hidden print-header"><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}><div><h1 style={{fontSize:'18px',fontWeight:800,margin:0}}>{prop.name} — Investment Summary</h1><p style={{fontSize:'9px',color:'#64748B',margin:'3px 0 0'}}>{prop.address}, {prop.city} {prop.state} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div><div style={{fontSize:'18px',fontWeight:900,color:'#1E3A5F'}}>OD</div></div></div>
+      <div className="hidden print-header"><div style={{display:'flex',justifyContent:'space-between'}}><div><h1 style={{fontSize:'18px',fontWeight:800,margin:0}}>{prop.name}</h1><p style={{fontSize:'9px',color:'#64748B',margin:'3px 0'}}>{prop.address}, {prop.city} {prop.state} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div><div style={{fontSize:'18px',fontWeight:900,color:'#1E3A5F'}}>OD</div></div></div>
 
-      {/* Header */}
-      <div className="flex justify-between items-start mb-5 no-print">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-800">{prop.name}</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{prop.address}, {prop.city} {prop.state} {prop.manager&&`· Administrador: ${prop.manager}`}</p>
-        </div>
+      <div className="flex justify-between items-start mb-4 no-print">
+        <div><h1 className="text-xl font-extrabold text-slate-800">{prop.name}</h1><p className="text-xs text-slate-400 mt-0.5">{prop.address}, {prop.city} {prop.state}</p></div>
         <div className="flex gap-2">
-          <button onClick={()=>window.print()} className="px-3 py-2 bg-slate-100 text-slate-600 text-xs rounded-xl font-bold hover:bg-slate-200 flex items-center gap-1.5"><Printer size={13}/> Imprimir</button>
+          <button onClick={()=>window.print()} className="px-3 py-2 bg-slate-100 text-slate-500 text-xs rounded-xl font-bold hover:bg-slate-200 flex items-center gap-1.5"><Printer size={13}/></button>
           <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="px-3 py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Upload size={13}/> Statements</button>
         </div>
       </div>
 
-      {/* Period tabs */}
-      {annual.length>0&&<div className="flex items-center gap-1.5 mb-5 no-print">
-        <button onClick={()=>setDashYear('all')} className={`px-4 py-2 rounded-xl text-xs font-bold transition ${dashYear==='all'?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>Acumulado</button>
-        {annual.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-4 py-2 rounded-xl text-xs font-bold transition ${dashYear===y.year?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
+      {annual.length>0&&<div className="flex items-center gap-1.5 mb-4 no-print">
+        <button onClick={()=>setDashYear('all')} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear==='all'?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>Acumulado</button>
+        {annual.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear===y.year?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
       </div>}
 
       {fRev>0?<>
+      {/* ROW 1: 6 KPI cards */}
+      <div className="grid grid-cols-6 gap-3 mb-4">
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Ingresos</div>
+          <div className="text-[22px] font-extrabold text-slate-800 mt-1 leading-tight">{fm(fRev)}</div>
+          <div className="text-[10px] text-slate-400">{fm(n>0?fRev/n:0)}/mes</div>
+          {revChg!==null&&<div className={`text-[10px] font-bold mt-1 ${revChg>=0?'text-emerald-600':'text-rose-500'}`}>{revChg>=0?'▲':'▼'} {Math.abs(revChg).toFixed(0)}% vs {dashYear-1}</div>}
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Gastos Operativos</div>
+          <div className="text-[22px] font-extrabold text-rose-600 mt-1 leading-tight">{fm(fOpEx)}</div>
+          <div className="text-[10px] text-slate-400">{fRev>0?(fOpEx/fRev*100).toFixed(0):0}% del ingreso</div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Net del Administrador</div>
+          <div className="text-[22px] font-extrabold text-emerald-700 mt-1 leading-tight">{fm(fNet)}</div>
+          <div className="text-[10px] text-slate-400">Margen {fMargin.toFixed(0)}%</div>
+        </div>
+        <div className={`bg-white rounded-2xl p-4 border shadow-sm ${fUtil>=0?'border-emerald-200':'border-rose-200'}`}>
+          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Utilidad Libre</div>
+          <div className={`text-[22px] font-extrabold mt-1 leading-tight ${fUtil>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fUtil)}</div>
+          <div className={`text-[10px] ${fUtil>=0?'text-emerald-500':'text-rose-400'}`}>{fm(fUtilMo)}/mes{partial?` · Proy: ${fm(proyAnual)}/año`:''}</div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Valor por Noche</div>
+          <div className="text-[22px] font-extrabold text-slate-800 mt-1 leading-tight">{fm(adr)}</div>
+          <div className="text-[10px] text-slate-400">ADR estimado</div>
+        </div>
+        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Retorno</div>
+          <div className={`text-[22px] font-extrabold mt-1 leading-tight ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
+          <div className="text-[10px] text-slate-400">Cash-on-Cash{partial?' (proy.)':''}</div>
+        </div>
+      </div>
 
-      {/* ════════════════════════════════════════════════
-           SECCIÓN 1: RESUMEN EJECUTIVO
-           La propiedad generó → costó operarla → quedó libre
-         ════════════════════════════════════════════════ */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-        <div className="grid grid-cols-3 divide-x divide-slate-100">
-          <div className="p-5 text-center">
-            <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">La propiedad generó</div>
-            <div className="text-3xl font-extrabold text-slate-800">{fm(fRev)}</div>
-            <div className="text-xs text-slate-400 mt-1">{fm(n>0?fRev/n:0)} promedio mensual · {n} meses</div>
+      {/* ROW 2: Monthly Performance Chart + Expense Donut + Property Card */}
+      <div className="grid grid-cols-12 gap-4 mb-4">
+        {/* Monthly chart — 7 cols */}
+        <div className="col-span-7 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider">Ingreso vs Utilidad — Mensual</h3>
+            {partial&&<span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">{n} meses</span>}
           </div>
-          <div className="p-5 text-center">
-            <div className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-2">Costó operarla</div>
-            <div className="text-3xl font-extrabold text-rose-600">{fm(fOpEx+ownerCosts)}</div>
-            <div className="text-xs text-slate-400 mt-1">Operación {fm(fOpEx)} + Owner {fm(ownerCosts)}</div>
-          </div>
-          <div className={`p-5 text-center ${fUtil>=0?'bg-emerald-50/50':'bg-rose-50/50'}`}>
-            <div className={`text-[10px] font-bold uppercase tracking-widest mb-2 ${fUtil>=0?'text-emerald-500':'text-rose-500'}`}>Utilidad libre</div>
-            <div className={`text-3xl font-extrabold ${fUtil>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fUtil)}</div>
-            <div className={`text-xs mt-1 ${fUtil>=0?'text-emerald-500':'text-rose-400'}`}>{fm(fUtilMo)}/mes {partial?`· Proy. anual: ${fm(proyAnual)}`:''}</div>
+          <ResponsiveContainer width="100%" height={210}>
+            <ComposedChart data={mChart}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/>
+              <XAxis dataKey="m" tick={{fontSize:9,fill:'#94a3b8'}} interval={mChart.length>18?2:0}/>
+              <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={fm}/>
+              <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
+              <Bar dataKey="rev" name="Ingreso" fill="#BFDBFE" radius={[3,3,0,0]}/>
+              <Bar dataKey="net" name="Net Admin." fill="#6EE7B7" radius={[3,3,0,0]}/>
+              {mMort>0&&<Line dataKey="libre" name="Utilidad libre" stroke="#1E293B" strokeWidth={2} dot={{r:2,fill:'#1E293B'}}/>}
+            </ComposedChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Expense donut — 2 cols */}
+        <div className="col-span-2 bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col">
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Costos</h3>
+          {expData.length>0&&<ResponsiveContainer width="100%" height={130}>
+            <PieChart><Pie data={expData} cx="50%" cy="50%" innerRadius={30} outerRadius={55} paddingAngle={2} dataKey="value">{expData.map((e,i)=><Cell key={i} fill={e.fill}/>)}</Pie></PieChart>
+          </ResponsiveContainer>}
+          <div className="mt-auto space-y-1">{expData.map(e=><div key={e.name} className="flex items-center justify-between text-[10px]"><div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full" style={{background:e.fill}}/><span className="text-slate-500">{e.name}</span></div><span className="font-bold text-slate-700">{fm(e.value)}</span></div>)}</div>
+        </div>
+
+        {/* Property card — 3 cols */}
+        <div className="col-span-3 bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Propiedad</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between"><span className="text-[11px] text-slate-400">Valor de mercado</span><span className="text-[11px] font-extrabold text-slate-800">{fm(marketValue)}</span></div>
+            <div className="flex justify-between"><span className="text-[11px] text-slate-400">Precio de compra</span><span className="text-[11px] font-bold text-slate-500">{fm(prop.purchasePrice)}</span></div>
+            {appreciation!==0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Valorización</span><span className={`text-[11px] font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{appreciation.toFixed(1)}%</span></div>}
+            <div className="border-t border-slate-100 my-1"/>
+            <div className="flex justify-between"><span className="text-[11px] text-slate-400">Equity (patrimonio)</span><span className="text-[11px] font-extrabold text-emerald-600">{fm(realEquity)}</span></div>
+            {mort.balance>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Deuda hipoteca</span><span className="text-[11px] font-bold text-slate-600">{fm(mort.balance)}</span></div>}
+            {realLTV>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">LTV</span><span className={`text-[11px] font-bold ${realLTV>80?'text-rose-500':realLTV>60?'text-amber-500':'text-emerald-500'}`}>{realLTV.toFixed(0)}%</span></div>}
+            <div className="border-t border-slate-100 my-1"/>
+            <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cap Rate{partial?' (proy.)':''}</span><span className={`text-[11px] font-bold ${fCapR>6?'text-emerald-600':fCapR>4?'text-amber-500':'text-rose-500'}`}>{fCapR.toFixed(2)}%</span></div>
+            <div className="flex justify-between"><span className="text-[11px] text-slate-400">Margen operativo</span><span className={`text-[11px] font-bold ${fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}`}>{fMargin.toFixed(0)}%</span></div>
+            <div className="flex justify-between"><span className="text-[11px] text-slate-400">Capital invertido</span><span className="text-[11px] font-bold text-slate-600">{fm(totCont)}</span></div>
           </div>
         </div>
-        {prevYear&&<div className="bg-slate-50 px-5 py-2.5 border-t border-slate-100 flex items-center gap-4 text-[11px]">
-          <span className="text-slate-400">vs {prevYear.year}:</span>
-          <span className={`font-bold ${fRev>prevYear.revenue?'text-emerald-600':'text-rose-500'}`}>Revenue {fRev>prevYear.revenue?'▲':'▼'}{Math.abs(((fRev-prevYear.revenue)/prevYear.revenue)*100).toFixed(0)}%</span>
-          <span className={`font-bold ${fNet>prevYear.net?'text-emerald-600':'text-rose-500'}`}>Net {fNet>prevYear.net?'▲':'▼'}{Math.abs(((fNet-prevYear.net)/prevYear.net)*100).toFixed(0)}%</span>
-          <span className={`font-bold ${fMargin>(prevYear.revenue?prevYear.net/prevYear.revenue*100:0)?'text-emerald-600':'text-rose-500'}`}>Margen {fMargin.toFixed(0)}% vs {prevYear.revenue?(prevYear.net/prevYear.revenue*100).toFixed(0):0}%</span>
+      </div>
+
+      {/* ROW 3: Year comparison chart (if multiple years) + partner split */}
+      <div className={`grid ${annual.length>1?'grid-cols-2':'grid-cols-1'} gap-4 mb-4`}>
+        {annual.length>1&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Comparativo Anual</h3>
+          <ResponsiveContainer width="100%" height={180}>
+            <ComposedChart data={annual}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/>
+              <XAxis dataKey="year" tick={{fontSize:11,fill:'#64748b'}}/>
+              <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={fm}/>
+              <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
+              <Bar dataKey="revenue" name="Ingreso" fill="#93C5FD" radius={[4,4,0,0]}/>
+              <Bar dataKey="net" name="Net Admin." fill="#6EE7B7" radius={[4,4,0,0]}/>
+              <Line dataKey="hoa" name="HOA" stroke="#8B5CF6" strokeWidth={2} dot={{r:3}}/>
+            </ComposedChart>
+          </ResponsiveContainer>
         </div>}
+
+        {partners.length>1?<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Socios</h3>
+          <div className="space-y-3">{partners.map(p=>{const t=pt[p.id]||{};return<div key={p.id} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:p.color}}>{p.name.charAt(0)}</div>
+            <div className="flex-1 min-w-0"><div className="text-sm font-bold text-slate-700 truncate">{p.name} <span className="text-xs text-slate-400 font-normal">{p.ownership}%</span></div>
+              <div className="flex gap-3 text-[10px] mt-0.5"><span className="text-emerald-600">Aportó {fm(t.cont)}</span><span className="text-rose-500">Gastó {fm(t.exp)}</span><span className="text-blue-600">Le toca {fm(fNet*(p.ownership/100))}</span></div>
+            </div>
+          </div>})}</div>
+        </div>:annual.length<=1&&<div/>}
       </div>
 
-      {/* ════════════════════════════════════════════════
-           SECCIÓN 2: INGRESOS vs GASTOS vs UTILIDAD
-           Desglose claro + Métricas de inversión al lado
-         ════════════════════════════════════════════════ */}
-      <div className="grid grid-cols-3 gap-4 mb-5">
-        <div className="col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Ingresos, Gastos y Utilidad{partial?` (${n} meses)`:''}</h3>
-          <div className="space-y-1 text-[13px]">
-            <div className="flex justify-between py-2.5 px-4 bg-blue-50 rounded-xl"><span className="font-bold text-blue-800">Ingreso Bruto (renta + fees)</span><span className="font-extrabold text-blue-800">{fm(fRev)}</span></div>
-            <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-1">— Gastos de operación (descuenta el administrador)</div>
-            {fComm>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Comisión administrador ({prop.managerCommission||15}%)</span><span className="text-rose-500">-{fm(fComm)}</span></div>}
-            {fDuke>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Electricidad</span><span className="text-rose-500">-{fm(fDuke)}</span></div>}
-            {fWater>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Agua</span><span className="text-rose-500">-{fm(fWater)}</span></div>}
-            {fHoa>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">HOA (cuota comunidad)</span><span className="text-rose-500">-{fm(fHoa)}</span></div>}
-            {fMaint>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Mantenimiento</span><span className="text-rose-500">-{fm(fMaint)}</span></div>}
-            {fVendor>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Otros / Vendor</span><span className="text-rose-500">-{fm(fVendor)}</span></div>}
-            <div className="flex justify-between py-2 px-4 bg-slate-50 rounded-lg"><span className="font-semibold text-slate-600">Total costos de operación</span><span className="font-bold text-rose-600">-{fm(fOpEx)} <span className="text-[10px] text-slate-400">({fRev>0?(fOpEx/fRev*100).toFixed(0):0}%)</span></span></div>
-            <div className="flex justify-between py-2.5 px-4 bg-emerald-50 rounded-xl"><span className="font-bold text-emerald-800">Lo que te paga el administrador</span><span className="font-extrabold text-emerald-800">{fm(fNet)}</span></div>
-            {(fMortP>0||insExp>0||taxExp>0||repExp>0)&&<>
-              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-1 mt-1">— Gastos del propietario (pagas tú)</div>
-              {fMortP>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Hipoteca ({fm(mMort)}/mes × {n} meses)</span><span className="text-red-500">-{fm(fMortP)}</span></div>}
-              {insExp>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Seguro de la propiedad</span><span className="text-red-500">-{fm(insExp)}</span></div>}
-              {taxExp>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Impuestos (Property Tax)</span><span className="text-red-500">-{fm(taxExp)}</span></div>}
-              {repExp>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Reparaciones y mejoras</span><span className="text-red-500">-{fm(repExp)}</span></div>}
-            </>}
-            <div className={`flex justify-between py-3 px-4 rounded-xl mt-1 border-2 ${fUtil>=0?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
-              <span className={`font-extrabold ${fUtil>=0?'text-emerald-800':'text-rose-800'}`}>Utilidad Libre</span>
-              <div className="text-right"><span className={`text-xl font-black ${fUtil>=0?'text-emerald-700':'text-rose-700'}`}>{fm(fUtil)}</span><span className={`text-xs ml-2 ${fUtil>=0?'text-emerald-500':'text-rose-500'}`}>{fm(fUtilMo)}/mes</span></div>
-            </div>
-            {partial&&<div className="bg-slate-50 rounded-lg py-2 px-4 mt-2 text-center text-[10px] text-slate-400">
-              Periodo parcial ({n} meses) · Proyección 12 meses: <b className={proyAnual>=0?'text-emerald-600':'text-rose-500'}>{fm(proyAnual)}</b>
-            </div>}
-          </div>
-        </div>
+      </>:<Empty icon={BarChart3} title="Sin datos" desc="Carga los statements de tu administrador para ver el dashboard financiero de tu propiedad." action="Cargar Statements" onAction={()=>{setUploadLog([]);setModal('upload')}}/>}
 
-        {/* Métricas */}
-        <div className="space-y-3">
-          {/* Propiedad y Patrimonio */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Propiedad</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Valor de mercado</span><span className="text-xs font-extrabold text-slate-800">{fm(marketValue)}</span></div>
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Precio de compra</span><span className="text-xs font-bold text-slate-500">{fm(prop.purchasePrice)}</span></div>
-              {appreciation!==0&&<div className="flex justify-between"><span className="text-xs text-slate-500">Valorización</span><span className={`text-xs font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{fm(marketValue-prop.purchasePrice)} ({appreciation.toFixed(1)}%)</span></div>}
-              {mort.balance>0&&<><div className="border-t border-slate-100 my-1"/><div className="flex justify-between"><span className="text-xs text-slate-500">Deuda hipoteca</span><span className="text-xs font-bold text-slate-600">{fm(mort.balance)}</span></div></>}
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Tu patrimonio (equity)</span><span className="text-xs font-extrabold text-emerald-600">{fm(realEquity)}</span></div>
-              {realLTV>0&&<div className="flex justify-between"><span className="text-xs text-slate-500">Apalancamiento (LTV)</span><span className={`text-xs font-bold ${realLTV>80?'text-rose-500':realLTV>60?'text-amber-500':'text-emerald-500'}`}>{realLTV.toFixed(0)}%</span></div>}
-            </div>
-          </div>
-
-          {/* Rendimiento */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Rendimiento{partial?' (proy.)':''}</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Margen operativo</span><span className={`text-xs font-bold ${fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}`}>{fMargin.toFixed(1)}%</span></div>
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Cap Rate</span><span className={`text-xs font-bold ${fCapR>6?'text-emerald-600':fCapR>4?'text-amber-500':'text-rose-500'}`}>{fCapR.toFixed(2)}%</span></div>
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Retorno (CoC)</span><span className={`text-xs font-bold ${fCoc>8?'text-emerald-600':fCoc>4?'text-amber-500':'text-rose-500'}`}>{fCoc.toFixed(1)}%</span></div>
-              {fDscr>0&&<div className="flex justify-between"><span className="text-xs text-slate-500">Cobertura deuda</span><span className={`text-xs font-bold ${fDscr>1.25?'text-emerald-600':fDscr>1?'text-amber-500':'text-rose-500'}`}>{fDscr.toFixed(2)}x</span></div>}
-              <div className="border-t border-slate-100 my-1"/>
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Valor por noche (est.)</span><span className="text-xs font-bold text-slate-700">{fm(adr)}</span></div>
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Capital invertido</span><span className="text-xs font-bold text-slate-700">{fm(totCont)}</span></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* ════════════════════════════════════════════════
-           SECCIÓN 3: COMPARATIVO ANUAL
-         ════════════════════════════════════════════════ */}
-      {annual.length>1&&dashYear==='all'&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100"><h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Comparativo Anual</h3></div>
-        <div className="overflow-x-auto"><table className="w-full"><thead><tr className="border-b border-slate-100">
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-left">Año</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Generó</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Costos Op.</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Te pagaron</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Margen</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">vs Año Ant.</th>
-        </tr></thead><tbody>{annual.map((y,i)=>{
-          const mg=y.revenue?(y.net/y.revenue*100):0;
-          const prev=i>0?annual[i-1]:null;
-          const chg=prev&&prev.revenue?((y.revenue-prev.revenue)/prev.revenue*100):null;
-          return<tr key={y.year} className={`border-b border-slate-50 ${i%2?'bg-slate-50/30':''}`}>
-            <td className="py-2.5 px-4 text-sm font-bold text-slate-700">{y.year} <span className="text-[10px] text-slate-400 font-normal">{y.n<12?`(${y.n}m)`:''}</span></td>
-            <td className="py-2.5 px-4 text-sm text-right text-blue-600 font-medium">{fm(y.revenue)}</td>
-            <td className="py-2.5 px-4 text-sm text-right text-rose-500">{fm(y.revenue-y.net)}</td>
-            <td className="py-2.5 px-4 text-sm text-right text-emerald-600 font-bold">{fm(y.net)}</td>
-            <td className={`py-2.5 px-4 text-sm text-right font-medium ${mg>50?'text-emerald-600':mg>40?'text-amber-500':'text-rose-500'}`}>{mg.toFixed(0)}%</td>
-            <td className="py-2.5 px-4 text-sm text-right">{chg!==null?<span className={`font-bold ${chg>=0?'text-emerald-600':'text-rose-500'}`}>{chg>=0?'▲':'▼'}{Math.abs(chg).toFixed(0)}%</span>:<span className="text-slate-300">—</span>}</td>
-          </tr>})}</tbody></table></div>
-      </div>}
-
-      {/* ════════════════════════════════════════════════
-           SECCIÓN 4: MES A MES
-         ════════════════════════════════════════════════ */}
-      {sorted.length>0&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
-        <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Detalle Mensual{dashYear!=='all'?` — ${dashYear}`:''}</h3>
-          <span className="text-[10px] text-slate-400">{sorted.length} meses</span>
-        </div>
-        <div className="overflow-x-auto"><table className="w-full"><thead><tr className="border-b border-slate-100">
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-left">Mes</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Generó</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Costos Op.</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Te pagaron</th>
-          {mMort>0&&<th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Hipoteca</th>}
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Libre</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Margen</th>
-        </tr></thead><tbody>{sorted.map((s,i)=>{
-          const op=(s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0);
-          const libre=(s.net||0)-mMort;
-          const mg=s.revenue?(s.net/s.revenue*100):0;
-          return<tr key={s.id} className={`border-b border-slate-50 ${i%2?'bg-slate-50/30':''}`}>
-            <td className="py-2 px-4 text-sm font-medium text-slate-700">{M[s.month-1]} {s.year}</td>
-            <td className="py-2 px-4 text-sm text-right text-blue-600">{fm(s.revenue)}</td>
-            <td className="py-2 px-4 text-sm text-right text-slate-500">{fm(op)}</td>
-            <td className="py-2 px-4 text-sm text-right text-emerald-600 font-medium">{fm(s.net)}</td>
-            {mMort>0&&<td className="py-2 px-4 text-sm text-right text-slate-400">-{fm(mMort)}</td>}
-            <td className={`py-2 px-4 text-sm text-right font-bold ${libre>=0?'text-emerald-700':'text-rose-600'}`}>{fm(libre)}</td>
-            <td className={`py-2 px-4 text-xs text-right ${mg<40?'text-rose-500':mg<50?'text-amber-500':'text-emerald-500'}`}>{mg.toFixed(0)}%</td>
-          </tr>})}</tbody>
-          <tfoot><tr className="bg-slate-50 border-t-2 border-slate-200">
-            <td className="py-2.5 px-4 text-xs font-bold text-slate-600">{sorted.length} meses</td>
-            <td className="py-2.5 px-4 text-xs text-right font-bold text-blue-600">{fm(sorted.reduce((s,x)=>s+(x.revenue||0),0))}</td>
-            <td className="py-2.5 px-4 text-xs text-right font-bold text-slate-500">{fm(sorted.reduce((s,x)=>s+(x.revenue||0)-(x.net||0),0))}</td>
-            <td className="py-2.5 px-4 text-xs text-right font-bold text-emerald-600">{fm(sorted.reduce((s,x)=>s+(x.net||0),0))}</td>
-            {mMort>0&&<td className="py-2.5 px-4 text-xs text-right font-bold text-slate-400">-{fm(mMort*sorted.length)}</td>}
-            <td className={`py-2.5 px-4 text-xs text-right font-extrabold ${fUtil>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fUtil)}</td>
-            <td className="py-2.5 px-4 text-xs text-right text-slate-400">{fMargin.toFixed(0)}%</td>
-          </tr></tfoot>
-        </table></div>
-      </div>}
-
-      {/* ════════════════════════════════════════════════
-           SECCIÓN 5: GRÁFICA
-         ════════════════════════════════════════════════ */}
-      {sorted.length>2&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-5">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Ingreso vs Utilidad — Mensual</h3>
-        <ResponsiveContainer width="100%" height={200}>
-          <ComposedChart data={[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>({p:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),gen:s.revenue||0,pago:s.net||0,libre:(s.net||0)-mMort}))}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/>
-            <XAxis dataKey="p" tick={{fontSize:9,fill:'#94a3b8'}} interval={fStmts.length>18?2:0}/>
-            <YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/>
-            <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
-            <Bar dataKey="gen" name="Generó" fill="#BFDBFE" radius={[3,3,0,0]}/>
-            <Bar dataKey="pago" name="Te pagaron" fill="#059669" radius={[3,3,0,0]}/>
-            {mMort>0&&<Line dataKey="libre" name="Libre (después hipoteca)" stroke="#1E293B" strokeWidth={2} dot={{r:2,fill:'#1E293B'}}/>}
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>}
-
-      {/* Socios */}
-      {partners.length>1&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Distribución entre Socios</h3>
-        <div className="grid gap-3" style={{gridTemplateColumns:`repeat(${Math.min(partners.length,3)},1fr)`}}>{partners.map(p=>{const t=pt[p.id]||{};return<div key={p.id} className="rounded-xl p-3 border border-slate-100 bg-slate-50/50" style={{borderLeft:`4px solid ${p.color}`}}>
-          <div className="flex justify-between items-center mb-2"><span className="text-sm font-bold text-slate-700">{p.name}</span><span className="text-xs text-slate-400">{p.ownership}%</span></div>
-          <div className="grid grid-cols-3 gap-2 text-center text-[10px]"><div><span className="text-slate-400">Aportó</span><div className="font-bold text-emerald-600">{fm(t.cont)}</div></div><div><span className="text-slate-400">Gastos</span><div className="font-bold text-rose-500">{fm(t.exp)}</div></div><div><span className="text-slate-400">Le toca</span><div className="font-bold text-blue-600">{fm(fNet*(p.ownership/100))}</div></div></div>
-        </div>})}</div>
-      </div>}
-
-      </>:<Empty icon={BarChart3} title="Sin datos aún" desc="Carga los statements de tu administrador para ver el análisis financiero completo de tu propiedad." action="Cargar Statements" onAction={()=>{setUploadLog([]);setModal('upload')}}/>}
-
-      {/* Print footer */}
-      <div className="hidden print-footer">OwnerDesk — {prop.name} — {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})} — Confidencial</div>
+      <div className="hidden print-footer">OwnerDesk · {prop.name} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</div>
     </>})()}
     {/* ═══ PARTNERS ═══ */}
     {view==='partners'&&<>
