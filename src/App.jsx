@@ -478,31 +478,31 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {/* ═══ DASHBOARD ═══ */}
     {/* ═══ DASHBOARD ═══ */}
     {/* ═══ DASHBOARD ═══ */}
-    {view==='dashboard'&&(()=>{
+    {view==='dashboard'&&(()=>{try{
       const fy=dashYear==='all'?null:annual.find(y=>y.year===dashYear);
       const fStmts=dashYear==='all'?stmts:stmts.filter(s=>s.year===dashYear);
-      const n=fy?fy.n:stmts.length;
-      const fRev=fy?fy.revenue:revenue;
-      const fNet=fy?fy.net:(stmtNet||totNet);
-      const fComm=fy?fy.commission:stmtComm;
-      const fDuke=fy?fy.duke:stmtDuke;
-      const fHoa=fy?fy.hoa:stmtHoa;
-      const fMaint=fy?fy.maintenance:stmtMaint;
-      const fWater=fy?fy.water:stmtWater;
-      const fVendor=fy?fy.vendor:stmtVendor;
+      const n=fy?fy.n:(stmts.length||0);
+      const fRev=fy?fy.revenue:(revenue||0);
+      const fNet=fy?fy.net:((stmtNet||totNet)||0);
+      const fComm=fy?(fy.commission||0):(stmtComm||0);
+      const fDuke=fy?(fy.duke||0):(stmtDuke||0);
+      const fHoa=fy?(fy.hoa||0):(stmtHoa||0);
+      const fMaint=fy?(fy.maintenance||0):(stmtMaint||0);
+      const fWater=fy?(fy.water||0):(stmtWater||0);
+      const fVendor=fy?(fy.vendor||0):(stmtVendor||0);
       const fOpEx=fComm+fDuke+fHoa+fMaint+fWater+fVendor;
       const fNoi=fRev-fOpEx;
       const mMort=mort.monthlyPayment||0;
       const fMortP=mMort*n;
-      const insExp=expenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+(e.amount||0),0);
-      const taxExp=expenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+(e.amount||0),0);
+      const insExp=expenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+((e.amount||0)),0);
+      const taxExp=expenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+((e.amount||0)),0);
       const ownerCosts=fMortP+insExp+taxExp;
-      const fUtil=fNoi-ownerCosts;
-      const fUtilMo=n>0?fUtil/n:0;
+      const fCF=fNoi-ownerCosts;
+      const fCFmo=n>0?fCF/n:0;
       const partial=n>0&&n<12;
-      const proyAnual=partial?(fUtil/n)*12:fUtil;
-      const fMargin=fRev>0?(fNet/fRev*100):0;
-      const noiAnual=partial?fNoi/n*12:fNoi;
+      const proyAnual=partial&&n>0?(fCF/n)*12:fCF;
+      const fMargin=fRev>0?(fNoi/fRev*100):0;
+      const noiAnual=partial&&n>0?fNoi/n*12:fNoi;
       const fCapR=marketValue>0?(noiAnual/marketValue*100):0;
       const fCoc=totCont>0?(proyAnual/totCont*100):0;
       const fDscr=mMort>0?(noiAnual/(mMort*12)):0;
@@ -544,11 +544,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="text-xs text-slate-400 mt-1">Después de gastos operativos</div>
           <div className="text-[11px] text-slate-500 mt-1">Margen operativo: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{(fRev>0?fNoi/fRev*100:0).toFixed(0)}%</b></div>
         </div>
-        <div className={`bg-white rounded-2xl p-5 border-l-4 border border-slate-200 shadow-sm ${fUtil>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
+        <div className={`bg-white rounded-2xl p-5 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cash Flow</div>
-          <div className={`text-[26px] font-extrabold mt-1 ${fUtil>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fUtil)}</div>
+          <div className={`text-[26px] font-extrabold mt-1 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fCF)}</div>
           <div className="text-xs text-slate-400 mt-1">Después de hipoteca, seguro, tax</div>
-          <div className={`text-[11px] mt-1 ${fUtil>=0?'text-emerald-500':'text-rose-400'}`}>{fm(fUtilMo)}/mes{partial?` · Proy: ${fm(proyAnual)}/año`:''}</div>
+          <div className={`text-[11px] mt-1 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{fm(fCFmo)}/mes{partial?` · Proy: ${fm(proyAnual)}/año`:''}</div>
         </div>
         <div className="bg-white rounded-2xl p-5 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
           <div className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">Return (CoC){partial?' proy.':''}</div>
@@ -585,11 +585,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </>}
 
             {/* Cash Flow */}
-            <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fUtil>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
-              <div className={`absolute inset-y-0 left-0 ${fUtil>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fUtil)/fRev*100)+'%'}}/>
+            <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
+              <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
               <div className="absolute inset-0 flex items-center justify-between px-4">
-                <span className={`text-[11px] font-extrabold ${fUtil>=0?'text-emerald-800':'text-rose-800'}`}>= CASH FLOW (utilidad neta)</span>
-                <span className={`text-[13px] font-black ${fUtil>=0?'text-emerald-700':'text-rose-700'}`}>{fm(fUtil)}</span>
+                <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= CASH FLOW (utilidad neta)</span>
+                <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{fm(fCF)}</span>
               </div>
             </div>
             {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded py-1.5 mt-1">Periodo parcial ({n} meses) · Proyección anual: <b>{fm(proyAnual)}</b></div>}
@@ -622,10 +622,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </div>
           </div>
           {/* Health indicator */}
-          <div className={`rounded-2xl p-3 border ${fUtil>=0&&fNoi/fRev>0.4?'bg-emerald-50 border-emerald-200':fUtil<0?'bg-rose-50 border-rose-200':'bg-amber-50 border-amber-200'}`}>
+          <div className={`rounded-2xl p-3 border ${fCF>=0&&fNoi/fRev>0.4?'bg-emerald-50 border-emerald-200':fCF<0?'bg-rose-50 border-rose-200':'bg-amber-50 border-amber-200'}`}>
             <div className="flex items-center gap-2 mb-1.5">
-              {fUtil>=0&&fNoi/fRev>0.4?<CheckCircle size={15} className="text-emerald-500"/>:<AlertTriangle size={15} className={fUtil<0?'text-rose-500':'text-amber-500'}/>}
-              <span className={`text-[10px] font-bold uppercase ${fUtil>=0&&fNoi/fRev>0.4?'text-emerald-700':fUtil<0?'text-rose-700':'text-amber-700'}`}>{fUtil>=0&&fNoi/fRev>0.4?'Inversión Saludable':fUtil<0?'Atención Requerida':'En Observación'}</span>
+              {fCF>=0&&fNoi/fRev>0.4?<CheckCircle size={15} className="text-emerald-500"/>:<AlertTriangle size={15} className={fCF<0?'text-rose-500':'text-amber-500'}/>}
+              <span className={`text-[10px] font-bold uppercase ${fCF>=0&&fNoi/fRev>0.4?'text-emerald-700':fCF<0?'text-rose-700':'text-amber-700'}`}>{fCF>=0&&fNoi/fRev>0.4?'Inversión Saludable':fCF<0?'Atención Requerida':'En Observación'}</span>
             </div>
             <div className="space-y-1 text-[10px] text-slate-600">
               <div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${fNoi/fRev>0.5?'bg-emerald-500':fNoi/fRev>0.4?'bg-amber-500':'bg-rose-500'}`}/>{(fNoi/fRev*100).toFixed(0)}% margen operativo</div>
@@ -710,7 +710,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       </>:<div className="text-center py-12"><Empty icon={BarChart3} title="Sin datos para mostrar" desc={`Esta propiedad tiene ${stmts.length} statements, ${expenses.length} gastos y ${income.length} ingresos registrados. ${stmts.length===0?'Carga los statements de tu administrador para ver el dashboard.':'Si ves esto con datos cargados, intenta seleccionar un año arriba.'}`} action="Cargar Statements" onAction={()=>{setUploadLog([]);setModal('upload')}}/></div>}
       <div className="hidden print-footer">OwnerDesk · {prop.name} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</div>
-    </>})()}
+    </>}catch(e){console.error('Dashboard error:',e);return<div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 m-6"><h3 className="font-bold text-rose-700 mb-2">Error en el dashboard</h3><p className="text-sm text-rose-600 mb-3">{e.message}</p><p className="text-xs text-slate-400 mb-3">Stmts: {stmts.length} · Revenue: {revenue} · Annual: {annual.length}</p><button onClick={()=>setView('statements')} className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold">Ir a Statements</button></div>}})()}
     {/* ═══ PARTNERS ═══ */}
     {view==='partners'&&<>
       <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">👥 Socios & Capital</h1><button onClick={()=>{setCf({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||''});setModal('contribution')}} className="px-4 py-2.5 bg-purple-600 text-white text-xs rounded-xl font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Aporte</button></div>
