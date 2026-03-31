@@ -559,28 +559,93 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="text-xs text-emerald-700"><b>Propiedad saludable:</b> Cash flow positivo ({fm(cashFlow)}), margen del {margin.toFixed(1)}%, expense ratio controlado ({expRatio.toFixed(0)}%){annualMortgage>0&&noi/annualMortgage>1.25?`, DSCR ${(noi/annualMortgage).toFixed(2)}`:''}</div>
       </div>}
 
-      {/* MONEY FLOW: How each dollar flows */}
+      {/* ═══ RADIOGRAFÍA DE LA PROPIEDAD ═══ */}
       {revenue>0&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4 print-avoid">
-        <h3 className="text-sm font-bold text-slate-700 mb-1">💸 ¿A dónde va cada dólar?</h3>
-        <p className="text-[10px] text-slate-400 mb-4">Flujo del dinero desde el ingreso bruto hasta lo que realmente queda para el propietario</p>
-        <div className="flex items-stretch gap-1">
-          {[
-            {label:'Revenue',val:revenue,color:'bg-blue-500',pct:100},
-            {label:'→ PM Comisión',val:stmtComm,color:'bg-rose-400',pct:revenue?(stmtComm/revenue*100):0},
-            {label:'→ Electricidad',val:stmtDuke,color:'bg-amber-400',pct:revenue?(stmtDuke/revenue*100):0},
-            {label:'→ HOA',val:stmtHoa,color:'bg-purple-400',pct:revenue?(stmtHoa/revenue*100):0},
-            {label:'→ Agua + Maint',val:stmtWater+stmtMaint,color:'bg-cyan-400',pct:revenue?((stmtWater+stmtMaint)/revenue*100):0},
-            {label:'→ Otros gastos',val:stmtVendor+totExp,color:'bg-slate-400',pct:revenue?((stmtVendor+totExp)/revenue*100):0},
-            ...(annualMortgage>0?[{label:'→ Hipoteca',val:annualMortgage,color:'bg-red-500',pct:revenue?(annualMortgage/revenue*100):0}]:[]),
-            {label:'= NET Owner',val:cashFlow,color:cashFlow>=0?'bg-emerald-500':'bg-rose-600',pct:revenue?Math.abs(cashFlow/revenue*100):0,bold:true},
-          ].filter(x=>x.val>0||x.bold).map((x,i)=>(
-            <div key={i} className="flex-1 text-center">
-              <div className="text-[9px] font-semibold text-slate-500 mb-1 truncate">{x.label}</div>
-              <div className={`${x.color} rounded-lg text-white py-2 text-xs font-bold ${x.bold?'ring-2 ring-offset-1 ring-emerald-400':''}`} style={{minHeight:Math.max(32,Math.min(80,x.pct*0.8))+'px',display:'flex',alignItems:'center',justifyContent:'center'}}>{fm(x.val)}</div>
-              <div className="text-[9px] text-slate-400 mt-0.5">{x.pct.toFixed(0)}%</div>
+        <h3 className="text-sm font-bold text-slate-700 mb-1">🔍 Radiografía: ¿Cuánto produce y cuánto cuesta tu propiedad?</h3>
+        <p className="text-[10px] text-slate-400 mb-4">De cada dólar que entra, esto es lo que pasa con tu dinero{dashYear!=='all'?` en ${dashYear}`:''}</p>
+
+        <div className="space-y-3">
+          {/* LEVEL 1: Revenue */}
+          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+            <div className="flex justify-between items-center"><span className="text-sm font-bold text-blue-700">💰 Ingreso Bruto (Revenue)</span><span className="text-xl font-extrabold text-blue-700">{fm(revenue)}</span></div>
+            <p className="text-[10px] text-blue-500 mt-1">Lo que genera la propiedad en total: renta, cleaning fees, pool heat, etc.</p>
+          </div>
+
+          {/* LEVEL 2: What the PM takes */}
+          <div className="bg-rose-50 rounded-xl p-4 border border-rose-100">
+            <div className="flex justify-between items-center mb-2"><span className="text-sm font-bold text-rose-700">📤 Gastos Operativos (lo que descuenta el PM)</span><span className="text-xl font-extrabold text-rose-600">-{fm(totalOpEx)}</span></div>
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-2">
+              {[['Comisión PM',stmtComm],['Electricidad',stmtDuke],['HOA',stmtHoa],['Agua',stmtWater],['Mantenimiento',stmtMaint],['Vendor/Otros',stmtVendor+totExp]].filter(([_,v])=>v>0).map(([l,v])=>
+                <div key={l} className="bg-white rounded-lg p-2 text-center"><div className="text-[9px] text-rose-500 font-semibold">{l}</div><div className="text-xs font-extrabold text-rose-700">{fm(v)}</div><div className="text-[8px] text-slate-400">{pct(v,revenue)}</div></div>
+              )}
             </div>
-          ))}
+          </div>
+
+          {/* NET del PM */}
+          <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+            <div className="flex justify-between items-center"><span className="text-sm font-bold text-emerald-700">✅ Net del PM (lo que te paga el administrador)</span><span className="text-xl font-extrabold text-emerald-700">{fm(stmtNet||totNet)}</span></div>
+            <div className="flex items-center gap-2 mt-1"><div className="flex-1 bg-emerald-200 rounded-full h-2"><div className="h-full bg-emerald-500 rounded-full" style={{width:pct(stmtNet||totNet,revenue)}}/></div><span className="text-xs font-bold text-emerald-600">{pct(stmtNet||totNet,revenue)} del revenue</span></div>
+          </div>
+
+          {/* LEVEL 3: Owner costs */}
+          {(annualMortgage>0||totExp>0)&&<div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
+            <div className="flex justify-between items-center mb-2"><span className="text-sm font-bold text-amber-700">🏠 Costos del Propietario (lo que pagas tú)</span><span className="text-xl font-extrabold text-amber-600">-{fm(annualMortgage+totExp)}</span></div>
+            <div className="grid grid-cols-3 gap-2">
+              {annualMortgage>0&&<div className="bg-white rounded-lg p-2 text-center"><div className="text-[9px] text-amber-600 font-semibold">Hipoteca</div><div className="text-xs font-extrabold text-amber-700">{fm(annualMortgage)}</div><div className="text-[8px] text-slate-400">{fm(mort.monthlyPayment)}/mes</div></div>}
+              {(()=>{const ins=expenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+(e.amount||0),0);return ins>0?<div className="bg-white rounded-lg p-2 text-center"><div className="text-[9px] text-amber-600 font-semibold">Seguro</div><div className="text-xs font-extrabold text-amber-700">{fm(ins)}</div><div className="text-[8px] text-slate-400">anual</div></div>:null})()}
+              {(()=>{const tax=expenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+(e.amount||0),0);return tax>0?<div className="bg-white rounded-lg p-2 text-center"><div className="text-[9px] text-amber-600 font-semibold">Impuestos</div><div className="text-xs font-extrabold text-amber-700">{fm(tax)}</div><div className="text-[8px] text-slate-400">anual</div></div>:null})()}
+              {(()=>{const rep=repairs.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);return rep>0?<div className="bg-white rounded-lg p-2 text-center"><div className="text-[9px] text-amber-600 font-semibold">Reparaciones</div><div className="text-xs font-extrabold text-amber-700">{fm(rep)}</div></div>:null})()}
+            </div>
+            <p className="text-[10px] text-amber-500 mt-2">Estos son gastos que tú como propietario pagas aparte de lo que descuenta el PM.</p>
+          </div>}
+
+          {/* FINAL: Real net */}
+          <div className={`rounded-xl p-4 border-2 ${cashFlow>=0?'bg-emerald-100 border-emerald-300':'bg-rose-100 border-rose-300'}`}>
+            <div className="flex justify-between items-center"><span className={`text-sm font-extrabold ${cashFlow>=0?'text-emerald-800':'text-rose-800'}`}>💎 NETO REAL (lo que queda en tu bolsillo)</span><span className={`text-2xl font-black ${cashFlow>=0?'text-emerald-700':'text-rose-700'}`}>{fm(cashFlow)}</span></div>
+            <p className={`text-[10px] mt-1 ${cashFlow>=0?'text-emerald-600':'text-rose-600'}`}>{cashFlow>=0?`La propiedad se paga sola y te genera ${fm(cashFlow)} al año (${fm(cashFlow/12)}/mes)`:`La propiedad necesita ${fm(Math.abs(cashFlow))} anuales de tu bolsillo (${fm(Math.abs(cashFlow)/12)}/mes)`}</p>
+          </div>
         </div>
+      </div>}
+
+      {/* MES A MES: tabla clara de la realidad */}
+      {stmts.length>0&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4">
+        <h3 className="text-sm font-bold text-slate-700 mb-1">📅 Mes a Mes — La Realidad</h3>
+        <p className="text-[10px] text-slate-400 mb-3">Cada fila: lo que produjo la propiedad, lo que se fue en gastos, y lo que te quedó después de hipoteca</p>
+        {(()=>{
+          const sorted=[...stmts].sort((a,b)=>b.year*100+b.month-a.year*100-a.month);
+          const filtered=dashYear==='all'?sorted:sorted.filter(s=>s.year===dashYear);
+          const monthMort=mort.monthlyPayment||0;
+          const totRev=filtered.reduce((s,x)=>s+(x.revenue||0),0);
+          const totNetPM=filtered.reduce((s,x)=>s+(x.net||0),0);
+          const totQueda=totNetPM-monthMort*filtered.length;
+          return <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="bg-slate-50/80">
+            <th className="py-3 px-3 text-[10px] font-bold text-slate-500 uppercase text-left">Mes</th>
+            <th className="py-3 px-3 text-[10px] font-bold text-blue-500 uppercase text-right">Produce</th>
+            <th className="py-3 px-3 text-[10px] font-bold text-rose-500 uppercase text-right">Gastos Op.</th>
+            <th className="py-3 px-3 text-[10px] font-bold text-emerald-600 uppercase text-right">Net del PM</th>
+            {monthMort>0&&<th className="py-3 px-3 text-[10px] font-bold text-red-500 uppercase text-right">Hipoteca</th>}
+            <th className="py-3 px-3 text-[10px] font-bold text-slate-800 uppercase text-right">Te Queda</th>
+          </tr></thead><tbody className="divide-y divide-slate-100">{filtered.slice(0,24).map(s=>{
+            const opex=(s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0);
+            const queda=(s.net||0)-monthMort;
+            return<tr key={s.id} className="hover:bg-blue-50/30 transition-colors">
+              <td className="py-2.5 px-3 font-bold text-slate-700">{M[s.month-1]} {s.year}</td>
+              <td className="py-2.5 px-3 text-right text-blue-600 font-semibold">{fm(s.revenue)}</td>
+              <td className="py-2.5 px-3 text-right text-rose-500">{fm(opex)}</td>
+              <td className="py-2.5 px-3 text-right text-emerald-600 font-semibold">{fm(s.net)}</td>
+              {monthMort>0&&<td className="py-2.5 px-3 text-right text-red-500">-{fm(monthMort)}</td>}
+              <td className={`py-2.5 px-3 text-right font-extrabold ${queda>=0?'text-emerald-700':'text-red-600'}`}>{fm(queda)}</td>
+            </tr>})}</tbody>
+            <tfoot><tr className="bg-slate-50 border-t-2 border-slate-200">
+              <td className="py-3 px-3 font-bold text-slate-600 text-xs">TOTAL ({filtered.length} meses)</td>
+              <td className="py-3 px-3 text-right font-bold text-blue-600 text-xs">{fm(totRev)}</td>
+              <td className="py-3 px-3 text-right font-bold text-rose-500 text-xs">{fm(totRev-totNetPM)}</td>
+              <td className="py-3 px-3 text-right font-bold text-emerald-600 text-xs">{fm(totNetPM)}</td>
+              {monthMort>0&&<td className="py-3 px-3 text-right font-bold text-red-500 text-xs">-{fm(monthMort*filtered.length)}</td>}
+              <td className={`py-3 px-3 text-right font-extrabold text-xs ${totQueda>=0?'text-emerald-700':'text-red-600'}`}>{fm(totQueda)}</td>
+            </tr></tfoot>
+          </table></div>})()}
+        {stmts.length>24&&<p className="text-[10px] text-slate-400 text-center mt-2">Mostrando últimos 24 meses. Usa el filtro de año para ver periodos específicos.</p>}
       </div>}
 
       {/* CHARTS ROW 1: Revenue & Net annual + Revenue mensual */}
@@ -637,19 +702,39 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
       </div>}
 
-      {/* P&L TABLE + MONTH RANKING + COSTS TREND */}
+      {/* P&L + RANKING + COSTS */}
       {relAnnual.length>0&&<>
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm col-span-2"><h3 className="text-sm font-bold text-slate-700 mb-3">📋 P&L Anual</h3>
-            <Tbl cols={[{label:'Año',render:r=><span className="font-extrabold text-slate-800">{r.year}{r.n<12?` (${r.n}m)`:''}</span>},{label:'Revenue',r:true,render:r=><span className="text-blue-600 font-bold">{fm(r.revenue)}</span>},{label:'Comisión',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},{label:'Elect.',r:true,render:r=>fm(r.duke)},{label:'HOA',r:true,render:r=>fm(r.hoa)},{label:'Maint',r:true,render:r=>fm(r.maintenance)},{label:'Net',r:true,render:r=><span className="font-extrabold text-emerald-600">{fm(r.net)}</span>},{label:'Margen',r:true,render:r=>{const m=r.revenue?r.net/r.revenue*100:0;return<span className={`font-bold ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(1)}%</span>}}]} rows={relAnnual}/>
-          </div>
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">🏆 Ranking Meses</h3>
-            {monthRank.length>0?<div className="space-y-1">{monthRank.map((r,i)=><div key={r.month} className={`flex items-center justify-between py-1.5 px-3 rounded-lg text-xs ${i<3?'bg-emerald-50 font-bold':i>=monthRank.length-3?'bg-rose-50':'bg-slate-50'}`}><div className="flex items-center gap-2"><span className="text-slate-400 w-4 text-right">{i+1}</span><span className={i<3?'text-emerald-700':i>=monthRank.length-3?'text-rose-600':'text-slate-600'}>{r.month}</span></div><span className={i<3?'text-emerald-600':i>=monthRank.length-3?'text-rose-500':'text-slate-500'}>{fm(r.avg)}</span></div>)}</div>:<p className="text-xs text-slate-400 text-center py-8">Necesita 12 meses de datos</p>}
-          </div>
+        {/* Annual P&L with 3 levels */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4">
+          <h3 className="text-sm font-bold text-slate-700 mb-3">📋 Resumen Anual — Revenue → Net PM → Neto Real</h3>
+          <div className="overflow-x-auto"><table className="w-full"><thead><tr className="bg-slate-50/80">
+            <th className="py-3 px-3 text-[10px] font-bold text-slate-500 uppercase text-left">Año</th>
+            <th className="py-3 px-3 text-[10px] font-bold text-blue-500 uppercase text-right">Revenue</th>
+            <th className="py-3 px-3 text-[10px] font-bold text-rose-500 uppercase text-right">Gastos PM</th>
+            <th className="py-3 px-3 text-[10px] font-bold text-emerald-500 uppercase text-right">Net PM</th>
+            <th className="py-3 px-3 text-[10px] font-bold text-amber-500 uppercase text-right">Hipoteca</th>
+            <th className="py-3 px-3 text-[10px] font-bold text-slate-500 uppercase text-right">Otros Owner</th>
+            <th className="py-3 px-3 text-[10px] font-bold text-emerald-700 uppercase text-right">Neto Real</th>
+            <th className="py-3 px-3 text-[10px] font-bold text-slate-500 uppercase text-right">Margen</th>
+          </tr></thead><tbody className="divide-y divide-slate-100">
+            {relAnnual.map(y=>{const gastosPM=y.commission+y.duke+y.water+y.hoa+y.maintenance+y.vendor;const netoReal=y.net-annualMortgage*(y.n/12);const mg=y.revenue?(netoReal/y.revenue*100):0;return<tr key={y.year} className="hover:bg-blue-50/30">
+              <td className="py-3 px-3 text-sm font-extrabold text-slate-800">{y.year}{y.n<12?` (${y.n}m)`:''}</td>
+              <td className="py-3 px-3 text-sm font-bold text-blue-600 text-right">{fm(y.revenue)}</td>
+              <td className="py-3 px-3 text-sm text-rose-500 text-right">-{fm(gastosPM)}</td>
+              <td className="py-3 px-3 text-sm font-bold text-emerald-600 text-right">{fm(y.net)}</td>
+              <td className="py-3 px-3 text-sm text-amber-600 text-right">{annualMortgage>0?'-'+fm(annualMortgage*(y.n/12)):'—'}</td>
+              <td className="py-3 px-3 text-sm text-slate-500 text-right">{totExp>0?'-'+fm(totExp):'—'}</td>
+              <td className={`py-3 px-3 text-sm font-extrabold text-right ${netoReal>=0?'text-emerald-700':'text-rose-600'}`}>{fm(netoReal)}</td>
+              <td className={`py-3 px-3 text-sm font-bold text-right ${mg<0?'text-rose-500':mg<30?'text-amber-600':'text-emerald-600'}`}>{mg.toFixed(0)}%</td>
+            </tr>})}
+          </tbody></table></div>
+          <p className="text-[9px] text-slate-400 mt-2">Revenue = ingreso bruto · Gastos PM = comisión + utilities + HOA + maintenance · Net PM = lo que te paga el administrador · Neto Real = lo que queda después de hipoteca y gastos del owner</p>
         </div>
 
-        {/* Costs trend + Break-even */}
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">🏆 Ranking Meses</h3>
+            {monthRank.length>0?<div className="space-y-1">{monthRank.map((r,i)=><div key={r.month} className={`flex items-center justify-between py-1.5 px-3 rounded-lg text-xs ${i<3?'bg-emerald-50 font-bold':i>=monthRank.length-3?'bg-rose-50':'bg-slate-50'}`}><div className="flex items-center gap-2"><span className="text-slate-400 w-4 text-right">{i+1}</span><span className={i<3?'text-emerald-700':i>=monthRank.length-3?'text-rose-600':'text-slate-600'}>{r.month}</span></div><span className={i<3?'text-emerald-600':i>=monthRank.length-3?'text-rose-500':'text-slate-500'}>{fm(r.avg)}</span></div>)}</div>:<p className="text-xs text-slate-400 text-center py-8">Necesita 12 meses</p>}
+          </div>
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">📊 Tendencia de Costos</h3>
             <ResponsiveContainer width="100%" height={180}><ComposedChart data={relAnnual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/><Bar dataKey="hoa" name="HOA" fill="#7C3AED" radius={[4,4,0,0]}/><Bar dataKey="duke" name="Electricidad" fill="#F59E0B" radius={[4,4,0,0]}/><Line dataKey="commission" name="Comisión" stroke="#DC2626" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
           </div>
@@ -657,8 +742,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             {(()=>{const lf=annual.filter(y=>y.n===12);if(!lf.length)return<p className="text-xs text-slate-400 text-center py-8">Necesita 1 año completo</p>;const ly=lf[lf.length-1];const tc=ly.commission+ly.duke+ly.water+ly.hoa+ly.maintenance+ly.vendor+annualMortgage;const adr=ly.revenue/365;const bed=adr>0?Math.ceil(tc/adr):0;const beo=bed>0?((bed/365)*100):0;return<div className="grid grid-cols-2 gap-3">
               <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Break-Even</div><div className="text-2xl font-extrabold text-amber-700">{bed}</div><div className="text-[10px] text-amber-500">noches/año</div></div>
               <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100"><div className="text-[10px] text-blue-600 font-bold uppercase">Ocupación Mín.</div><div className="text-2xl font-extrabold text-blue-700">{beo.toFixed(0)}%</div><div className="text-[10px] text-blue-500">para cubrir costos</div></div>
-              <div className="bg-slate-50 rounded-xl p-3 text-center border"><div className="text-[10px] text-slate-500 font-bold uppercase">ADR ({ly.year})</div><div className="text-2xl font-extrabold text-slate-800">{fm(adr)}</div><div className="text-[10px] text-slate-400">/noche</div></div>
-              <div className={`rounded-xl p-3 text-center border ${ly.net>0?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}><div className={`text-[10px] font-bold uppercase ${ly.net>0?'text-emerald-600':'text-rose-600'}`}>Net {ly.year}</div><div className={`text-2xl font-extrabold ${ly.net>0?'text-emerald-700':'text-rose-700'}`}>{fm(ly.net)}</div><div className={`text-[10px] ${ly.net>0?'text-emerald-500':'text-rose-500'}`}>{ly.revenue?((ly.net/ly.revenue)*100).toFixed(0)+'% margen':'—'}</div></div>
+              <div className="bg-slate-50 rounded-xl p-3 text-center border col-span-2"><div className="text-[10px] text-slate-500 font-bold uppercase">ADR Promedio ({ly.year})</div><div className="text-xl font-extrabold text-slate-800">{fm(adr)}<span className="text-sm font-normal text-slate-400"> /noche</span></div></div>
             </div>})()}
           </div>
         </div>
