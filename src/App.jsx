@@ -456,7 +456,6 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div className="flex justify-between items-start mb-4">
         <div><h1 className="text-[22px] font-extrabold text-slate-800">{prop.name} <button onClick={()=>{setSettingsForm(null);setView('settings')}} className="inline-flex items-center text-slate-300 hover:text-blue-500 ml-1 align-middle"><Pencil size={14}/></button></h1><p className="text-sm text-slate-400">{prop.address}, {prop.city}, {prop.state} · {prop.bedrooms||'?'}BR/{prop.bathrooms||'?'}BA {prop.manager&&`· PM: ${prop.manager} (${prop.managerCommission||15}%)`} · <span className="text-slate-500">Compra: {fm(prop.purchasePrice)}</span>{marketValue!==prop.purchasePrice&&<span className="text-emerald-600 font-semibold"> · Mercado: {fm(marketValue)}</span>}</p></div>
         <div className="flex gap-2">
-          <button onClick={()=>{setNf({date:'',month:'',grossAmount:''});setModal('income')}} className="px-3.5 py-2 bg-emerald-600 text-white text-xs rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"><Plus size={13}/> Ingreso</button>
           <button onClick={()=>{setEf({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="px-3.5 py-2 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 flex items-center gap-1.5 shadow-sm"><Plus size={13}/> Gasto</button>
           <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="px-3.5 py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Upload size={13}/> Statement</button>
         </div>
@@ -688,12 +687,51 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {!expenses.length&&<Empty icon={Receipt} title="Sin gastos" desc="Registra gastos fijos y adicionales." action="Registrar" onAction={()=>{setEf({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}}/>}
     </>}
 
-    {/* ═══ INCOME ═══ */}
+    {/* ═══ INCOME (powered by statements) ═══ */}
     {view==='income'&&<>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">💰 Ingresos</h1><button onClick={()=>{setNf({date:'',month:'',grossAmount:''});setModal('income')}} className="px-4 py-2.5 bg-emerald-600 text-white text-xs rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Ingreso</button></div>
-      {income.length>0?<><div className="grid grid-cols-3 gap-3 mb-5"><KPI label="Bruto" value={fm(totGross)} color="blue"/><KPI label="Comisiones" value={fm(totGross-totNet)} color="red"/><KPI label="Neto" value={fm(totNet)} color="green"/></div>
-        <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},{label:'Mes',key:'month',cls:'font-medium'},{label:'Bruto',r:true,render:r=>fm(r.grossAmount)},{label:`Comisión (${prop.managerCommission||15}%)`,r:true,render:r=><span className="text-rose-500">-{fm(r.hostUFee)}</span>},{label:'Neto',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.netAmount)}</span>},...(partners.length>1?[{label:'Por Socio',r:true,render:r=><span className="text-amber-600">{fm(r.netAmount/partners.length)}</span>}]:[])]} rows={income} onDel={del} dc="income" onEdit={r=>{setNf({date:r.date||'',month:r.month||'',grossAmount:String(r.grossAmount||'')});setEditId(r.id);setModal('income')}}/>
-      </>:<Empty icon={DollarSign} title="Sin ingresos" desc="Registra ingresos." action="Registrar" onAction={()=>{setNf({date:'',month:'',grossAmount:''});setModal('income')}}/>}
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">💰 Ingresos</h1><p className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full">Datos de Statements</p></div>
+
+      {stmts.length>0?(()=>{
+        const sorted=[...stmts].sort((a,b)=>b.year*100+b.month-a.year*100-a.month);
+        const totR=stmts.reduce((s,x)=>s+(x.revenue||0),0);
+        const totC=stmts.reduce((s,x)=>s+(x.commission||0),0);
+        const totN=stmts.reduce((s,x)=>s+(x.net||0),0);
+        const avgMonth=stmts.length>0?totR/stmts.length:0;
+        const avgNet=stmts.length>0?totN/stmts.length:0;
+        return <>
+        <div className="grid grid-cols-5 gap-3 mb-5">
+          <KPI label="Revenue Bruto" value={fm(totR)} sub={stmts.length+' meses'} color="blue"/>
+          <KPI label="Comisiones PM" value={fm(totC)} sub={totR>0?((totC/totR)*100).toFixed(1)+'% del revenue':''} color="red"/>
+          <KPI label="Net al Owner" value={fm(totN)} sub={totR>0?((totN/totR)*100).toFixed(1)+'% margen':''} color="green"/>
+          <KPI label="Promedio/Mes" value={fm(avgMonth)} sub="revenue bruto" color="cyan"/>
+          <KPI label="Net Promedio/Mes" value={fm(avgNet)} sub="net al owner" color="green"/>
+        </div>
+
+        {/* Revenue by year */}
+        {annual.length>0&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4"><h3 className="text-sm font-bold text-slate-700 mb-3">Revenue por Año</h3>
+          <div className="grid gap-2">{annual.map(y=>{const m=y.revenue?(y.net/y.revenue*100):0;return<div key={y.year} className="flex items-center gap-3 py-3 px-4 bg-slate-50 rounded-xl">
+            <span className="font-extrabold text-slate-800 w-12">{y.year}</span>
+            <div className="flex-1 bg-slate-200 rounded-full h-2.5 overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{width:Math.min(100,(y.revenue/Math.max(...annual.map(a=>a.revenue))*100))+'%'}}/></div>
+            <span className="text-sm font-bold text-blue-600 w-24 text-right">{fm(y.revenue)}</span>
+            <span className="text-sm font-bold text-emerald-600 w-24 text-right">{fm(y.net)}</span>
+            <span className={`text-xs font-bold w-14 text-right ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(0)}%</span>
+            <span className="text-[10px] text-slate-400 w-8">{y.n}m</span>
+          </div>})}</div>
+        </div>}
+
+        {/* Monthly detail table */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">Detalle Mensual</h3>
+          <Tbl cols={[
+            {label:'Periodo',render:r=><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>},
+            {label:'Revenue',r:true,render:r=><span className="text-blue-600 font-semibold">{fm(r.revenue)}</span>},
+            {label:'Comisión',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},
+            {label:'Gastos Op.',r:true,render:r=><span className="text-rose-400">{fm((r.duke||0)+(r.water||0)+(r.hoa||0)+(r.maintenance||0)+(r.vendor||0))}</span>},
+            {label:'Net',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.net)}</span>},
+            {label:'Margen',r:true,render:r=>{const m=r.revenue?(r.net/r.revenue*100):0;return<span className={`font-bold ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(0)}%</span>}},
+            ...(partners.length>1?partners.map(p=>({label:p.name.split(' ')[0]+' ('+p.ownership+'%)',r:true,render:r=><span className="text-sm" style={{color:p.color}}>{fm((r.net||0)*(p.ownership/100))}</span>})):[]),
+          ]} rows={sorted}/>
+        </div>
+      </>})():<Empty icon={DollarSign} title="Sin ingresos" desc="Los ingresos se alimentan de los Statements. Ve a Statements y carga los PDFs de tu property manager." action="Ir a Statements" onAction={()=>setView('statements')}/>}
     </>}
 
     {/* ═══ MORTGAGE ═══ */}
@@ -1020,12 +1058,6 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <Inp label="Monto (USD)" value={ef.amount} onChange={v=>ue('amount',v)} prefix="$" type="number"/>
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de gasto</label><div className="grid grid-cols-2 gap-2">{[['fixed','🔄 Fijo'],['additional','➕ Adicional']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('type',v)} className={`py-2.5 rounded-xl border-2 text-sm font-medium transition ${ef.type===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={ef.paidBy} onChange={v=>ue('paidBy',v)}/></div>
-    </Mdl>}
-
-    {modal==='income'&&<Mdl title={editId?'✏️ Editar Ingreso':'Registrar Ingreso'} grad="from-emerald-500 to-emerald-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const g=parseFloat(nf.grossAmount);const fee=(prop.managerCommission||15)/100;const data={date:nf.date,month:nf.month,grossAmount:g,hostUFee:g*fee,netAmount:g*(1-fee)};if(editId){update('income',editId,data)}else{save('income',data)}}} disabled={!nf.grossAmount} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <div className="grid grid-cols-2 gap-3"><Inp label="Fecha" value={nf.date} onChange={v=>un('date',v)} type="date"/><Inp label="Mes" value={nf.month} onChange={v=>un('month',v)} placeholder="Ej: Febrero 2025"/></div>
-      <Inp label="Ingreso Bruto" value={nf.grossAmount} onChange={v=>un('grossAmount',v)} prefix="$" type="number"/>
-      {nf.grossAmount&&<div className="bg-slate-50 rounded-2xl p-4 space-y-2 text-sm border border-slate-100"><div className="flex justify-between"><span className="text-slate-400">Comisión {prop.manager} ({prop.managerCommission||15}%)</span><span className="text-rose-500 font-semibold">-{fm(nf.grossAmount*(prop.managerCommission||15)/100)}</span></div><div className="flex justify-between font-bold border-t border-slate-200 pt-2"><span>Neto</span><span className="text-emerald-600">{fm(nf.grossAmount*(1-(prop.managerCommission||15)/100))}</span></div>{partners.length>1&&<div className="flex justify-between text-amber-600"><span>Por socio</span><span>{fm(nf.grossAmount*(1-(prop.managerCommission||15)/100)/partners.length)}</span></div>}</div>}
     </Mdl>}
 
     {modal==='contribution'&&<Mdl title={editId?'✏️ Editar Aporte':'Aporte de Capital'} grad="from-purple-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...cf,amount:parseFloat(cf.amount),type:'contribution'};if(editId){update('contributions',editId,data)}else{save('contributions',data)}}} disabled={!cf.amount} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
