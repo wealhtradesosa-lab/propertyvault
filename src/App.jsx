@@ -519,14 +519,26 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-4">📊 Revenue vs Net — Anual</h3>
           <ResponsiveContainer width="100%" height={200}><ComposedChart data={annual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[6,6,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[6,6,0,0]}/></ComposedChart></ResponsiveContainer>
         </div>
-        {/* Revenue mensual — clean line chart with year selector */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">📈 Revenue Mensual</h3>
-          {Object.keys(monthly).length>0&&<ResponsiveContainer width="100%" height={200}>
-            <ComposedChart data={M.map((m,i)=>{const e={month:m};Object.keys(monthly).forEach(y=>{if(monthly[y].rev[i]>0)e['r'+y]=monthly[y].rev[i]});return e})}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="month" tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
-              {Object.keys(monthly).sort().map((y,i)=><Line key={y} dataKey={'r'+y} name={y} stroke={C[i%C.length]} strokeWidth={2} dot={{r:2.5}} connectNulls/>)}
-            </ComposedChart>
-          </ResponsiveContainer>}
+        {/* Revenue mensual — single year selector for clarity */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-bold text-slate-700">📈 Revenue Mensual</h3>
+            <div className="flex gap-1">{Object.keys(monthly).sort().map(y=>
+              <button key={y} onClick={()=>setDashYear(parseInt(y))} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${dashYear===parseInt(y)?'bg-blue-600 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{y}</button>
+            )}</div>
+          </div>
+          {(()=>{
+            const yr=dashYear!=='all'?dashYear:parseInt(Object.keys(monthly).sort().pop()||0);
+            const md=monthly[yr];if(!md)return<p className="text-xs text-slate-400 text-center py-8">Selecciona un año</p>;
+            const data=M.map((m,i)=>({month:m,revenue:md.rev[i]||0,net:md.net[i]||0})).filter(d=>d.revenue>0||d.net>0);
+            if(!data.length)return<p className="text-xs text-slate-400 text-center py-8">Sin datos para {yr}</p>;
+            return<ResponsiveContainer width="100%" height={200}>
+              <ComposedChart data={data}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="month" tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
+                <Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[4,4,0,0]} opacity={0.7}/>
+                <Bar dataKey="net" name="Net" fill="#059669" radius={[4,4,0,0]}/>
+              </ComposedChart>
+            </ResponsiveContainer>;
+          })()}
         </div>
       </div>}
 
