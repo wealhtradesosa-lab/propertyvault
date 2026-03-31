@@ -476,6 +476,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {/* ═══ DASHBOARD ═══ */}
     {/* ═══ DASHBOARD ═══ */}
     {/* ═══ DASHBOARD ═══ */}
+    {/* ═══ DASHBOARD ═══ */}
     {view==='dashboard'&&(()=>{
       const fy=dashYear==='all'?null:annual.find(y=>y.year===dashYear);
       const fStmts=dashYear==='all'?stmts:stmts.filter(s=>s.year===dashYear);
@@ -491,187 +492,242 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const fOpEx=fComm+fDuke+fHoa+fMaint+fWater+fVendor;
       const fNoi=fRev-fOpEx;
       const mMort=mort.monthlyPayment||0;
-      const fMortPeriod=mMort*n;
-      const fCF=fNet-fMortPeriod;
-      const fCFmo=n>0?fCF/n:0;
-      const annualized=n>0&&n<12?(fCF/n)*12:fCF;
+      const fMortP=mMort*n;
+      const insExp=expenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+(e.amount||0),0);
+      const taxExp=expenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+(e.amount||0),0);
+      const repExp=repairs.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+      const ownerCosts=fMortP+insExp+taxExp+repExp;
+      const fUtil=fNet-fMortP-insExp-taxExp-repExp;
+      const fUtilMo=n>0?fUtil/n:0;
       const fMargin=fRev>0?(fNet/fRev*100):0;
-      const fCapR=marketValue>0?(n>=12?fNoi:(fNoi/Math.max(n,1)*12))/marketValue*100:0;
-      const fCoc=totCont>0?(annualized/totCont*100):0;
-      const fDscr=mMort>0&&fNoi>0?((n>=12?fNoi:(fNoi/Math.max(n,1)*12))/(mMort*12)):0;
       const partial=n>0&&n<12;
+      const proyAnual=partial?(fUtil/n)*12:fUtil;
+      const fCapR=marketValue>0?((partial?fNoi/n*12:fNoi)/marketValue*100):0;
+      const fCoc=totCont>0?(proyAnual/totCont*100):0;
+      const fDscr=mMort>0?((partial?fNoi/n*12:fNoi)/(mMort*12)):0;
+      const estNights=n>0?Math.round(fRev/(n>0?fRev/n/150*30:1)):0;
+      const adr=fRev>0&&n>0?fRev/(n*22):0;
       const sorted=[...fStmts].sort((a,b)=>b.year*100+b.month-a.year*100-a.month);
+      const prevYear=dashYear!=='all'&&annual.find(y=>y.year===dashYear-1);
 
       return <>
       {/* Print header */}
-      <div className="hidden print-header"><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}><div><h1 style={{fontSize:'18px',fontWeight:800,margin:0}}>OwnerDesk — {prop.name}</h1><p style={{fontSize:'9px',color:'#64748B',margin:'3px 0 0'}}>{prop.address}, {prop.city} {prop.state} · {prop.manager?`PM: ${prop.manager}`:''} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div><div style={{fontSize:'20px',fontWeight:900,color:'#1E3A5F'}}>OD</div></div></div>
+      <div className="hidden print-header"><div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}><div><h1 style={{fontSize:'18px',fontWeight:800,margin:0}}>{prop.name} — Investment Summary</h1><p style={{fontSize:'9px',color:'#64748B',margin:'3px 0 0'}}>{prop.address}, {prop.city} {prop.state} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div><div style={{fontSize:'18px',fontWeight:900,color:'#1E3A5F'}}>OD</div></div></div>
 
       {/* Header */}
       <div className="flex justify-between items-start mb-5 no-print">
-        <div><h1 className="text-xl font-extrabold text-slate-800 tracking-tight">{prop.name}</h1><p className="text-xs text-slate-400 mt-0.5">{prop.address}, {prop.city} {prop.state} {prop.manager&&`· ${prop.manager} (${prop.managerCommission||15}%)`}</p></div>
+        <div>
+          <h1 className="text-xl font-extrabold text-slate-800">{prop.name}</h1>
+          <p className="text-xs text-slate-400 mt-0.5">{prop.address}, {prop.city} {prop.state} {prop.manager&&`· Administrador: ${prop.manager}`}</p>
+        </div>
         <div className="flex gap-2">
-          <button onClick={()=>window.print()} className="px-3 py-2 bg-slate-100 text-slate-600 text-xs rounded-xl font-bold hover:bg-slate-200 flex items-center gap-1.5"><Printer size={13}/> PDF</button>
-          <button onClick={()=>{setEf({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="px-3 py-2 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 flex items-center gap-1.5 shadow-sm"><Plus size={13}/> Gasto</button>
-          <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="px-3 py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Upload size={13}/> Statement</button>
+          <button onClick={()=>window.print()} className="px-3 py-2 bg-slate-100 text-slate-600 text-xs rounded-xl font-bold hover:bg-slate-200 flex items-center gap-1.5"><Printer size={13}/> Imprimir</button>
+          <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="px-3 py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Upload size={13}/> Statements</button>
         </div>
       </div>
 
-      {/* Period selector */}
+      {/* Period tabs */}
       {annual.length>0&&<div className="flex items-center gap-1.5 mb-5 no-print">
-        <button onClick={()=>setDashYear('all')} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear==='all'?'bg-slate-800 text-white shadow-md':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>Acumulado</button>
-        {annual.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear===y.year?'bg-slate-800 text-white shadow-md':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
+        <button onClick={()=>setDashYear('all')} className={`px-4 py-2 rounded-xl text-xs font-bold transition ${dashYear==='all'?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>Acumulado</button>
+        {annual.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-4 py-2 rounded-xl text-xs font-bold transition ${dashYear===y.year?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
       </div>}
 
-      {fRev>0&&<>
-      {/* ── SECTION 1: Performance Summary ── */}
-      <div className="grid grid-cols-4 gap-3 mb-5">
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm border-l-4 border-l-blue-500">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Gross Revenue</div>
-          <div className="text-2xl font-extrabold text-slate-800 mt-1">{fm(fRev)}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">{n} {n===1?'mes':'meses'} · {fm(n>0?fRev/n:0)}/mes</div>
+      {fRev>0?<>
+
+      {/* ════════════════════════════════════════════════
+           SECCIÓN 1: RESUMEN EJECUTIVO
+           La propiedad generó → costó operarla → quedó libre
+         ════════════════════════════════════════════════ */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
+        <div className="grid grid-cols-3 divide-x divide-slate-100">
+          <div className="p-5 text-center">
+            <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest mb-2">La propiedad generó</div>
+            <div className="text-3xl font-extrabold text-slate-800">{fm(fRev)}</div>
+            <div className="text-xs text-slate-400 mt-1">{fm(n>0?fRev/n:0)} promedio mensual · {n} meses</div>
+          </div>
+          <div className="p-5 text-center">
+            <div className="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-2">Costó operarla</div>
+            <div className="text-3xl font-extrabold text-rose-600">{fm(fOpEx+ownerCosts)}</div>
+            <div className="text-xs text-slate-400 mt-1">Operación {fm(fOpEx)} + Owner {fm(ownerCosts)}</div>
+          </div>
+          <div className={`p-5 text-center ${fUtil>=0?'bg-emerald-50/50':'bg-rose-50/50'}`}>
+            <div className={`text-[10px] font-bold uppercase tracking-widest mb-2 ${fUtil>=0?'text-emerald-500':'text-rose-500'}`}>Utilidad libre</div>
+            <div className={`text-3xl font-extrabold ${fUtil>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fUtil)}</div>
+            <div className={`text-xs mt-1 ${fUtil>=0?'text-emerald-500':'text-rose-400'}`}>{fm(fUtilMo)}/mes {partial?`· Proy. anual: ${fm(proyAnual)}`:''}</div>
+          </div>
         </div>
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Net Income</div>
-          <div className="text-2xl font-extrabold text-emerald-700 mt-1">{fm(fNet)}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Después de gastos operativos · Margen {fMargin.toFixed(0)}%</div>
-        </div>
-        <div className={`bg-white rounded-2xl p-4 border border-slate-200 shadow-sm border-l-4 ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cash Flow {partial?'(parcial)':''}</div>
-          <div className={`text-2xl font-extrabold mt-1 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fCF)}</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">{fm(fCFmo)}/mes {partial?`· Proy. anual: ${fm(annualized)}`:''}</div>
-        </div>
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm border-l-4 border-l-purple-500">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Return (CoC) {partial?'proy.':''}</div>
-          <div className={`text-2xl font-extrabold mt-1 ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
-          <div className="text-[10px] text-slate-400 mt-0.5">Cash flow / Capital invertido ({fm(totCont)})</div>
-        </div>
+        {prevYear&&<div className="bg-slate-50 px-5 py-2.5 border-t border-slate-100 flex items-center gap-4 text-[11px]">
+          <span className="text-slate-400">vs {prevYear.year}:</span>
+          <span className={`font-bold ${fRev>prevYear.revenue?'text-emerald-600':'text-rose-500'}`}>Revenue {fRev>prevYear.revenue?'▲':'▼'}{Math.abs(((fRev-prevYear.revenue)/prevYear.revenue)*100).toFixed(0)}%</span>
+          <span className={`font-bold ${fNet>prevYear.net?'text-emerald-600':'text-rose-500'}`}>Net {fNet>prevYear.net?'▲':'▼'}{Math.abs(((fNet-prevYear.net)/prevYear.net)*100).toFixed(0)}%</span>
+          <span className={`font-bold ${fMargin>(prevYear.revenue?prevYear.net/prevYear.revenue*100:0)?'text-emerald-600':'text-rose-500'}`}>Margen {fMargin.toFixed(0)}% vs {prevYear.revenue?(prevYear.net/prevYear.revenue*100).toFixed(0):0}%</span>
+        </div>}
       </div>
 
-      {/* ── SECTION 2: P&L Waterfall ── */}
+      {/* ════════════════════════════════════════════════
+           SECCIÓN 2: INGRESOS vs GASTOS vs UTILIDAD
+           Desglose claro + Métricas de inversión al lado
+         ════════════════════════════════════════════════ */}
       <div className="grid grid-cols-3 gap-4 mb-5">
-        <div className="col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="bg-slate-800 text-white px-5 py-3 flex justify-between items-center">
-            <span className="text-xs font-bold uppercase tracking-wider">Estado de Resultados{dashYear!=='all'?` — ${dashYear}`:''}{partial?` (${n} meses)`:''}</span>
-            <span className="text-[10px] text-slate-400">{prop.name}</span>
-          </div>
-          <div className="p-5 space-y-1 text-sm">
-            <div className="flex justify-between py-2 px-3 bg-blue-50 rounded-lg"><span className="font-bold text-blue-800">Gross Revenue</span><span className="font-extrabold text-blue-800">{fm(fRev)}</span></div>
-            <div className="px-3 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">Operating Expenses</div>
-            {[[`Comisión PM (${prop.managerCommission||15}%)`,fComm],['Electricidad',fDuke],['Agua',fWater],['HOA',fHoa],['Mantenimiento',fMaint],['Vendor / Otros',fVendor]].filter(([_,v])=>v>0).map(([l,v])=><div key={l} className="flex justify-between py-1.5 px-3"><span className="text-slate-600">{l}</span><span className="text-slate-500">({fm(v)})</span></div>)}
-            <div className="flex justify-between py-2 px-3 bg-slate-50 rounded-lg border border-slate-100"><span className="font-bold text-slate-700">Total OpEx</span><span className="font-bold text-rose-600">({fm(fOpEx)})</span></div>
-            <div className="flex justify-between py-2.5 px-3 bg-emerald-50 rounded-lg border border-emerald-100"><span className="font-bold text-emerald-800">Net Operating Income (NOI)</span><span className="font-extrabold text-emerald-800">{fm(fNoi)}</span></div>
-            {mMort>0&&<>
-              <div className="px-3 py-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Debt Service & Owner Costs</div>
-              <div className="flex justify-between py-1.5 px-3"><span className="text-slate-600">Mortgage ({fm(mMort)}/mes × {n})</span><span className="text-slate-500">({fm(fMortPeriod)})</span></div>
-              {(()=>{const ins=expenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+(e.amount||0),0);return ins>0?<div className="flex justify-between py-1.5 px-3"><span className="text-slate-600">Insurance</span><span className="text-slate-500">({fm(ins)})</span></div>:null})()}
-              {(()=>{const tax=expenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+(e.amount||0),0);return tax>0?<div className="flex justify-between py-1.5 px-3"><span className="text-slate-600">Property Tax</span><span className="text-slate-500">({fm(tax)})</span></div>:null})()}
+        <div className="col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Ingresos, Gastos y Utilidad{partial?` (${n} meses)`:''}</h3>
+          <div className="space-y-1 text-[13px]">
+            <div className="flex justify-between py-2.5 px-4 bg-blue-50 rounded-xl"><span className="font-bold text-blue-800">Ingreso Bruto (renta + fees)</span><span className="font-extrabold text-blue-800">{fm(fRev)}</span></div>
+            <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-1">— Gastos de operación (descuenta el administrador)</div>
+            {fComm>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Comisión administrador ({prop.managerCommission||15}%)</span><span className="text-rose-500">-{fm(fComm)}</span></div>}
+            {fDuke>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Electricidad</span><span className="text-rose-500">-{fm(fDuke)}</span></div>}
+            {fWater>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Agua</span><span className="text-rose-500">-{fm(fWater)}</span></div>}
+            {fHoa>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">HOA (cuota comunidad)</span><span className="text-rose-500">-{fm(fHoa)}</span></div>}
+            {fMaint>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Mantenimiento</span><span className="text-rose-500">-{fm(fMaint)}</span></div>}
+            {fVendor>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Otros / Vendor</span><span className="text-rose-500">-{fm(fVendor)}</span></div>}
+            <div className="flex justify-between py-2 px-4 bg-slate-50 rounded-lg"><span className="font-semibold text-slate-600">Total costos de operación</span><span className="font-bold text-rose-600">-{fm(fOpEx)} <span className="text-[10px] text-slate-400">({fRev>0?(fOpEx/fRev*100).toFixed(0):0}%)</span></span></div>
+            <div className="flex justify-between py-2.5 px-4 bg-emerald-50 rounded-xl"><span className="font-bold text-emerald-800">Lo que te paga el administrador</span><span className="font-extrabold text-emerald-800">{fm(fNet)}</span></div>
+            {(fMortP>0||insExp>0||taxExp>0||repExp>0)&&<>
+              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-1 mt-1">— Gastos del propietario (pagas tú)</div>
+              {fMortP>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Hipoteca ({fm(mMort)}/mes × {n} meses)</span><span className="text-red-500">-{fm(fMortP)}</span></div>}
+              {insExp>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Seguro de la propiedad</span><span className="text-red-500">-{fm(insExp)}</span></div>}
+              {taxExp>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Impuestos (Property Tax)</span><span className="text-red-500">-{fm(taxExp)}</span></div>}
+              {repExp>0&&<div className="flex justify-between py-1.5 px-4"><span className="text-slate-500">Reparaciones y mejoras</span><span className="text-red-500">-{fm(repExp)}</span></div>}
             </>}
-            <div className={`flex justify-between py-3 px-4 rounded-lg mt-1 border-2 ${fCF>=0?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
-              <span className={`font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>Net Cash Flow</span>
-              <div><span className={`text-xl font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{fm(fCF)}</span><span className={`text-xs ml-2 ${fCF>=0?'text-emerald-500':'text-rose-500'}`}>{fm(fCFmo)}/mo</span></div>
+            <div className={`flex justify-between py-3 px-4 rounded-xl mt-1 border-2 ${fUtil>=0?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
+              <span className={`font-extrabold ${fUtil>=0?'text-emerald-800':'text-rose-800'}`}>Utilidad Libre</span>
+              <div className="text-right"><span className={`text-xl font-black ${fUtil>=0?'text-emerald-700':'text-rose-700'}`}>{fm(fUtil)}</span><span className={`text-xs ml-2 ${fUtil>=0?'text-emerald-500':'text-rose-500'}`}>{fm(fUtilMo)}/mes</span></div>
             </div>
-            {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded-lg py-2 mt-2">Datos parciales ({n} meses). Proyección 12 meses: <b className={annualized>=0?'text-emerald-600':'text-rose-500'}>{fm(annualized)}</b>/año</div>}
+            {partial&&<div className="bg-slate-50 rounded-lg py-2 px-4 mt-2 text-center text-[10px] text-slate-400">
+              Periodo parcial ({n} meses) · Proyección 12 meses: <b className={proyAnual>=0?'text-emerald-600':'text-rose-500'}>{fm(proyAnual)}</b>
+            </div>}
           </div>
         </div>
 
-        {/* Right column: Key Metrics */}
+        {/* Métricas */}
         <div className="space-y-3">
+          {/* Propiedad y Patrimonio */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Propiedad</div>
-            <div className="space-y-2.5">
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Precio Compra</span><span className="text-xs font-bold text-slate-700">{fm(prop.purchasePrice)}</span></div>
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Valor de Mercado</span><span className="text-xs font-bold text-slate-800">{fm(marketValue)}</span></div>
-              {appreciation!==0&&<div className="flex justify-between"><span className="text-xs text-slate-500">Apreciación</span><span className={`text-xs font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{appreciation.toFixed(1)}% ({fm(marketValue-prop.purchasePrice)})</span></div>}
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Equity</span><span className="text-xs font-bold text-emerald-600">{fm(realEquity)}</span></div>
-              {mort.balance>0&&<div className="flex justify-between"><span className="text-xs text-slate-500">Mortgage Balance</span><span className="text-xs font-bold text-slate-600">{fm(mort.balance)}</span></div>}
-              {realLTV>0&&<div className="flex justify-between"><span className="text-xs text-slate-500">LTV</span><span className={`text-xs font-bold ${realLTV>80?'text-rose-500':realLTV>60?'text-amber-500':'text-emerald-600'}`}>{realLTV.toFixed(0)}%</span></div>}
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Propiedad</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Valor de mercado</span><span className="text-xs font-extrabold text-slate-800">{fm(marketValue)}</span></div>
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Precio de compra</span><span className="text-xs font-bold text-slate-500">{fm(prop.purchasePrice)}</span></div>
+              {appreciation!==0&&<div className="flex justify-between"><span className="text-xs text-slate-500">Valorización</span><span className={`text-xs font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{fm(marketValue-prop.purchasePrice)} ({appreciation.toFixed(1)}%)</span></div>}
+              {mort.balance>0&&<><div className="border-t border-slate-100 my-1"/><div className="flex justify-between"><span className="text-xs text-slate-500">Deuda hipoteca</span><span className="text-xs font-bold text-slate-600">{fm(mort.balance)}</span></div></>}
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Tu patrimonio (equity)</span><span className="text-xs font-extrabold text-emerald-600">{fm(realEquity)}</span></div>
+              {realLTV>0&&<div className="flex justify-between"><span className="text-xs text-slate-500">Apalancamiento (LTV)</span><span className={`text-xs font-bold ${realLTV>80?'text-rose-500':realLTV>60?'text-amber-500':'text-emerald-500'}`}>{realLTV.toFixed(0)}%</span></div>}
             </div>
           </div>
+
+          {/* Rendimiento */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Métricas {partial?'(proy.)':''}</div>
-            <div className="space-y-2.5">
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Net Margin</span><span className={`text-xs font-bold ${fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}`}>{fMargin.toFixed(1)}%</span></div>
+            <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Rendimiento{partial?' (proy.)':''}</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Margen operativo</span><span className={`text-xs font-bold ${fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}`}>{fMargin.toFixed(1)}%</span></div>
               <div className="flex justify-between"><span className="text-xs text-slate-500">Cap Rate</span><span className={`text-xs font-bold ${fCapR>6?'text-emerald-600':fCapR>4?'text-amber-500':'text-rose-500'}`}>{fCapR.toFixed(2)}%</span></div>
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Cash-on-Cash</span><span className={`text-xs font-bold ${fCoc>8?'text-emerald-600':fCoc>4?'text-amber-500':'text-rose-500'}`}>{fCoc.toFixed(1)}%</span></div>
-              {fDscr>0&&<div className="flex justify-between"><span className="text-xs text-slate-500">DSCR</span><span className={`text-xs font-bold ${fDscr>1.25?'text-emerald-600':fDscr>1?'text-amber-500':'text-rose-500'}`}>{fDscr.toFixed(2)}</span></div>}
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Expense Ratio</span><span className={`text-xs font-bold ${fOpEx/fRev<0.5?'text-emerald-600':fOpEx/fRev<0.6?'text-amber-500':'text-rose-500'}`}>{(fOpEx/fRev*100).toFixed(0)}%</span></div>
-              <div className="flex justify-between"><span className="text-xs text-slate-500">ADR (est.)</span><span className="text-xs font-bold text-slate-700">{fm(n>0?fRev/(n*30):0)}/noche</span></div>
-              <div className="flex justify-between"><span className="text-xs text-slate-500">Capital Invertido</span><span className="text-xs font-bold text-slate-700">{fm(totCont)}</span></div>
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Retorno (CoC)</span><span className={`text-xs font-bold ${fCoc>8?'text-emerald-600':fCoc>4?'text-amber-500':'text-rose-500'}`}>{fCoc.toFixed(1)}%</span></div>
+              {fDscr>0&&<div className="flex justify-between"><span className="text-xs text-slate-500">Cobertura deuda</span><span className={`text-xs font-bold ${fDscr>1.25?'text-emerald-600':fDscr>1?'text-amber-500':'text-rose-500'}`}>{fDscr.toFixed(2)}x</span></div>}
+              <div className="border-t border-slate-100 my-1"/>
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Valor por noche (est.)</span><span className="text-xs font-bold text-slate-700">{fm(adr)}</span></div>
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Capital invertido</span><span className="text-xs font-bold text-slate-700">{fm(totCont)}</span></div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* ── SECTION 3: Monthly Performance ── */}
-      {sorted.length>0&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-5">
-        <div className="bg-slate-50 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
-          <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Monthly Performance{dashYear!=='all'?` — ${dashYear}`:''}</span>
-          <span className="text-[10px] text-slate-400">{sorted.length} months</span>
+      {/* ════════════════════════════════════════════════
+           SECCIÓN 3: COMPARATIVO ANUAL
+         ════════════════════════════════════════════════ */}
+      {annual.length>1&&dashYear==='all'&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100"><h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Comparativo Anual</h3></div>
+        <div className="overflow-x-auto"><table className="w-full"><thead><tr className="border-b border-slate-100">
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-left">Año</th>
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Generó</th>
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Costos Op.</th>
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Te pagaron</th>
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Margen</th>
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">vs Año Ant.</th>
+        </tr></thead><tbody>{annual.map((y,i)=>{
+          const mg=y.revenue?(y.net/y.revenue*100):0;
+          const prev=i>0?annual[i-1]:null;
+          const chg=prev&&prev.revenue?((y.revenue-prev.revenue)/prev.revenue*100):null;
+          return<tr key={y.year} className={`border-b border-slate-50 ${i%2?'bg-slate-50/30':''}`}>
+            <td className="py-2.5 px-4 text-sm font-bold text-slate-700">{y.year} <span className="text-[10px] text-slate-400 font-normal">{y.n<12?`(${y.n}m)`:''}</span></td>
+            <td className="py-2.5 px-4 text-sm text-right text-blue-600 font-medium">{fm(y.revenue)}</td>
+            <td className="py-2.5 px-4 text-sm text-right text-rose-500">{fm(y.revenue-y.net)}</td>
+            <td className="py-2.5 px-4 text-sm text-right text-emerald-600 font-bold">{fm(y.net)}</td>
+            <td className={`py-2.5 px-4 text-sm text-right font-medium ${mg>50?'text-emerald-600':mg>40?'text-amber-500':'text-rose-500'}`}>{mg.toFixed(0)}%</td>
+            <td className="py-2.5 px-4 text-sm text-right">{chg!==null?<span className={`font-bold ${chg>=0?'text-emerald-600':'text-rose-500'}`}>{chg>=0?'▲':'▼'}{Math.abs(chg).toFixed(0)}%</span>:<span className="text-slate-300">—</span>}</td>
+          </tr>})}</tbody></table></div>
+      </div>}
+
+      {/* ════════════════════════════════════════════════
+           SECCIÓN 4: MES A MES
+         ════════════════════════════════════════════════ */}
+      {sorted.length>0&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm mb-5 overflow-hidden">
+        <div className="px-5 py-3 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Detalle Mensual{dashYear!=='all'?` — ${dashYear}`:''}</h3>
+          <span className="text-[10px] text-slate-400">{sorted.length} meses</span>
         </div>
         <div className="overflow-x-auto"><table className="w-full"><thead><tr className="border-b border-slate-100">
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-left">Period</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Revenue</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">OpEx</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Net Income</th>
-          {mMort>0&&<th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Mortgage</th>}
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Cash Flow</th>
-          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Margin</th>
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-left">Mes</th>
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Generó</th>
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Costos Op.</th>
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Te pagaron</th>
+          {mMort>0&&<th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Hipoteca</th>}
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Libre</th>
+          <th className="py-2.5 px-4 text-[10px] font-bold text-slate-400 text-right">Margen</th>
         </tr></thead><tbody>{sorted.map((s,i)=>{
-          const opex=(s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0);
-          const cf=(s.net||0)-mMort;
+          const op=(s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0);
+          const libre=(s.net||0)-mMort;
           const mg=s.revenue?(s.net/s.revenue*100):0;
-          return<tr key={s.id} className={`border-b border-slate-50 ${i%2?'bg-slate-50/30':''} hover:bg-blue-50/30`}>
+          return<tr key={s.id} className={`border-b border-slate-50 ${i%2?'bg-slate-50/30':''}`}>
             <td className="py-2 px-4 text-sm font-medium text-slate-700">{M[s.month-1]} {s.year}</td>
             <td className="py-2 px-4 text-sm text-right text-blue-600">{fm(s.revenue)}</td>
-            <td className="py-2 px-4 text-sm text-right text-slate-500">{fm(opex)}</td>
-            <td className="py-2 px-4 text-sm text-right font-medium text-emerald-600">{fm(s.net)}</td>
-            {mMort>0&&<td className="py-2 px-4 text-sm text-right text-slate-400">({fm(mMort)})</td>}
-            <td className={`py-2 px-4 text-sm text-right font-bold ${cf>=0?'text-emerald-700':'text-rose-600'}`}>{fm(cf)}</td>
+            <td className="py-2 px-4 text-sm text-right text-slate-500">{fm(op)}</td>
+            <td className="py-2 px-4 text-sm text-right text-emerald-600 font-medium">{fm(s.net)}</td>
+            {mMort>0&&<td className="py-2 px-4 text-sm text-right text-slate-400">-{fm(mMort)}</td>}
+            <td className={`py-2 px-4 text-sm text-right font-bold ${libre>=0?'text-emerald-700':'text-rose-600'}`}>{fm(libre)}</td>
             <td className={`py-2 px-4 text-xs text-right ${mg<40?'text-rose-500':mg<50?'text-amber-500':'text-emerald-500'}`}>{mg.toFixed(0)}%</td>
           </tr>})}</tbody>
-          <tfoot><tr className="bg-slate-100/80 border-t-2 border-slate-200">
-            <td className="py-2.5 px-4 text-xs font-bold text-slate-600">Total ({sorted.length}m)</td>
+          <tfoot><tr className="bg-slate-50 border-t-2 border-slate-200">
+            <td className="py-2.5 px-4 text-xs font-bold text-slate-600">{sorted.length} meses</td>
             <td className="py-2.5 px-4 text-xs text-right font-bold text-blue-600">{fm(sorted.reduce((s,x)=>s+(x.revenue||0),0))}</td>
             <td className="py-2.5 px-4 text-xs text-right font-bold text-slate-500">{fm(sorted.reduce((s,x)=>s+(x.revenue||0)-(x.net||0),0))}</td>
             <td className="py-2.5 px-4 text-xs text-right font-bold text-emerald-600">{fm(sorted.reduce((s,x)=>s+(x.net||0),0))}</td>
-            {mMort>0&&<td className="py-2.5 px-4 text-xs text-right font-bold text-slate-400">({fm(mMort*sorted.length)})</td>}
-            <td className={`py-2.5 px-4 text-xs text-right font-extrabold ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fCF)}</td>
+            {mMort>0&&<td className="py-2.5 px-4 text-xs text-right font-bold text-slate-400">-{fm(mMort*sorted.length)}</td>}
+            <td className={`py-2.5 px-4 text-xs text-right font-extrabold ${fUtil>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fUtil)}</td>
             <td className="py-2.5 px-4 text-xs text-right text-slate-400">{fMargin.toFixed(0)}%</td>
           </tr></tfoot>
         </table></div>
       </div>}
 
-      {/* ── SECTION 4: Chart ── */}
+      {/* ════════════════════════════════════════════════
+           SECCIÓN 5: GRÁFICA
+         ════════════════════════════════════════════════ */}
       {sorted.length>2&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-5">
-        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Revenue & Cash Flow — Monthly</span>
-        <ResponsiveContainer width="100%" height={200} className="mt-3">
-          <ComposedChart data={[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>({p:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:s.revenue||0,net:s.net||0,cf:(s.net||0)-mMort}))}>
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Ingreso vs Utilidad — Mensual</h3>
+        <ResponsiveContainer width="100%" height={200}>
+          <ComposedChart data={[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>({p:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),gen:s.revenue||0,pago:s.net||0,libre:(s.net||0)-mMort}))}>
             <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/>
             <XAxis dataKey="p" tick={{fontSize:9,fill:'#94a3b8'}} interval={fStmts.length>18?2:0}/>
             <YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/>
             <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
-            <Bar dataKey="rev" name="Revenue" fill="#BFDBFE" radius={[3,3,0,0]}/>
-            <Bar dataKey="net" name="Net Income" fill="#059669" radius={[3,3,0,0]}/>
-            {mMort>0&&<Line dataKey="cf" name="Cash Flow" stroke="#1E293B" strokeWidth={2} dot={{r:2,fill:'#1E293B'}}/>}
+            <Bar dataKey="gen" name="Generó" fill="#BFDBFE" radius={[3,3,0,0]}/>
+            <Bar dataKey="pago" name="Te pagaron" fill="#059669" radius={[3,3,0,0]}/>
+            {mMort>0&&<Line dataKey="libre" name="Libre (después hipoteca)" stroke="#1E293B" strokeWidth={2} dot={{r:2,fill:'#1E293B'}}/>}
           </ComposedChart>
         </ResponsiveContainer>
       </div>}
 
-      {/* ── SECTION 5: Partners ── */}
+      {/* Socios */}
       {partners.length>1&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
-        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Partner Summary</span>
-        <div className="grid gap-3 mt-3" style={{gridTemplateColumns:`repeat(${Math.min(partners.length,3)},1fr)`}}>{partners.map(p=>{const t=pt[p.id]||{};return<div key={p.id} className="rounded-xl p-3 border border-slate-100 bg-slate-50/50" style={{borderLeft:`4px solid ${p.color}`}}>
-          <div className="flex justify-between items-center mb-2"><span className="text-sm font-bold text-slate-700">{p.name}</span><span className="text-xs text-slate-400 font-medium">{p.ownership}%</span></div>
-          <div className="grid grid-cols-3 gap-2 text-center text-[10px]"><div><span className="text-slate-400">Capital</span><div className="font-bold text-emerald-600">{fm(t.cont)}</div></div><div><span className="text-slate-400">Expenses</span><div className="font-bold text-rose-500">{fm(t.exp)}</div></div><div><span className="text-slate-400">Share</span><div className="font-bold text-blue-600">{fm(fNet*(p.ownership/100))}</div></div></div>
+        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Distribución entre Socios</h3>
+        <div className="grid gap-3" style={{gridTemplateColumns:`repeat(${Math.min(partners.length,3)},1fr)`}}>{partners.map(p=>{const t=pt[p.id]||{};return<div key={p.id} className="rounded-xl p-3 border border-slate-100 bg-slate-50/50" style={{borderLeft:`4px solid ${p.color}`}}>
+          <div className="flex justify-between items-center mb-2"><span className="text-sm font-bold text-slate-700">{p.name}</span><span className="text-xs text-slate-400">{p.ownership}%</span></div>
+          <div className="grid grid-cols-3 gap-2 text-center text-[10px]"><div><span className="text-slate-400">Aportó</span><div className="font-bold text-emerald-600">{fm(t.cont)}</div></div><div><span className="text-slate-400">Gastos</span><div className="font-bold text-rose-500">{fm(t.exp)}</div></div><div><span className="text-slate-400">Le toca</span><div className="font-bold text-blue-600">{fm(fNet*(p.ownership/100))}</div></div></div>
         </div>})}</div>
       </div>}
 
-      </>}
+      </>:<Empty icon={BarChart3} title="Sin datos aún" desc="Carga los statements de tu administrador para ver el análisis financiero completo de tu propiedad." action="Cargar Statements" onAction={()=>{setUploadLog([]);setModal('upload')}}/>}
 
       {/* Print footer */}
-      <div className="hidden print-footer">OwnerDesk — {prop.name} — {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})} — Confidential</div>
-
-      {!stmts.length&&<Empty icon={BarChart3} title="No data yet" desc="Upload your property manager statements to see the financial performance of your investment." action="Upload Statements" onAction={()=>{setUploadLog([]);setModal('upload')}}/>}
+      <div className="hidden print-footer">OwnerDesk — {prop.name} — {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})} — Confidencial</div>
     </>})()}
     {/* ═══ PARTNERS ═══ */}
     {view==='partners'&&<>
