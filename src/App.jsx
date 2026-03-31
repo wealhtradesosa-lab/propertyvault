@@ -87,29 +87,92 @@ async function parsePDF(file) {
     const content = await page.getTextContent();
     text += content.items.map(it=>it.str).join(' ') + '\n';
   }
+
   // Year & Period
   const ym = text.match(/Year:\s*(\d{4})\s*Period:\s*(\d+)/);
-  if (!ym || parseInt(ym[2])===0) return {error:'No es un statement mensual válido'};
+  if (!ym || parseInt(ym[2])===0) return {error:'No es un statement mensual válido (Period=0 o no encontrado)'};
   const year=parseInt(ym[1]), month=parseInt(ym[2]);
-  // Revenue from totals row
-  const totMatch = text.match(/\$([0-9,]+\.\d{2})\s+\$([0-9,]+\.\d{2})\s*_{3,}/);
-  let revenue = totMatch ? parseFloat(totMatch[1].replace(/,/g,'')) : 0;
-  // Duke Energy
-  let duke=0; const dukeM=text.match(/Duke[^$]*\$([0-9,]+\.\d{2})/gi);
-  if(dukeM) dukeM.forEach(m=>{const v=m.match(/\$([0-9,]+\.\d{2})/);if(v)duke+=parseFloat(v[1].replace(',',''))});
-  // Toho Water
-  let water=0; const tohoM=text.match(/Toho[^$]*\$([0-9,]+\.\d{2})/gi);
-  if(tohoM) tohoM.forEach(m=>{const v=m.match(/\$([0-9,]+\.\d{2})/);if(v)water+=parseFloat(v[1].replace(',',''))});
-  // Transaction Summary
-  const ts = text.match(/Transaction Summary\s+Period[\s\S]*?Net/i);
-  let commission=0,hoa=0,maintenance=0,vendor=0,net=0,clean=0,room=0;
-  if(ts) {
-    const g=s=>{const m=ts[0].match(new RegExp(s+'\\s+(-?\\$[\\d,]+\\.\\d{2})','i'));return m?Math.abs(parseFloat(m[1].replace(/[$,]/g,''))):0};
-    room=g('Room Charge'); commission=g('Commission'); hoa=g('HOA');
-    maintenance=g('Maintenance'); vendor=g('Vendor'); net=g('Payments To Owner'); clean=g('Cleaning');
+
+  // Universal value finder — tries multiple patterns
+  const findVal = (label) => {
+    const patterns = [
+      // Pattern 1: Label followed by value with $ sign (possibly in parentheses)
+      new RegExp(label+'[\\s:]*\\(?\\$([\\d,]+\\.\\d{2})\\)?','i'),
+      // Pattern 2: Label then some chars then $ value
+      new RegExp(label+'[^\\d$]{0,30}\\(?\\$([\\d,]+\\.\\d{2})\\)?','i'),
+      // Pattern 3: Label then space then just number
+      new RegExp(label+'\\s+\\(?([\\d,]+\\.\\d{2})\\)?','i'),
+      // Pattern 4: Very loose — label anywhere near a dollar amount
+      new RegExp(label+'[\\s\\S]{0,50}?\\$([\\d,]+\\.\\d{2})','i'),
+    ];
+    for (const p of patterns) {
+      const m = text.match(p);
+      if (m) return Math.abs(parseFloat(m[1].replace(/,/g,'')));
+    }
+    return 0;
+  };
+
+  // Revenue — try multiple approaches
+  let revenue = findVal('Room Charge');
+  if (!revenue) {
+    // Try from totals line
+    const totMatch = text.match(/\$([0-9,]+\.\d{2})\s+\$([0-9,]+\.\d{2})\s*_{3,}/);
+    if (totMatch) revenue = parseFloat(totMatch[1].replace(/,/g,''));
   }
-  if(!revenue && room) revenue = room;
-  return {year,month,revenue,commission,duke,water,hoa,maintenance,vendor:vendor+clean,net};
+  if (!revenue) revenue = findVal('Total Revenue');
+  if (!revenue) revenue = findVal('Gross Revenue');
+
+  // Pool Heat
+  const pool = findVal('Pool Heat');
+  if (pool > 0 && revenue > 0) revenue += pool; // Pool heat is additional to room charge
+
+  // Commission
+  let commission = findVal('Commission');
+  if (!commission) commission = findVal('Management Fee');
+
+  // HOA
+  let hoa = findVal('HOA');
+  if (!hoa) hoa = findVal('Association');
+
+  // Maintenance Fee
+  let maintenance = findVal('Maintenance');
+  if (!maintenance) maintenance = findVal('Maint Fee');
+  if (!maintenance) maintenance = findVal('Mgmt Fee');
+
+  // Duke Energy (may appear multiple times in vendor section)
+  let duke = 0;
+  const dukeMatches = text.match(/Duke\s*Energy[^$]*?\$([0-9,]+\.\d{2})/gi);
+  if (dukeMatches) dukeMatches.forEach(m => { const v = m.match(/\$([0-9,]+\.\d{2})/); if(v) duke += parseFloat(v[1].replace(',','')); });
+  if (!duke) duke = findVal('Duke Energy');
+  if (!duke) duke = findVal('Electric');
+
+  // Toho Water (may appear multiple times)
+  let water = 0;
+  const tohoMatches = text.match(/Toho[^$]*?\$([0-9,]+\.\d{2})/gi);
+  if (tohoMatches) tohoMatches.forEach(m => { const v = m.match(/\$([0-9,]+\.\d{2})/); if(v) water += parseFloat(v[1].replace(',','')); });
+  if (!water) water = findVal('Toho');
+  if (!water) water = findVal('Water');
+
+  // Vendor bills
+  let vendor = findVal('Vendor');
+  // Cleaning
+  const clean = findVal('Clean');
+  // Owner cleaning
+  const ownerClean = findVal('Owner Clean');
+
+  // Net — try multiple labels
+  let net = findVal('Payments To Owner');
+  if (!net) net = findVal('Payment to Owner');
+  if (!net) net = findVal('Net to Owner');
+  if (!net) net = findVal('Amount Due');
+  if (!net) net = findVal('ACH Payment');
+  // Also try to find "Paid" or "Check" amounts near the end
+  if (!net) {
+    const paidMatch = text.match(/(?:Paid|Check|ACH|Wire)[^$]*?\$([0-9,]+\.\d{2})/i);
+    if (paidMatch) net = parseFloat(paidMatch[1].replace(/,/g,''));
+  }
+
+  return {year, month, revenue, commission, duke, water, hoa, maintenance, vendor: vendor + clean + ownerClean, net, _debug: text.substring(0, 500)};
 }
 
 // ═══ AUTH ═══
@@ -240,10 +303,15 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           setUploadLog([...log]);continue;
         }
 
-        await addDoc(collection(db,'properties',propertyId,'statements'),{...r,createdAt:serverTimestamp()});
+        const {_debug, ...stmtData} = r;
+        await addDoc(collection(db,'properties',propertyId,'statements'),{...stmtData,createdAt:serverTimestamp()});
         uploaded.add(key);
-        existingPeriods.add(key); // Also mark as existing for rest of batch
-        log[log.length-1]={file:f.name,status:'ok',msg:`${M[r.month-1]} ${r.year} — Revenue: ${fm(r.revenue)} | Net: ${fm(r.net)}`};
+        existingPeriods.add(key);
+        const missing=[];
+        if(!r.commission)missing.push('Comisión');if(!r.maintenance)missing.push('Maint');if(!r.net)missing.push('Net');
+        let msg=`${M[r.month-1]} ${r.year} — Rev: ${fm(r.revenue)} | Comm: ${fm(r.commission)} | Duke: ${fm(r.duke)} | HOA: ${fm(r.hoa)} | Maint: ${fm(r.maintenance)} | Net: ${fm(r.net)}`;
+        if(missing.length)msg+=`\n⚠️ No se leyó: ${missing.join(', ')}`;
+        log[log.length-1]={file:f.name,status:missing.length?'warn':'ok',msg};
         setUploadLog([...log]);
       }catch(e){log[log.length-1]={file:f.name,status:'error',msg:'Error: '+e.message};setUploadLog([...log]);}
     }
@@ -775,8 +843,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>
       <input ref={fileRef} type="file" accept=".pdf" multiple className="hidden" onChange={e=>{if(e.target.files.length)handlePDFs(e.target.files);e.target.value=''}}/>
       {uploadLog.length>0&&<div className="space-y-2 mt-3 max-h-[300px] overflow-y-auto">{uploadLog.map((l,i)=>(
-        <div key={i} className={`flex items-start gap-2 p-3 rounded-xl text-xs font-medium ${l.status==='ok'?'bg-emerald-50 text-emerald-700 border border-emerald-100':l.status==='dup'?'bg-amber-50 text-amber-700 border border-amber-100':l.status==='processing'?'bg-blue-50 text-blue-700 border border-blue-100':'bg-rose-50 text-rose-700 border border-rose-100'}`}>
-          <span className="shrink-0">{l.status==='ok'?'✅':l.status==='dup'?'⚠️':l.status==='processing'?'⏳':'❌'}</span>
+        <div key={i} className={`flex items-start gap-2 p-3 rounded-xl text-xs font-medium ${l.status==='ok'?'bg-emerald-50 text-emerald-700 border border-emerald-100':l.status==='warn'?'bg-amber-50 text-amber-700 border border-amber-100':l.status==='dup'?'bg-slate-50 text-slate-600 border border-slate-200':l.status==='processing'?'bg-blue-50 text-blue-700 border border-blue-100':'bg-rose-50 text-rose-700 border border-rose-100'}`}>
+          <span className="shrink-0">{l.status==='ok'?'✅':l.status==='warn'?'⚠️':l.status==='dup'?'🔄':l.status==='processing'?'⏳':'❌'}</span>
           <div><div className="font-bold">{l.file}</div><div className="font-normal mt-0.5">{l.msg}</div></div>
         </div>
       ))}</div>}
