@@ -327,9 +327,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   // PDF Upload handler — with robust duplicate detection
   const handlePDFs=async(files)=>{
     const log=[];
-    const uploaded=new Set(); // Track what we upload in THIS batch
-    // Also build set of existing periods from DB
-    const existingPeriods=new Set(stmts.map(s=>s.year+'-'+s.month));
+    const uploaded=new Set();
+    // Query Firestore FRESH to avoid stale state after deletes
+    const {getDocs}=await import('firebase/firestore');
+    const freshSnap=await getDocs(collection(db,'properties',propertyId,'statements'));
+    const existingPeriods=new Set(freshSnap.docs.map(d=>{const s=d.data();return s.year+'-'+s.month}));
 
     for(const f of Array.from(files)){
       if(!f.name.toLowerCase().endsWith('.pdf')){log.push({file:f.name,status:'error',msg:'No es un archivo PDF'});setUploadLog([...log]);continue;}
