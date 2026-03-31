@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { db, auth } from './firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where, updateDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, LineChart, Line, ComposedChart } from 'recharts';
 import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, FileText, TrendingUp, PiggyBank, Printer, ArrowLeft, BarChart3 } from 'lucide-react';
@@ -298,6 +298,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [inf,setInf]=useState({date:'',month:'',gross:''});
   const [cf,setCf]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||''});
   const [sf,setSf]=useState({year:new Date().getFullYear(),month:new Date().getMonth()+1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''});
+  const [mortForm,setMortForm]=useState({balance:'',rate:'',term:'30',payment:'',start:''});
 
   const ue=useCallback((k,v)=>setEf(x=>({...x,[k]:v})),[]);
   const ui=useCallback((k,v)=>setInf(x=>({...x,[k]:v})),[]);
@@ -409,16 +410,112 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <button onClick={()=>setModal('statement')} className="px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-md shadow-blue-500/20 transition"><ClipboardList size={14}/>Statement</button>
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-5 mb-7">
+
+        {/* ROW 1: Main KPIs */}
+        <div className="grid grid-cols-4 gap-5 mb-5">
           <KPI label="Valor Propiedad" value={fm(prop.purchasePrice)} icon={<Building2 size={18}/>}/>
-          <KPI label="Ingreso Neto" value={fm(totNet)} sub={`${income.length} periodos registrados`} icon={<TrendingUp size={18}/>}/>
-          <KPI label="Gastos Directos" value={fm(totExp)} sub={`${expenses.length} transacciones`} icon={<Receipt size={18}/>}/>
           <KPI label="Capital Invertido" value={fm(totCont)} sub={`${partners.length} socio(s)`} icon={<PiggyBank size={18}/>}/>
+          {annualStmt.length>0?<>
+            <KPI label="Revenue Total (Statements)" value={fm(annualStmt.reduce((s,y)=>s+y.revenue,0))} sub={`${stmts.length} meses registrados`} icon={<TrendingUp size={18}/>}/>
+            <KPI label="Net al Owner Total" value={fm(annualStmt.reduce((s,y)=>s+y.net,0))} sub={annualStmt.reduce((s,y)=>s+y.revenue,0)>0?`Margen ${pct(annualStmt.reduce((s,y)=>s+y.net,0),annualStmt.reduce((s,y)=>s+y.revenue,0))}`:''} icon={<DollarSign size={18}/>}/>
+          </>:<>
+            <KPI label="Ingreso Neto (Manual)" value={fm(totNet)} sub={`${income.length} periodos`} icon={<TrendingUp size={18}/>}/>
+            <KPI label="Gastos Directos" value={fm(totExp)} sub={`${expenses.length} transacciones`} icon={<Receipt size={18}/>}/>
+          </>}
         </div>
-        <div className="grid grid-cols-2 gap-5">
-          {catData.length>0&&<div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-5">Gastos por Categoría</h3><ResponsiveContainer width="100%" height={230}><PieChart><Pie data={catData} cx="50%" cy="50%" outerRadius={80} dataKey="value" label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>{catData.map((_,i)=><Cell key={i} fill={C[i%C.length]}/>)}</Pie><Tooltip formatter={v=>fm(v)}/></PieChart></ResponsiveContainer></div>}
-          {annualStmt.length>0&&<div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-5">Revenue vs Net (Statements PM)</h3><ResponsiveContainer width="100%" height={230}><BarChart data={annualStmt}><CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/><XAxis dataKey="year" tick={{fontSize:12}}/><YAxis tick={{fontSize:10}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[6,6,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[6,6,0,0]}/></BarChart></ResponsiveContainer></div>}
-        </div>
+
+        {/* ROW 2: P&L + Performance */}
+        {annualStmt.length>0&&<>
+          {/* P&L Summary Card */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm mb-5">
+            <h3 className="text-sm font-bold text-slate-700 mb-4">📈 Estado de Resultados (P&L) — Desde Statements del PM</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead><tr className="border-b-2 border-slate-200">
+                  <th className="text-left py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Concepto</th>
+                  {annualStmt.map(y=><th key={y.year} className="text-right py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">{y.year}{y.months<12?` (${y.months}m)`:''}</th>)}
+                  {annualStmt.length>=2&&<th className="text-right py-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Var YoY</th>}
+                </tr></thead>
+                <tbody>
+                  {[{l:'💰 Revenue',k:'revenue',c:'text-blue-600 font-bold'},{l:'├ Comisión PM',k:'commission',c:'text-rose-500'},{l:'├ Electricidad',k:'duke',c:'text-slate-600'},{l:'├ Agua',k:'water',c:'text-slate-600'},{l:'├ HOA',k:'hoa',c:'text-slate-600'},{l:'├ Mantenimiento',k:'maintenance',c:'text-slate-600'},{l:'└ Vendor/Otros',k:'vendor',c:'text-slate-600'},{l:'📊 Total Gastos',calc:y=>y.commission+y.duke+y.water+y.hoa+y.maintenance+y.vendor,c:'text-rose-500 font-bold'},{l:'✅ Net al Owner',k:'net',c:'text-emerald-600 font-extrabold text-base'},{l:'📉 Margen',calc:y=>y.revenue>0?(y.net/y.revenue*100):0,fmt:v=>v.toFixed(1)+'%',c:'text-slate-700 font-bold'},{l:'📆 Net Mensual Prom.',calc:y=>y.months>0?y.net/y.months:0,c:'text-slate-600'}].map((row,ri)=>{
+                    const vals=annualStmt.map(y=>row.k?y[row.k]:row.calc(y));
+                    const last2=vals.length>=2?[vals[vals.length-2],vals[vals.length-1]]:null;
+                    const change=last2&&last2[0]?((last2[1]-last2[0])/Math.abs(last2[0])*100).toFixed(1):null;
+                    return<tr key={ri} className={ri===7?'border-t-2 border-slate-200':ri===8?'border-t-2 border-emerald-200 bg-emerald-50/30':''}>
+                      <td className="py-2 text-xs text-slate-700">{row.l}</td>
+                      {vals.map((v,i)=><td key={i} className={`py-2 text-right text-sm ${row.c}`}>{row.fmt?row.fmt(v):fm(v)}</td>)}
+                      {annualStmt.length>=2&&<td className={`py-2 text-right text-xs font-bold ${change&&parseFloat(change)>=0?'text-emerald-600':'text-rose-500'}`}>{change?`${parseFloat(change)>=0?'▲':'▼'}${change}%`:'—'}</td>}
+                    </tr>;
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ROW 3: Charts */}
+          <div className="grid grid-cols-2 gap-5 mb-5">
+            <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-5">Revenue vs Net — Anual</h3>
+              <ResponsiveContainer width="100%" height={230}><BarChart data={annualStmt}><CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/><XAxis dataKey="year" tick={{fontSize:12}}/><YAxis tick={{fontSize:10}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[6,6,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[6,6,0,0]}/></BarChart></ResponsiveContainer>
+            </div>
+            {expPieData.length>0&&<div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-5">Composición Gastos (último año)</h3>
+              <ResponsiveContainer width="100%" height={230}><PieChart><Pie data={expPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>{expPieData.map((_,i)=><Cell key={i} fill={C[i%C.length]}/>)}</Pie><Tooltip formatter={v=>fm(v)}/></PieChart></ResponsiveContainer>
+            </div>}
+          </div>
+
+          {/* ROW 4: Best/Worst months + Monthly comparison */}
+          {monthlyByYear&&Object.keys(monthlyByYear).length>0&&<>
+            {(()=>{
+              const fullYears=annualStmt.filter(y=>y.months===12);
+              if(!fullYears.length) return null;
+              const avgNet=MO.map((_,i)=>{let s=0,c=0;fullYears.forEach(y=>{const v=monthlyByYear[y.year]?.net[i];if(v!==undefined){s+=v;c++}});return c?s/c:0;});
+              const best=avgNet.indexOf(Math.max(...avgNet));
+              const worst=avgNet.indexOf(Math.min(...avgNet));
+              return <div className="grid grid-cols-3 gap-5 mb-5">
+                <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100">
+                  <div className="text-[10px] text-emerald-600 font-extrabold uppercase tracking-wider mb-1">🏆 Mejor Mes (Prom. Net)</div>
+                  <div className="text-2xl font-extrabold text-emerald-700">{MO[best]}</div>
+                  <div className="text-sm text-emerald-600 font-bold mt-0.5">{fm(avgNet[best])}/mes</div>
+                </div>
+                <div className="bg-rose-50 rounded-2xl p-5 border border-rose-100">
+                  <div className="text-[10px] text-rose-500 font-extrabold uppercase tracking-wider mb-1">📉 Peor Mes (Prom. Net)</div>
+                  <div className="text-2xl font-extrabold text-rose-600">{MO[worst]}</div>
+                  <div className="text-sm text-rose-500 font-bold mt-0.5">{fm(avgNet[worst])}/mes</div>
+                </div>
+                <div className="bg-blue-50 rounded-2xl p-5 border border-blue-100">
+                  <div className="text-[10px] text-blue-600 font-extrabold uppercase tracking-wider mb-1">📊 Net Mensual Promedio</div>
+                  <div className="text-2xl font-extrabold text-blue-700">{fm(avgNet.reduce((s,v)=>s+v,0)/12)}</div>
+                  <div className="text-sm text-blue-500 font-bold mt-0.5">{fullYears.length} años de datos</div>
+                </div>
+              </div>;
+            })()}
+            <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm mb-5"><h3 className="text-sm font-bold text-slate-700 mb-5">Revenue Mensual — Comparativo YoY</h3>
+              <ResponsiveContainer width="100%" height={260}><BarChart data={MO.map((m,i)=>{const e={month:m};Object.keys(monthlyByYear).forEach(y=>{e['rev_'+y]=monthlyByYear[y].rev[i]});return e;})}><CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/><XAxis dataKey="month" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/>{Object.keys(monthlyByYear).sort().map((y,i)=><Bar key={y} dataKey={'rev_'+y} name={y} fill={C[i%C.length]} radius={[4,4,0,0]}/>)}</BarChart></ResponsiveContainer>
+            </div>
+          </>}
+
+          {/* Costos Fijos vs Variables */}
+          {annualStmt.length>0&&<div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm mb-5">
+            <h3 className="text-sm font-bold text-slate-700 mb-4">🔒 Costos Fijos vs Variables</h3>
+            <div className="grid grid-cols-2 gap-5">
+              <div>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Costos Fijos Mensuales (se pagan siempre)</div>
+                {(()=>{const y=annualStmt[annualStmt.length-1];const fixed=[{l:'HOA',v:y.hoa},{l:'Electricidad',v:y.duke},{l:'Agua',v:y.water},{l:'Mantenimiento PM',v:y.maintenance}];const total=fixed.reduce((s,f)=>s+f.v,0);return<>
+                  {fixed.map((f,i)=><div key={i} className="flex justify-between py-2 border-b border-slate-50 text-sm"><span className="text-slate-600">{f.l}</span><div><span className="text-slate-800 font-semibold">{fm(f.v/y.months)}/mes</span><span className="text-slate-400 text-xs ml-2">({fm(f.v)}/año)</span></div></div>)}
+                  <div className="flex justify-between py-3 text-sm font-extrabold border-t-2 border-slate-200 mt-1"><span className="text-slate-800">Total Fijos</span><span className="text-rose-600">{fm(total/y.months)}/mes</span></div>
+                </>})()}
+              </div>
+              <div>
+                <div className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Costos Variables (dependen de ocupación)</div>
+                {(()=>{const y=annualStmt[annualStmt.length-1];const variable=[{l:'Comisión PM ('+prop.managerCommission+'%)',v:y.commission},{l:'Vendor / Proveedores',v:y.vendor}];const total=variable.reduce((s,f)=>s+f.v,0);return<>
+                  {variable.map((f,i)=><div key={i} className="flex justify-between py-2 border-b border-slate-50 text-sm"><span className="text-slate-600">{f.l}</span><div><span className="text-slate-800 font-semibold">{fm(f.v/y.months)}/mes</span><span className="text-slate-400 text-xs ml-2">({fm(f.v)}/año)</span></div></div>)}
+                  <div className="flex justify-between py-3 text-sm font-extrabold border-t-2 border-slate-200 mt-1"><span className="text-slate-800">Total Variables</span><span className="text-amber-600">{fm(total/y.months)}/mes</span></div>
+                </>})()}
+              </div>
+            </div>
+          </div>}
+        </>}
+
+        {/* Partners Balance */}
         {partners.length>1&&<div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm mt-5"><h3 className="text-sm font-bold text-slate-700 mb-5">Balance entre Socios</h3><div className="grid gap-5" style={{gridTemplateColumns:`repeat(${Math.min(partners.length,3)},1fr)`}}>{partners.map(p=>{const t=pt[p.id]||{};return<div key={p.id} className="rounded-2xl border-2 p-5 hover:shadow-md transition" style={{borderColor:p.color+'15',borderLeftColor:p.color,borderLeftWidth:5}}>
           <div className="font-bold text-sm mb-4 flex items-center gap-2.5"><div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-extrabold shadow-sm" style={{background:p.color}}>{p.name.charAt(0)}</div><span style={{color:p.color}}>{p.name} <span className="text-slate-400 font-medium">({p.ownership}%)</span></span></div>
           <div className="grid grid-cols-3 gap-3 text-center text-xs">
@@ -427,6 +524,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <div className="bg-blue-50 rounded-xl p-3"><div className="text-blue-400 font-bold uppercase text-[9px] mb-1">Ingreso</div><div className="font-extrabold text-blue-700 text-base">{fm(t.inc)}</div></div>
           </div>
         </div>})}</div></div>}
+
+        {/* Empty state */}
+        {!annualStmt.length&&!income.length&&<Empty icon={BarChart3} title="Empieza a registrar datos" desc="Carga statements del PM, registra ingresos y gastos para ver el tablero de control completo." action="Cargar Primer Statement" onAction={()=>setModal('statement')}/>}
       </>}
 
       {/* ════ PARTNERS ════ */}
@@ -551,7 +651,20 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <ResponsiveContainer width="100%" height={280}><AreaChart data={sNE.map((d,i)=>({year:'Año '+d.year,sinExtra:d.balance,conExtra:sE[i]?.balance||0}))}><CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/><XAxis dataKey="year" tick={{fontSize:9}} interval={4}/><YAxis tick={{fontSize:10}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Area dataKey="sinExtra" name="Sin extra" stroke="#DC2626" fill="rgba(220,38,38,.05)"/><Area dataKey="conExtra" name={`$${extraP||0}/mes extra`} stroke="#059669" fill="rgba(5,150,105,.05)"/></AreaChart></ResponsiveContainer>
             </>}
           </div>
-        </>:<Empty icon={Landmark} title="Sin hipoteca" desc="No hay crédito hipotecario configurado para esta propiedad."/>}
+        </>:<div className="bg-white rounded-2xl border border-slate-100 p-7 shadow-sm">
+          <div className="text-center mb-6"><div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4"><Landmark size={28} className="text-blue-500"/></div><h3 className="text-lg font-extrabold text-slate-800 mb-1">Configurar Hipoteca</h3><p className="text-sm text-slate-400 max-w-md mx-auto">Ingresa los datos del crédito hipotecario para ver la tabla de amortización y simular pagos anticipados.</p></div>
+          <div className="max-w-lg mx-auto space-y-4">
+            <div className="grid grid-cols-2 gap-4"><Inp label="Balance Actual del Préstamo" value={mortForm.balance} onChange={v=>setMortForm(x=>({...x,balance:v}))} prefix="$" type="number" placeholder="250,000"/><Inp label="Tasa de Interés Anual (%)" value={mortForm.rate} onChange={v=>setMortForm(x=>({...x,rate:v}))} type="number" placeholder="7.5"/></div>
+            <div className="grid grid-cols-3 gap-4"><Inp label="Plazo (años)" value={mortForm.term} onChange={v=>setMortForm(x=>({...x,term:v}))} type="number" placeholder="30"/><Inp label="Pago Mensual" value={mortForm.payment} onChange={v=>setMortForm(x=>({...x,payment:v}))} prefix="$" type="number" placeholder="1,750"/><Inp label="Fecha de Inicio" value={mortForm.start} onChange={v=>setMortForm(x=>({...x,start:v}))} type="date"/></div>
+            <button onClick={async()=>{
+              try{
+                await updateDoc(doc(db,'properties',propertyId),{mortgage:{balance:parseFloat(mortForm.balance)||0,rate:parseFloat(mortForm.rate)||0,termYears:parseInt(mortForm.term)||30,monthlyPayment:parseFloat(mortForm.payment)||0,startDate:mortForm.start||''}});
+                alert('Hipoteca guardada. Recarga la página para ver el simulador.');
+                window.location.reload();
+              }catch(e){alert('Error: '+e.message)}
+            }} disabled={!mortForm.balance||!mortForm.rate||!mortForm.payment} className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold text-sm disabled:opacity-40 transition shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2"><Landmark size={16}/>Guardar Hipoteca</button>
+          </div>
+        </div>}
       </>}
 
     </div></div>
