@@ -148,30 +148,37 @@ async function parsePDF(file) {
   let maintenance = findRow('Maintenance Fee');
   if (!maintenance) maintenance = findRow('Maintenance');
 
-  // Duke Energy — find ALL rows mentioning Duke, take first $ from each
+  // Duke Energy — very flexible matching
   let duke = 0;
   rows.forEach(r => {
-    if (/duke/i.test(r.text) && /energy|\$/i.test(r.text)) {
+    const rt = r.text.toLowerCase();
+    if (rt.includes('duke') || (rt.includes('electric') && !rt.includes('commission'))) {
       const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
       if (amounts && amounts.length > 0) {
         const val = parseFloat(amounts[0].replace(/[$,]/g, ''));
-        if (val < 1500) duke += val; // sanity check per line
+        if (val > 0 && val < 1500) duke += val;
       }
     }
   });
+  if (!duke) duke = findRow('Duke');
   if (!duke) duke = findRow('Electric');
+  if (!duke) duke = findRow('Electricity');
+  if (!duke) duke = findRow('OUC');
+  if (!duke) duke = findRow('FPL');
 
-  // Toho Water — same approach
+  // Toho Water — flexible matching
   let water = 0;
   rows.forEach(r => {
-    if (/toho/i.test(r.text)) {
+    const rt = r.text.toLowerCase();
+    if (rt.includes('toho') || (rt.includes('water') && !rt.includes('pool') && !rt.includes('heater'))) {
       const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
       if (amounts && amounts.length > 0) {
         const val = parseFloat(amounts[0].replace(/[$,]/g, ''));
-        if (val < 500) water += val;
+        if (val > 0 && val < 500) water += val;
       }
     }
   });
+  if (!water) water = findRow('Toho');
   if (!water) water = findRow('Water');
 
   // Vendor
@@ -341,9 +348,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         uploaded.add(key);
         existingPeriods.add(key);
         const missing=[];
-        if(!r.commission)missing.push('Comisión');if(!r.maintenance)missing.push('Maint');if(!r.net)missing.push('Net');
-        let msg=`${M[r.month-1]} ${r.year} — Rev: ${fm(r.revenue)} | Comm: ${fm(r.commission)} | Duke: ${fm(r.duke)} | HOA: ${fm(r.hoa)} | Maint: ${fm(r.maintenance)} | Net: ${fm(r.net)}`;
-        if(missing.length)msg+=`\n⚠️ No se leyó: ${missing.join(', ')}`;
+        if(!r.commission)missing.push('Comisión');if(!r.duke)missing.push('Electricidad');if(!r.maintenance)missing.push('Maint');if(!r.net)missing.push('Net');
+        let msg=`${M[r.month-1]} ${r.year} — Rev: ${fm(r.revenue)} | Comm: ${fm(r.commission)} | Duke: ${fm(r.duke)} | Water: ${fm(r.water)} | HOA: ${fm(r.hoa)} | Maint: ${fm(r.maintenance)} | Net: ${fm(r.net)}`;
+        if(missing.length)msg+=` ⚠️ Sin: ${missing.join(', ')}`;
         log[log.length-1]={file:f.name,status:missing.length?'warn':'ok',msg};
         setUploadLog([...log]);
       }catch(e){log[log.length-1]={file:f.name,status:'error',msg:'Error: '+e.message};setUploadLog([...log]);}
