@@ -413,6 +413,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   // Cash flow timeline (cumulative net by month)
   const cfTimeline=useMemo(()=>{const sorted=[...stmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month);let cum=0;return sorted.map(s=>{cum+=s.net||0;return{period:M[s.month-1]+' '+String(s.year).slice(2),net:s.net||0,cumulative:cum}})},[stmts]);
 
+  // Filter out years with < 6 months of data (except current year) for charts
+  const curYear=new Date().getFullYear();
+  const relAnnual=useMemo(()=>annual.filter(y=>y.n>=6||y.year===curYear),[annual,curYear]);
+  const relMonthly=useMemo(()=>{const r={};Object.keys(monthly).forEach(y=>{const yr=parseInt(y);const a=annual.find(x=>x.year===yr);if(a&&(a.n>=6||yr===curYear))r[y]=monthly[y]});return r},[monthly,annual,curYear]);
+
   const mortCalc=useCallback((ex=0)=>{if(!mort.balance||!mort.rate||!mort.monthlyPayment)return[];let b=mort.balance;const mr=mort.rate/100/12;const sc=[];let ti=0;for(let i=1;i<=mort.termYears*12&&b>0;i++){const int=b*mr;const pr=Math.min(mort.monthlyPayment-int+ex,b);b=Math.max(0,b-pr);ti+=int;if(i%12===0||b===0)sc.push({yr:Math.ceil(i/12),mo:i,bal:b,ti})}return sc},[mort]);
   const sNE=useMemo(()=>mortCalc(0),[mortCalc]);
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0),[mortCalc,extraP]);
@@ -449,7 +454,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {/* ═══ DASHBOARD PREMIUM (unified) ═══ */}
     {view==='dashboard'&&<>
       <div className="flex justify-between items-start mb-4">
-        <div><h1 className="text-[22px] font-extrabold text-slate-800">{prop.name}</h1><p className="text-sm text-slate-400">{prop.address}, {prop.city}, {prop.state} · {prop.bedrooms||'?'}BR/{prop.bathrooms||'?'}BA {prop.manager&&`· PM: ${prop.manager} (${prop.managerCommission||15}%)`}</p></div>
+        <div><h1 className="text-[22px] font-extrabold text-slate-800">{prop.name} <button onClick={()=>{setSettingsForm(null);setView('settings')}} className="inline-flex items-center text-slate-300 hover:text-blue-500 ml-1 align-middle"><Pencil size={14}/></button></h1><p className="text-sm text-slate-400">{prop.address}, {prop.city}, {prop.state} · {prop.bedrooms||'?'}BR/{prop.bathrooms||'?'}BA {prop.manager&&`· PM: ${prop.manager} (${prop.managerCommission||15}%)`} · <span className="text-slate-500">Compra: {fm(prop.purchasePrice)}</span>{marketValue!==prop.purchasePrice&&<span className="text-emerald-600 font-semibold"> · Mercado: {fm(marketValue)}</span>}</p></div>
         <div className="flex gap-2">
           <button onClick={()=>{setNf({date:'',month:'',grossAmount:''});setModal('income')}} className="px-3.5 py-2 bg-emerald-600 text-white text-xs rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"><Plus size={13}/> Ingreso</button>
           <button onClick={()=>{setEf({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="px-3.5 py-2 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 flex items-center gap-1.5 shadow-sm"><Plus size={13}/> Gasto</button>
@@ -457,36 +462,42 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
       </div>
 
-      {/* Year Filter Tabs */}
-      {annual.length>0&&<div className="flex items-center gap-1.5 mb-5 flex-wrap">
+      {/* Year Filter Tabs — hide years with < 6 months unless current year */}
+      {annual.length>0&&(()=>{
+        const curYr=new Date().getFullYear();
+        const relevant=annual.filter(y=>y.n>=6||y.year===curYr);
+        return relevant.length>0&&<div className="flex items-center gap-1.5 mb-5 flex-wrap">
         <button onClick={()=>setDashYear('all')} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear==='all'?'bg-blue-600 text-white shadow-md':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>Todos</button>
-        {annual.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear===y.year?'bg-blue-600 text-white shadow-md':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
-      </div>}
+        {relevant.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear===y.year?'bg-blue-600 text-white shadow-md':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
+      </div>})()}
 
       {/* KPIs — all use market value where applicable */}
       {(()=>{
+        const curYr=new Date().getFullYear();
+        const relevantYears=annual.filter(y=>y.n>=6||y.year===curYr);
         const fy=dashYear==='all'?null:annual.find(y=>y.year===dashYear);
-        const fRev=fy?fy.revenue:revenue;
-        const fNet=fy?fy.net:(stmtNet||totNet);
-        const fComm=fy?fy.commission:stmtComm;
-        const fDuke=fy?fy.duke:stmtDuke;
-        const fHoa=fy?fy.hoa:stmtHoa;
-        const fMaint=fy?fy.maintenance:stmtMaint;
-        const fWater=fy?fy.water:stmtWater;
-        const fVendor=fy?fy.vendor:stmtVendor;
+        // When 'Todos', only sum relevant years (not 2021 with 2 months)
+        const relStmts=dashYear==='all'?stmts.filter(s=>relevantYears.some(y=>y.year===s.year)):stmts.filter(s=>s.year===dashYear);
+        const fRev=fy?fy.revenue:relStmts.reduce((s,x)=>s+(x.revenue||0),0);
+        const fNet=fy?fy.net:relStmts.reduce((s,x)=>s+(x.net||0),0);
+        const fComm=fy?fy.commission:relStmts.reduce((s,x)=>s+(x.commission||0),0);
+        const fDuke=fy?fy.duke:relStmts.reduce((s,x)=>s+(x.duke||0),0);
+        const fHoa=fy?fy.hoa:relStmts.reduce((s,x)=>s+(x.hoa||0),0);
+        const fMaint=fy?fy.maintenance:relStmts.reduce((s,x)=>s+(x.maintenance||0),0);
+        const fWater=fy?fy.water:relStmts.reduce((s,x)=>s+(x.water||0),0);
+        const fVendor=fy?fy.vendor:relStmts.reduce((s,x)=>s+(x.vendor||0),0);
         const fOpEx=fComm+fDuke+fHoa+fMaint+fWater+fVendor+(dashYear==='all'?totExp:0);
         const fNoi=fRev-fOpEx;
-        const fCF=fNoi-annualMortgage;
-        const fCoc=totCont>0?(fCF/totCont)*100:0;
+        const fCF=fNoi-(dashYear==='all'?annualMortgage*relevantYears.length:annualMortgage);
+        const fCoc=totCont>0?(dashYear==='all'&&relevantYears.length>1?(fCF/relevantYears.length/totCont)*100:(fCF/totCont)*100):0;
         const fMargin=fRev>0?(fNet/fRev)*100:0;
         const fExpR=fRev>0?(fOpEx/fRev)*100:0;
-        // CAP RATE uses market value, not purchase price
-        const fCapR=marketValue>0?(fNoi/marketValue)*100:0;
-        const fADR=fy?(fy.revenue/(fy.n*30)):stmts.length>0?(revenue/(stmts.length*30)):0;
+        const fCapR=marketValue>0?((fy?fNoi:relevantYears.length>0?fNoi/relevantYears.length:0)/marketValue)*100:0;
+        const fADR=fy?(fy.revenue/(fy.n*30)):relStmts.length>0?(fRev/(relStmts.length*30)):0;
         return <>
       {/* Row 1: Core Financial */}
       <div className="grid grid-cols-5 gap-3 mb-3">
-        <KPI label={`Revenue ${dashYear!=='all'?dashYear:'Total'}`} value={fm(fRev)} sub={fy?fy.n+' meses':stmts.length+' stmts'} color="blue" trend={yoyTrend}/>
+        <KPI label={`Revenue ${dashYear!=='all'?dashYear:'Total'}`} value={fm(fRev)} sub={fy?fy.n+' meses':relStmts.length+' stmts'} color="blue" trend={yoyTrend}/>
         <KPI label="NOI" value={fm(fNoi)} sub="Revenue - OpEx" color={fNoi>0?'green':'red'} alert={fNoi<0?'red':fNoi>fRev*0.4?'green':'yellow'}/>
         <KPI label="Cash Flow" value={fm(fCF)} sub={mort.balance>0?'NOI - Mortgage':'= NOI'} color={fCF>0?'green':'red'} alert={fCF<0?'red':'green'}/>
         <KPI label="Cash-on-Cash" value={fCoc.toFixed(1)+'%'} sub="CF / Capital" color={fCoc>8?'green':fCoc>4?'amber':'red'} alert={fCoc>8?'green':fCoc<0?'red':null}/>
@@ -515,21 +526,21 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
 
       {/* CHARTS ROW 1: Revenue & Net annual + Revenue mensual */}
-      {annual.length>0&&<div className="grid grid-cols-2 gap-4 mb-4">
+      {relAnnual.length>0&&<div className="grid grid-cols-2 gap-4 mb-4">
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-4">📊 Revenue vs Net — Anual</h3>
-          <ResponsiveContainer width="100%" height={200}><ComposedChart data={annual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[6,6,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[6,6,0,0]}/></ComposedChart></ResponsiveContainer>
+          <ResponsiveContainer width="100%" height={200}><ComposedChart data={relAnnual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[6,6,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[6,6,0,0]}/></ComposedChart></ResponsiveContainer>
         </div>
         {/* Revenue mensual — single year selector for clarity */}
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-slate-700">📈 Revenue Mensual</h3>
-            <div className="flex gap-1">{Object.keys(monthly).sort().map(y=>
+            <div className="flex gap-1">{Object.keys(relMonthly).sort().map(y=>
               <button key={y} onClick={()=>setDashYear(parseInt(y))} className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition ${dashYear===parseInt(y)?'bg-blue-600 text-white':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{y}</button>
             )}</div>
           </div>
           {(()=>{
-            const yr=dashYear!=='all'?dashYear:parseInt(Object.keys(monthly).sort().pop()||0);
-            const md=monthly[yr];if(!md)return<p className="text-xs text-slate-400 text-center py-8">Selecciona un año</p>;
+            const yr=dashYear!=='all'?dashYear:parseInt(Object.keys(relMonthly).sort().pop()||0);
+            const md=relMonthly[yr]||monthly[yr];if(!md)return<p className="text-xs text-slate-400 text-center py-8">Selecciona un año</p>;
             const data=M.map((m,i)=>({month:m,revenue:md.rev[i]||0,net:md.net[i]||0})).filter(d=>d.revenue>0||d.net>0);
             if(!data.length)return<p className="text-xs text-slate-400 text-center py-8">Sin datos para {yr}</p>;
             return<ResponsiveContainer width="100%" height={200}>
@@ -569,10 +580,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
 
       {/* P&L TABLE + MONTH RANKING + COSTS TREND */}
-      {annual.length>0&&<>
+      {relAnnual.length>0&&<>
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm col-span-2"><h3 className="text-sm font-bold text-slate-700 mb-3">📋 P&L Anual</h3>
-            <Tbl cols={[{label:'Año',render:r=><span className="font-extrabold text-slate-800">{r.year}{r.n<12?` (${r.n}m)`:''}</span>},{label:'Revenue',r:true,render:r=><span className="text-blue-600 font-bold">{fm(r.revenue)}</span>},{label:'Comisión',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},{label:'Elect.',r:true,render:r=>fm(r.duke)},{label:'HOA',r:true,render:r=>fm(r.hoa)},{label:'Maint',r:true,render:r=>fm(r.maintenance)},{label:'Net',r:true,render:r=><span className="font-extrabold text-emerald-600">{fm(r.net)}</span>},{label:'Margen',r:true,render:r=>{const m=r.revenue?r.net/r.revenue*100:0;return<span className={`font-bold ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(1)}%</span>}}]} rows={annual}/>
+            <Tbl cols={[{label:'Año',render:r=><span className="font-extrabold text-slate-800">{r.year}{r.n<12?` (${r.n}m)`:''}</span>},{label:'Revenue',r:true,render:r=><span className="text-blue-600 font-bold">{fm(r.revenue)}</span>},{label:'Comisión',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},{label:'Elect.',r:true,render:r=>fm(r.duke)},{label:'HOA',r:true,render:r=>fm(r.hoa)},{label:'Maint',r:true,render:r=>fm(r.maintenance)},{label:'Net',r:true,render:r=><span className="font-extrabold text-emerald-600">{fm(r.net)}</span>},{label:'Margen',r:true,render:r=>{const m=r.revenue?r.net/r.revenue*100:0;return<span className={`font-bold ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(1)}%</span>}}]} rows={relAnnual}/>
           </div>
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">🏆 Ranking Meses</h3>
             {monthRank.length>0?<div className="space-y-1">{monthRank.map((r,i)=><div key={r.month} className={`flex items-center justify-between py-1.5 px-3 rounded-lg text-xs ${i<3?'bg-emerald-50 font-bold':i>=monthRank.length-3?'bg-rose-50':'bg-slate-50'}`}><div className="flex items-center gap-2"><span className="text-slate-400 w-4 text-right">{i+1}</span><span className={i<3?'text-emerald-700':i>=monthRank.length-3?'text-rose-600':'text-slate-600'}>{r.month}</span></div><span className={i<3?'text-emerald-600':i>=monthRank.length-3?'text-rose-500':'text-slate-500'}>{fm(r.avg)}</span></div>)}</div>:<p className="text-xs text-slate-400 text-center py-8">Necesita 12 meses de datos</p>}
@@ -582,7 +593,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         {/* Costs trend + Break-even */}
         <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">📊 Tendencia de Costos</h3>
-            <ResponsiveContainer width="100%" height={180}><ComposedChart data={annual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/><Bar dataKey="hoa" name="HOA" fill="#7C3AED" radius={[4,4,0,0]}/><Bar dataKey="duke" name="Electricidad" fill="#F59E0B" radius={[4,4,0,0]}/><Line dataKey="commission" name="Comisión" stroke="#DC2626" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
+            <ResponsiveContainer width="100%" height={180}><ComposedChart data={relAnnual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/><Bar dataKey="hoa" name="HOA" fill="#7C3AED" radius={[4,4,0,0]}/><Bar dataKey="duke" name="Electricidad" fill="#F59E0B" radius={[4,4,0,0]}/><Line dataKey="commission" name="Comisión" stroke="#DC2626" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
           </div>
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">🎯 Break-Even</h3>
             {(()=>{const lf=annual.filter(y=>y.n===12);if(!lf.length)return<p className="text-xs text-slate-400 text-center py-8">Necesita 1 año completo</p>;const ly=lf[lf.length-1];const tc=ly.commission+ly.duke+ly.water+ly.hoa+ly.maintenance+ly.vendor+annualMortgage;const adr=ly.revenue/365;const bed=adr>0?Math.ceil(tc/adr):0;const beo=bed>0?((bed/365)*100):0;return<div className="grid grid-cols-2 gap-3">
@@ -872,8 +883,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="bg-slate-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-slate-500 font-semibold uppercase">LTV</div><div className="text-sm font-extrabold text-slate-800">{ltv.toFixed(0)}%</div></div>
           <div className="bg-slate-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-slate-500 font-semibold uppercase">Capital</div><div className="text-sm font-extrabold text-slate-800">{fm(totCont)}</div></div>
         </div>
-        {annual.length>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Evolución Anual</h3>
-          <ResponsiveContainer width="100%" height={220}><ComposedChart data={annual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[4,4,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[4,4,0,0]}/><Line dataKey="commission" name="Comisión" stroke="#DC2626" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
+        {relAnnual.length>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Evolución Anual</h3>
+          <ResponsiveContainer width="100%" height={220}><ComposedChart data={relAnnual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[4,4,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[4,4,0,0]}/><Line dataKey="commission" name="Comisión" stroke="#DC2626" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
         </>}
         {monthRank.length>0&&<><h3 className="text-sm font-bold text-slate-700 mt-5 mb-3">Estacionalidad — Mejores y Peores Meses</h3>
           <div className="grid grid-cols-4 gap-2">{monthRank.slice(0,4).map((r,i)=><div key={r.month} className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-100"><div className="text-[10px] text-emerald-600 font-bold">#{i+1} MEJOR</div><div className="text-base font-extrabold text-emerald-700">{r.month}</div><div className="text-xs text-emerald-500">{fm(r.avg)} avg</div></div>)}
