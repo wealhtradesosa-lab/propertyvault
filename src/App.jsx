@@ -3,7 +3,7 @@ import { db, auth } from './firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where, updateDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart, Line } from 'recharts';
-import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock } from 'lucide-react';
+import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer } from 'lucide-react';
 
 // ═══ CONSTANTS ═══
 const C=['#2563EB','#059669','#F59E0B','#7C3AED','#DC2626','#0891B2','#DB2777','#65A30D'];
@@ -460,9 +460,18 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ DASHBOARD PREMIUM (unified) ═══ */}
     {view==='dashboard'&&<>
-      <div className="flex justify-between items-start mb-4">
+      {/* Print-only header */}
+      <div className="hidden print-header">
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-end'}}>
+          <div><h1 style={{fontSize:'20px',fontWeight:800,color:'#1E293B',margin:0}}>OwnerDesk — {prop.name}</h1><p style={{fontSize:'10px',color:'#64748B',margin:'4px 0 0'}}>{prop.address}, {prop.city}, {prop.state} · {prop.manager&&`PM: ${prop.manager} (${prop.managerCommission||15}%)`} · Compra: {fm(prop.purchasePrice)}{marketValue!==prop.purchasePrice?` · Mercado: ${fm(marketValue)}`:''} · Generado: {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div>
+          <div style={{textAlign:'right'}}><div style={{fontSize:'22px',fontWeight:900,color:'#1E3A5F',letterSpacing:'-1px'}}>OD</div><div style={{fontSize:'7px',color:'#94A3B8',letterSpacing:'1px'}}>INVESTMENT PROPERTY INTELLIGENCE</div></div>
+        </div>
+      </div>
+
+      <div className="flex justify-between items-start mb-4 no-print">
         <div><h1 className="text-[22px] font-extrabold text-slate-800">{prop.name} <button onClick={()=>{setSettingsForm(null);setView('settings')}} className="inline-flex items-center text-slate-300 hover:text-blue-500 ml-1 align-middle"><Pencil size={14}/></button></h1><p className="text-sm text-slate-400">{prop.address}, {prop.city}, {prop.state} · {prop.bedrooms||'?'}BR/{prop.bathrooms||'?'}BA {prop.manager&&`· PM: ${prop.manager} (${prop.managerCommission||15}%)`} · <span className="text-slate-500">Compra: {fm(prop.purchasePrice)}</span>{marketValue!==prop.purchasePrice&&<span className="text-emerald-600 font-semibold"> · Mercado: {fm(marketValue)}</span>}</p></div>
         <div className="flex gap-2">
+          <button onClick={()=>window.print()} className="px-3.5 py-2 bg-slate-100 text-slate-600 text-xs rounded-xl font-bold hover:bg-slate-200 flex items-center gap-1.5 transition"><Printer size={13}/> Imprimir PDF</button>
           <button onClick={()=>{setEf({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="px-3.5 py-2 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 flex items-center gap-1.5 shadow-sm"><Plus size={13}/> Gasto</button>
           <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="px-3.5 py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Upload size={13}/> Statement</button>
         </div>
@@ -510,25 +519,32 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <KPI label="Margen" value={fMargin.toFixed(1)+'%'} sub="Net / Revenue" color={fMargin>50?'green':fMargin>40?'amber':'red'} alert={fMargin<40?'red':fMargin>50?'green':null}/>
       </div>
       {/* Row 2: Investment + Property Value */}
-      <div className="grid grid-cols-5 gap-3 mb-4">
+      <div className="grid grid-cols-6 gap-3 mb-4">
         <KPI label="Valor de Mercado" value={fm(marketValue)} sub={latestVal?'Actualizado '+fmDate(latestVal.date):'= Precio compra'} color="cyan"/>
         <KPI label="Equity Real" value={fm(realEquity)} sub={realLTV>0?'LTV: '+realLTV.toFixed(0)+'%':'Sin hipoteca'} color="green"/>
         <KPI label="ADR Promedio" value={fm(fADR)} sub="/noche estimado" color="blue"/>
         <KPI label="Cap Rate Real" value={fCapR.toFixed(2)+'%'} sub="NOI / Valor Mercado" color={fCapR>6?'green':fCapR>4?'amber':'red'}/>
         <KPI label="Expense Ratio" value={fExpR.toFixed(1)+'%'} sub="OpEx / Revenue" color={fExpR<50?'green':fExpR<60?'amber':'red'}/>
+        {annualMortgage>0?<KPI label="DSCR" value={fNoi>0?(fNoi/annualMortgage).toFixed(2):'N/A'} sub={fNoi/annualMortgage>1.25?'Saludable — cubre deuda':fNoi/annualMortgage>1?'Ajustado':'No cubre deuda'} color={fNoi/annualMortgage>1.25?'green':fNoi/annualMortgage>1?'amber':'red'} alert={fNoi/annualMortgage<1?'red':fNoi/annualMortgage>1.25?'green':null}/>:<KPI label="Capital Invertido" value={fm(totCont)} sub={partners.length+' socio(s)'} color="purple"/>}
       </div>
       </>;})()}
 
       {/* ALERTS */}
-      {(cashFlow<0||margin<40||expRatio>60)&&<div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-4 flex items-start gap-3">
+      {/* Alerts */}
+      {(cashFlow<0||margin<40||expRatio>60||(annualMortgage>0&&noi/annualMortgage<1))&&<div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-4 flex items-start gap-3 print-avoid">
         <AlertTriangle size={20} className="text-rose-500 mt-0.5 shrink-0"/>
-        <div><div className="text-sm font-bold text-rose-700 mb-1">Alertas</div>
+        <div><div className="text-sm font-bold text-rose-700 mb-1">Alertas de Rendimiento</div>
           <div className="text-xs text-rose-600 space-y-0.5">
-            {cashFlow<0&&<div>⚠ Cash Flow negativo — la propiedad no cubre hipoteca</div>}
-            {margin<40&&<div>⚠ Margen bajo ({margin.toFixed(1)}%)</div>}
-            {expRatio>60&&<div>⚠ Expense ratio alto ({expRatio.toFixed(1)}%)</div>}
+            {cashFlow<0&&<div>⚠ Cash Flow negativo ({fm(cashFlow)}) — la propiedad no cubre sus costos + hipoteca</div>}
+            {margin<40&&<div>⚠ Margen bajo ({margin.toFixed(1)}%) — revisar estructura de costos</div>}
+            {expRatio>60&&<div>⚠ Expense ratio alto ({expRatio.toFixed(1)}%) — los gastos consumen más del 60% del revenue</div>}
+            {annualMortgage>0&&noi/annualMortgage<1&&<div>⚠ DSCR por debajo de 1 ({(noi/annualMortgage).toFixed(2)}) — el NOI no cubre el pago de deuda</div>}
           </div>
         </div>
+      </div>}
+      {cashFlow>0&&margin>50&&expRatio<50&&<div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 mb-4 flex items-center gap-3 print-avoid">
+        <CheckCircle size={18} className="text-emerald-500 shrink-0"/>
+        <div className="text-xs text-emerald-700"><b>Propiedad saludable:</b> Cash flow positivo ({fm(cashFlow)}), margen del {margin.toFixed(1)}%, expense ratio controlado ({expRatio.toFixed(0)}%){annualMortgage>0&&noi/annualMortgage>1.25?`, DSCR ${(noi/annualMortgage).toFixed(2)}`:''}</div>
       </div>}
 
       {/* CHARTS ROW 1: Revenue & Net annual + Revenue mensual */}
@@ -619,6 +635,16 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="grid grid-cols-3 gap-2 text-center text-[10px]"><div className="bg-white rounded-xl p-2"><div className="text-slate-400 font-semibold">Aportado</div><div className="font-extrabold text-emerald-600 text-sm">{fm(t.cont)}</div></div><div className="bg-white rounded-xl p-2"><div className="text-slate-400 font-semibold">Gastos</div><div className="font-extrabold text-rose-500 text-sm">{fm(t.exp)}</div></div><div className="bg-white rounded-xl p-2"><div className="text-slate-400 font-semibold">Ingreso</div><div className="font-extrabold text-blue-600 text-sm">{fm(t.inc)}</div></div></div>
         </div>})}</div>
       </div>}
+
+      {/* Print-only comprehensive summary */}
+      <div className="hidden print-footer">
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:'12px',marginBottom:'12px',fontSize:'10px'}}>
+          <div><b>Fórmulas:</b><br/>NOI = Revenue - OpEx (sin mortgage)<br/>Cash Flow = NOI - Pago anual hipoteca<br/>Cash-on-Cash = CF Anual / Capital Invertido</div>
+          <div><b>Valoración:</b><br/>Cap Rate Real = NOI / Valor de Mercado<br/>Equity = Valor Mercado - Balance Hipoteca<br/>LTV = Balance / Valor de Mercado</div>
+          <div><b>Propiedad:</b><br/>Compra: {fm(prop.purchasePrice)} · Mercado: {fm(marketValue)}<br/>{mort.balance>0?`Hipoteca: ${fm(mort.balance)} · Tasa: ${mort.rate}%`:''}<br/>Capital Total: {fm(totCont)}</div>
+        </div>
+        OwnerDesk — Investment Property Intelligence · {prop.name} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})} · Este reporte es confidencial
+      </div>
 
       {!annual.length&&!income.length&&<Empty icon={BarChart3} title="Empieza a registrar datos" desc="Carga statements, registra ingresos y gastos para ver tu dashboard financiero profesional." action="Cargar Statement" onAction={()=>{setUploadLog([]);setModal('upload')}}/>}
     </>}
@@ -901,11 +927,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ REPORTS ═══ */}
     {view==='reports'&&<>
-      <h1 className="text-[22px] font-extrabold text-slate-800 mb-2">📄 Reportes Financieros</h1>
-      <p className="text-sm text-slate-400 mb-5">Reportes profesionales de tu propiedad. Usa Ctrl+P para imprimir o guardar como PDF.</p>
+      <div className="flex justify-between items-center mb-2 no-print"><h1 className="text-[22px] font-extrabold text-slate-800">📄 Reportes Financieros</h1><button onClick={()=>window.print()} className="px-4 py-2.5 bg-slate-100 text-slate-600 text-xs rounded-xl font-bold hover:bg-slate-200 flex items-center gap-1.5 transition"><Printer size={13}/> Imprimir PDF</button></div>
+      <p className="text-sm text-slate-400 mb-5 no-print">Reportes profesionales de tu propiedad. Selecciona un reporte y dale Imprimir PDF.</p>
 
       {/* Report tabs */}
-      <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-slate-200 shadow-sm mb-5 overflow-x-auto">
+      <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-slate-200 shadow-sm mb-5 overflow-x-auto no-print">
         {[['performance','📊 Rendimiento'],['pnl','📋 P&L Detallado'],['partners','👥 Socios'],['cashflow','💰 Cash Flow'],['mortgage_rpt','🏦 Hipoteca'],['expenses_rpt','🧾 Gastos']].map(([k,l])=>
           <button key={k} onClick={()=>setRptTab(k)} className={`px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${rptTab===k?'bg-blue-600 text-white shadow-md':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}>{l}</button>
         )}

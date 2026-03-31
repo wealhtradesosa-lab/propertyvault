@@ -9,11 +9,56 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
-/* Smooth transitions */
 * { scroll-behavior: smooth; }
+
+/* Slide-in animation for drawer modals */
+@keyframes slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.animate-slide-in { animation: slide-in 0.25s ease-out; }
+
+/* ═══ PRINT STYLES ═══ */
+@media print {
+  body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  
+  /* Hide non-printable elements */
+  .no-print, nav, button, .fixed, [class*="md:hidden"] { display: none !important; }
+  
+  /* Reset layout for print */
+  .min-h-screen { min-height: auto !important; }
+  .flex { display: block !important; }
+  .w-60 { display: none !important; } /* sidebar */
+  .overflow-auto { overflow: visible !important; }
+  .pt-\[72px\] { padding-top: 0 !important; }
+  
+  /* Print-specific styles */
+  .print-break { page-break-before: always; }
+  .print-avoid { page-break-inside: avoid; }
+  
+  /* Make grids print-friendly */
+  .grid { page-break-inside: avoid; }
+  
+  /* Ensure colors print */
+  .bg-blue-50, .bg-emerald-50, .bg-rose-50, .bg-amber-50, .bg-purple-50, .bg-cyan-50,
+  .bg-slate-50, .bg-blue-100, .bg-emerald-100, .bg-rose-100 {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Charts */
+  .recharts-wrapper { page-break-inside: avoid; }
+  
+  /* Header */
+  .print-header { display: block !important; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 3px solid #1E3A5F; }
+  .print-header h1 { font-size: 20px; font-weight: 800; color: #1E293B; }
+  .print-header p { font-size: 10px; color: #64748B; }
+  
+  /* Footer */
+  .print-footer { display: block !important; margin-top: 24px; padding-top: 12px; border-top: 1px solid #E2E8F0; text-align: center; font-size: 9px; color: #94A3B8; }
+  
+  /* Page settings */
+  @page { margin: 0.6in; size: letter; }
+}
