@@ -418,7 +418,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0),[mortCalc,extraP]);
 
   const pN=id=>partners.find(p=>p.id===id)?.name||id;const pCl=id=>partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'analytics',icon:<BarChart3 size={18}/>,l:'Análisis'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'repairs',icon:<Wrench size={18}/>,l:'Reparaciones'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Valorización'},{id:'pipeline',icon:<Clock size={18}/>,l:'Pipeline'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'repairs',icon:<Wrench size={18}/>,l:'Reparaciones'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Valorización'},{id:'pipeline',icon:<Clock size={18}/>,l:'Pipeline'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
 
   if(loading)return<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 size={36} className="animate-spin text-blue-500"/></div>;
   return <div className="min-h-screen bg-[#F8FAFC] flex">
@@ -446,9 +446,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     <div className="flex-1 overflow-auto"><div className="p-6 pt-[72px] md:pt-6 max-w-[1200px]">
 
-    {/* ═══ DASHBOARD PREMIUM ═══ */}
+    {/* ═══ DASHBOARD PREMIUM (unified) ═══ */}
     {view==='dashboard'&&<>
-      <div className="flex justify-between items-start mb-6">
+      <div className="flex justify-between items-start mb-4">
         <div><h1 className="text-[22px] font-extrabold text-slate-800">{prop.name}</h1><p className="text-sm text-slate-400">{prop.address}, {prop.city}, {prop.state} · {prop.bedrooms||'?'}BR/{prop.bathrooms||'?'}BA {prop.manager&&`· PM: ${prop.manager} (${prop.managerCommission||15}%)`}</p></div>
         <div className="flex gap-2">
           <button onClick={()=>{setNf({date:'',month:'',grossAmount:''});setModal('income')}} className="px-3.5 py-2 bg-emerald-600 text-white text-xs rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"><Plus size={13}/> Ingreso</button>
@@ -457,16 +457,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
       </div>
 
-      {/* Year Filter */}
-      {annual.length>0&&<div className="flex items-center gap-1.5 mb-4 flex-wrap">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Año:</span>
-        <button onClick={()=>setDashYear('all')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${dashYear==='all'?'bg-blue-600 text-white shadow-sm':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Todos</button>
-        {annual.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${dashYear===y.year?'bg-blue-600 text-white shadow-sm':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
+      {/* Year Filter Tabs */}
+      {annual.length>0&&<div className="flex items-center gap-1.5 mb-5 flex-wrap">
+        <button onClick={()=>setDashYear('all')} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear==='all'?'bg-blue-600 text-white shadow-md':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>Todos</button>
+        {annual.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear===y.year?'bg-blue-600 text-white shadow-md':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
       </div>}
 
-      {/* ROW 1: Core Financial KPIs */}
+      {/* KPIs — all use market value where applicable */}
       {(()=>{
-        // Filter metrics by year if selected
         const fy=dashYear==='all'?null:annual.find(y=>y.year===dashYear);
         const fRev=fy?fy.revenue:revenue;
         const fNet=fy?fy.net:(stmtNet||totNet);
@@ -482,121 +480,108 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         const fCoc=totCont>0?(fCF/totCont)*100:0;
         const fMargin=fRev>0?(fNet/fRev)*100:0;
         const fExpR=fRev>0?(fOpEx/fRev)*100:0;
-        const fCapR=prop.purchasePrice>0?(fNoi/prop.purchasePrice)*100:0;
-        const fADR=fy?(fy.revenue/(fy.n*30)):revenue>0?(revenue/(stmts.length*30)):0;
+        // CAP RATE uses market value, not purchase price
+        const fCapR=marketValue>0?(fNoi/marketValue)*100:0;
+        const fADR=fy?(fy.revenue/(fy.n*30)):stmts.length>0?(revenue/(stmts.length*30)):0;
         return <>
-      <div className="grid grid-cols-5 gap-3 mb-4">
-        <KPI label={`Revenue ${dashYear!=='all'?dashYear:'Total'}`} value={fm(fRev)} sub={dashYear!=='all'&&fy?fy.n+' meses':(stmts.length?stmts.length+' statements':income.length+' ingresos')} color="blue" trend={yoyTrend}/>
+      {/* Row 1: Core Financial */}
+      <div className="grid grid-cols-5 gap-3 mb-3">
+        <KPI label={`Revenue ${dashYear!=='all'?dashYear:'Total'}`} value={fm(fRev)} sub={fy?fy.n+' meses':stmts.length+' stmts'} color="blue" trend={yoyTrend}/>
         <KPI label="NOI" value={fm(fNoi)} sub="Revenue - OpEx" color={fNoi>0?'green':'red'} alert={fNoi<0?'red':fNoi>fRev*0.4?'green':'yellow'}/>
-        <KPI label="Cash Flow" value={fm(fCF)} sub={mort.balance>0?'NOI - Mortgage':'Sin hipoteca'} color={fCF>0?'green':'red'} alert={fCF<0?'red':'green'}/>
-        <KPI label="Cash-on-Cash" value={fCoc.toFixed(1)+'%'} sub={totCont>0?'CF / Capital':''} color={fCoc>8?'green':fCoc>4?'amber':'red'} alert={fCoc>8?'green':fCoc<0?'red':null}/>
-        <KPI label="Margen Neto" value={fMargin.toFixed(1)+'%'} sub="Net / Revenue" color={fMargin>50?'green':fMargin>40?'amber':'red'} alert={fMargin<40?'red':fMargin>50?'green':null}/>
+        <KPI label="Cash Flow" value={fm(fCF)} sub={mort.balance>0?'NOI - Mortgage':'= NOI'} color={fCF>0?'green':'red'} alert={fCF<0?'red':'green'}/>
+        <KPI label="Cash-on-Cash" value={fCoc.toFixed(1)+'%'} sub="CF / Capital" color={fCoc>8?'green':fCoc>4?'amber':'red'} alert={fCoc>8?'green':fCoc<0?'red':null}/>
+        <KPI label="Margen" value={fMargin.toFixed(1)+'%'} sub="Net / Revenue" color={fMargin>50?'green':fMargin>40?'amber':'red'} alert={fMargin<40?'red':fMargin>50?'green':null}/>
       </div>
-
-      <div className="grid grid-cols-4 gap-3 mb-5">
-        <KPI label="ADR Promedio" value={fm(fADR)} sub="/noche estimado" color="cyan"/>
+      {/* Row 2: Investment + Property Value */}
+      <div className="grid grid-cols-5 gap-3 mb-4">
+        <KPI label="Valor de Mercado" value={fm(marketValue)} sub={latestVal?'Actualizado '+fmDate(latestVal.date):'= Precio compra'} color="cyan"/>
+        <KPI label="Equity Real" value={fm(realEquity)} sub={realLTV>0?'LTV: '+realLTV.toFixed(0)+'%':'Sin hipoteca'} color="green"/>
+        <KPI label="ADR Promedio" value={fm(fADR)} sub="/noche estimado" color="blue"/>
+        <KPI label="Cap Rate Real" value={fCapR.toFixed(2)+'%'} sub="NOI / Valor Mercado" color={fCapR>6?'green':fCapR>4?'amber':'red'}/>
         <KPI label="Expense Ratio" value={fExpR.toFixed(1)+'%'} sub="OpEx / Revenue" color={fExpR<50?'green':fExpR<60?'amber':'red'}/>
-        {prop.purchasePrice>0&&<KPI label="Cap Rate" value={fCapR.toFixed(2)+'%'} sub="NOI / Precio" color={fCapR>6?'green':fCapR>4?'amber':'red'}/>}
-        <KPI label="Capital Invertido" value={fm(totCont)} sub={partners.length+' socio(s)'} color="purple"/>
       </div>
       </>;})()}
 
-      {/* SEMÁFORO ALERTS */}
-      {(cashFlow<0||margin<40||expRatio>60)&&<div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-5 flex items-start gap-3">
+      {/* ALERTS */}
+      {(cashFlow<0||margin<40||expRatio>60)&&<div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-4 flex items-start gap-3">
         <AlertTriangle size={20} className="text-rose-500 mt-0.5 shrink-0"/>
-        <div><div className="text-sm font-bold text-rose-700 mb-1">Alertas de Rendimiento</div>
-          <div className="text-xs text-rose-600 space-y-1">
-            {cashFlow<0&&<div>⚠ Cash Flow negativo ({fm(cashFlow)}). La propiedad no cubre sus costos incluyendo hipoteca.</div>}
-            {margin<40&&<div>⚠ Margen por debajo de 40% ({margin.toFixed(1)}%). Revisar estructura de costos.</div>}
-            {expRatio>60&&<div>⚠ Expense ratio alto ({expRatio.toFixed(1)}%). Los gastos consumen más del 60% del revenue.</div>}
+        <div><div className="text-sm font-bold text-rose-700 mb-1">Alertas</div>
+          <div className="text-xs text-rose-600 space-y-0.5">
+            {cashFlow<0&&<div>⚠ Cash Flow negativo — la propiedad no cubre hipoteca</div>}
+            {margin<40&&<div>⚠ Margen bajo ({margin.toFixed(1)}%)</div>}
+            {expRatio>60&&<div>⚠ Expense ratio alto ({expRatio.toFixed(1)}%)</div>}
           </div>
         </div>
       </div>}
-      {cashFlow>0&&margin>50&&<div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-5 flex items-start gap-3">
-        <CheckCircle size={20} className="text-emerald-500 mt-0.5 shrink-0"/>
-        <div><div className="text-sm font-bold text-emerald-700">Propiedad Saludable</div><div className="text-xs text-emerald-600">Cash flow positivo ({fm(cashFlow)}), margen del {margin.toFixed(1)}%. Buen rendimiento.</div></div>
+
+      {/* CHARTS ROW 1: Revenue & Net annual + Revenue mensual */}
+      {annual.length>0&&<div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-4">📊 Revenue vs Net — Anual</h3>
+          <ResponsiveContainer width="100%" height={200}><ComposedChart data={annual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[6,6,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[6,6,0,0]}/></ComposedChart></ResponsiveContainer>
+        </div>
+        {/* Revenue mensual — clean line chart with year selector */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">📈 Revenue Mensual</h3>
+          {Object.keys(monthly).length>0&&<ResponsiveContainer width="100%" height={200}>
+            <ComposedChart data={M.map((m,i)=>{const e={month:m};Object.keys(monthly).forEach(y=>{if(monthly[y].rev[i]>0)e['r'+y]=monthly[y].rev[i]});return e})}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="month" tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
+              {Object.keys(monthly).sort().map((y,i)=><Line key={y} dataKey={'r'+y} name={y} stroke={C[i%C.length]} strokeWidth={2} dot={{r:2.5}} connectNulls/>)}
+            </ComposedChart>
+          </ResponsiveContainer>}
+        </div>
       </div>}
 
-      {/* CHARTS ROW 1: Revenue Annual + Health Score + Rankings */}
-      {annual.length>0&&<div className="grid grid-cols-4 gap-4 mb-4">
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm col-span-2"><h3 className="text-sm font-bold text-slate-700 mb-4">📊 Revenue vs Net — Anual</h3>
-          <ResponsiveContainer width="100%" height={200}><ComposedChart data={annual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[6,6,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[6,6,0,0]}/><Line dataKey="hoa" name="HOA" stroke="#7C3AED" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
+      {/* CHARTS ROW 2: Cash Flow Timeline + Margin + Costs */}
+      {cfTimeline.length>3&&<div className="grid grid-cols-3 gap-4 mb-4">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm col-span-2"><h3 className="text-sm font-bold text-slate-700 mb-3">💰 Cash Flow Acumulado</h3>
+          <ResponsiveContainer width="100%" height={180}><ComposedChart data={cfTimeline}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="period" tick={{fontSize:8,fill:'#94a3b8'}} interval={Math.max(0,Math.floor(cfTimeline.length/12))}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Bar dataKey="net" name="Net Mensual" fill="#2563EB" radius={[3,3,0,0]} opacity={0.3}/><Line dataKey="cumulative" name="Acumulado" stroke="#059669" strokeWidth={2.5} dot={false}/></ComposedChart></ResponsiveContainer>
         </div>
-        {/* Property Health Score */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-          <h3 className="text-sm font-bold text-slate-700 mb-3">🏥 Salud de la Propiedad</h3>
-          {(()=>{let score=0;if(margin>50)score+=25;else if(margin>40)score+=15;if(cashFlow>0)score+=25;else if(noi>0)score+=10;if(coc>8)score+=25;else if(coc>4)score+=15;if(expRatio<50)score+=25;else if(expRatio<60)score+=15;const label=score>=80?'Excelente':score>=60?'Buena':score>=40?'Regular':'Crítica';const color=score>=80?'emerald':score>=60?'blue':score>=40?'amber':'rose';
-            return<div className="text-center">
-              <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full border-4 ${score>=80?'border-emerald-500 bg-emerald-50':score>=60?'border-blue-500 bg-blue-50':score>=40?'border-amber-500 bg-amber-50':'border-rose-500 bg-rose-50'} mb-2`}><span className={`text-2xl font-black ${score>=80?'text-emerald-600':score>=60?'text-blue-600':score>=40?'text-amber-600':'text-rose-600'}`}>{score}</span></div>
-              <div className={`text-sm font-extrabold ${score>=80?'text-emerald-600':score>=60?'text-blue-600':score>=40?'text-amber-600':'text-rose-600'}`}>{label}</div>
-              <div className="text-[10px] text-slate-400 mt-1">de 100 pts</div>
-              <div className="mt-3 space-y-1 text-left">
-                {[['Margen',margin>50,margin>40],['Cash Flow',cashFlow>0,noi>0],['CoC Return',coc>8,coc>4],['Eficiencia',expRatio<50,expRatio<60]].map(([l,g,y])=>
-                  <div key={l} className="flex items-center gap-2 text-[10px]"><div className={`w-2 h-2 rounded-full ${g?'bg-emerald-500':y?'bg-amber-500':'bg-rose-500'}`}/><span className="text-slate-500">{l}</span></div>
-                )}
-              </div>
+        <div className="space-y-3">
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Trailing 12 Months</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Revenue</span><span className="text-sm font-extrabold text-blue-600">{fm(t12.rev)}</span></div>
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Net</span><span className="text-sm font-extrabold text-emerald-600">{fm(t12.net)}</span></div>
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Margen</span><span className="text-sm font-extrabold">{t12.rev?((t12.net/t12.rev)*100).toFixed(1)+'%':'—'}</span></div>
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Promedio/mes</span><span className="text-sm font-extrabold">{t12.n?fm(t12.net/t12.n):'—'}</span></div>
             </div>
-          })()}
-        </div>
-        {/* Ranking */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">🏆 Ranking Meses</h3>
-          {monthRank.length>0?<div className="space-y-1">{monthRank.map((r,i)=><div key={r.month} className={`flex items-center justify-between py-1.5 px-3 rounded-lg text-xs ${i<3?'bg-emerald-50 font-bold':i>=monthRank.length-3?'bg-rose-50':'bg-slate-50'}`}><div className="flex items-center gap-2"><span className="text-slate-400 w-4 text-right">{i+1}</span><span className={i<3?'text-emerald-700':i>=monthRank.length-3?'text-rose-600':'text-slate-600'}>{r.month}</span></div><span className={i<3?'text-emerald-600':i>=monthRank.length-3?'text-rose-500':'text-slate-500'}>{fm(r.avg)}</span></div>)}</div>:<p className="text-xs text-slate-400 text-center py-8">Necesita 12 meses de datos</p>}
-        </div>
-      </div>}
-
-      {/* CHARTS ROW 2: Monthly YoY + Expense Donut + Monthly Net Timeline */}
-      {annual.length>0&&<div className="grid grid-cols-3 gap-4 mb-4">
-        {/* Monthly YoY Revenue */}
-        {Object.keys(monthly).length>0&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">📅 Revenue Mensual YoY</h3>
-          <ResponsiveContainer width="100%" height={180}><BarChart data={M.map((m,i)=>{const e={month:m};Object.keys(monthly).forEach(y=>{e['r'+y]=monthly[y].rev[i]});return e})}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="month" tick={{fontSize:9,fill:'#94a3b8'}}/><YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>fm(v).replace('$','')}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:9}}/>{Object.keys(monthly).sort().map((y,i)=><Bar key={y} dataKey={'r'+y} name={y} fill={C[i%C.length]} radius={[3,3,0,0]}/>)}</BarChart></ResponsiveContainer>
-        </div>}
-        {/* Expense Donut */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">🧩 Distribución de Gastos</h3>
-          {(()=>{const last=annual[annual.length-1];const data=[{name:'Comisión',value:last.commission},{name:'Electricidad',value:last.duke},{name:'HOA',value:last.hoa},{name:'Maint',value:last.maintenance},{name:'Agua',value:last.water},{name:'Otros',value:last.vendor}].filter(d=>d.value>0);
-            return data.length>0?<ResponsiveContainer width="100%" height={180}><PieChart><Pie data={data} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" label={({name,percent})=>`${name} ${(percent*100).toFixed(0)}%`} labelLine={false}>{data.map((_,i)=><Cell key={i} fill={C[i%C.length]}/>)}</Pie><Tooltip formatter={v=>fm(v)}/></PieChart></ResponsiveContainer>:<p className="text-xs text-slate-400 text-center py-8">Sin datos</p>
-          })()}
-        </div>
-        {/* Monthly Net Income Timeline */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">📈 Net Mensual ({annual[annual.length-1].year})</h3>
-          {(()=>{const yr=annual[annual.length-1].year;const md=monthly[yr];if(!md)return<p className="text-xs text-slate-400 text-center py-8">Sin datos</p>;
-            const data=M.map((m,i)=>({month:m,net:md.net[i]}));
-            return<ResponsiveContainer width="100%" height={180}><BarChart data={data}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="month" tick={{fontSize:9,fill:'#94a3b8'}}/><YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>fm(v).replace('$','')}/><Tooltip content={<Tip/>}/><Bar dataKey="net" name="Net" radius={[4,4,0,0]}>{data.map((d,i)=><Cell key={i} fill={d.net>=0?'#059669':'#DC2626'}/>)}</Bar></BarChart></ResponsiveContainer>
-          })()}
-        </div>
-      </div>}
-
-      {/* P&L TABLE */}
-      {annual.length>0&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4"><h3 className="text-sm font-bold text-slate-700 mb-4">📋 P&L — Estado de Resultados</h3>
-        <Tbl cols={[{label:'Año',render:r=><span className="font-extrabold text-slate-800">{r.year}{r.n<12?` (${r.n}m)`:''}</span>},{label:'Revenue',r:true,render:r=><span className="text-blue-600 font-bold">{fm(r.revenue)}</span>},{label:'Comisión',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},{label:'Electricidad',r:true,render:r=>fm(r.duke)},{label:'HOA',r:true,render:r=><span className={r.n>=12&&r.hoa/r.n>600?'text-amber-600 font-semibold':''}>{fm(r.hoa)}</span>},{label:'Maint',r:true,render:r=>fm(r.maintenance)},{label:'Agua',r:true,render:r=>fm(r.water)},{label:'Otros',r:true,render:r=>fm(r.vendor)},{label:'Net',r:true,render:r=><span className="font-extrabold text-emerald-600">{fm(r.net)}</span>},{label:'Margen',r:true,render:r=>{const m=r.revenue?r.net/r.revenue*100:0;return<span className={`font-bold ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(1)}%</span>}}]} rows={annual}/>
-      </div>}
-
-      {/* COST STRUCTURE — Monthly Fixed Costs */}
-      {annual.length>0&&(()=>{const last=annual[annual.length-1];const n=last.n||1;return<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4">
-        <h3 className="text-sm font-bold text-slate-700 mb-1">💡 Estructura de Costos Mensuales ({last.year})</h3>
-        <p className="text-[10px] text-slate-400 mb-4">Lo que cuesta operar esta propiedad cada mes, en promedio</p>
-        <div className="grid grid-cols-6 gap-2 mb-3">
-          {[['Comisión PM',last.commission/n,'💼','blue'],['Electricidad',last.duke/n,'⚡','amber'],['HOA',last.hoa/n,'🏢','purple'],['Mantenimiento',last.maintenance/n,'🔧','cyan'],['Agua',last.water/n,'💧','blue'],['Otros',last.vendor/n,'🛠️','slate']].map(([l,v,ic,cl])=>
-            <div key={l} className={`rounded-xl p-3 text-center bg-${cl==='slate'?'slate':'blue'}-50/50 border border-slate-100`}>
-              <div className="text-lg mb-1">{ic}</div>
-              <div className="text-base font-extrabold text-slate-800">{fm(v)}</div>
-              <div className="text-[9px] text-slate-500 font-semibold">{l}</div>
-              <div className="text-[9px] text-slate-400">{last.revenue?((v*n/last.revenue)*100).toFixed(1)+'% rev':''}</div>
+          </div>
+          <div className={`rounded-2xl p-4 border shadow-sm ${appreciation>=0?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Patrimonio</h3>
+            <div className="space-y-1.5">
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Valor Mercado</span><span className="text-sm font-extrabold">{fm(marketValue)}</span></div>
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Equity</span><span className="text-sm font-extrabold text-emerald-600">{fm(realEquity)}</span></div>
+              <div className="flex justify-between"><span className="text-xs text-slate-500">Apreciación</span><span className={`text-sm font-extrabold ${appreciation>=0?'text-emerald-600':'text-rose-500'}`}>{appreciation.toFixed(1)}%</span></div>
             </div>
-          )}
+          </div>
         </div>
-        <div className="flex items-center justify-between bg-slate-50 rounded-xl p-3 border border-slate-100">
-          <div className="text-xs text-slate-500 font-semibold">Costo operativo mensual total</div>
-          <div className="text-lg font-extrabold text-slate-800">{fm((last.commission+last.duke+last.hoa+last.maintenance+last.water+last.vendor)/n)}/mes</div>
+      </div>}
+
+      {/* P&L TABLE + MONTH RANKING + COSTS TREND */}
+      {annual.length>0&&<>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm col-span-2"><h3 className="text-sm font-bold text-slate-700 mb-3">📋 P&L Anual</h3>
+            <Tbl cols={[{label:'Año',render:r=><span className="font-extrabold text-slate-800">{r.year}{r.n<12?` (${r.n}m)`:''}</span>},{label:'Revenue',r:true,render:r=><span className="text-blue-600 font-bold">{fm(r.revenue)}</span>},{label:'Comisión',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},{label:'Elect.',r:true,render:r=>fm(r.duke)},{label:'HOA',r:true,render:r=>fm(r.hoa)},{label:'Maint',r:true,render:r=>fm(r.maintenance)},{label:'Net',r:true,render:r=><span className="font-extrabold text-emerald-600">{fm(r.net)}</span>},{label:'Margen',r:true,render:r=>{const m=r.revenue?r.net/r.revenue*100:0;return<span className={`font-bold ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(1)}%</span>}}]} rows={annual}/>
+          </div>
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">🏆 Ranking Meses</h3>
+            {monthRank.length>0?<div className="space-y-1">{monthRank.map((r,i)=><div key={r.month} className={`flex items-center justify-between py-1.5 px-3 rounded-lg text-xs ${i<3?'bg-emerald-50 font-bold':i>=monthRank.length-3?'bg-rose-50':'bg-slate-50'}`}><div className="flex items-center gap-2"><span className="text-slate-400 w-4 text-right">{i+1}</span><span className={i<3?'text-emerald-700':i>=monthRank.length-3?'text-rose-600':'text-slate-600'}>{r.month}</span></div><span className={i<3?'text-emerald-600':i>=monthRank.length-3?'text-rose-500':'text-slate-500'}>{fm(r.avg)}</span></div>)}</div>:<p className="text-xs text-slate-400 text-center py-8">Necesita 12 meses de datos</p>}
+          </div>
         </div>
-        {mort.balance>0&&<div className="flex items-center justify-between bg-amber-50 rounded-xl p-3 border border-amber-100 mt-2">
-          <div className="text-xs text-amber-600 font-semibold">+ Pago de Hipoteca</div>
-          <div className="text-lg font-extrabold text-amber-700">{fm(mort.monthlyPayment)}/mes</div>
-        </div>}
-        <div className={`flex items-center justify-between rounded-xl p-3 border mt-2 ${cashFlow>=0?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}>
-          <div className={`text-xs font-bold ${cashFlow>=0?'text-emerald-600':'text-rose-600'}`}>= Revenue necesario para break-even</div>
-          <div className={`text-lg font-extrabold ${cashFlow>=0?'text-emerald-700':'text-rose-700'}`}>{fm(((last.commission+last.duke+last.hoa+last.maintenance+last.water+last.vendor)/n)+(mort.monthlyPayment||0))}/mes</div>
+
+        {/* Costs trend + Break-even */}
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">📊 Tendencia de Costos</h3>
+            <ResponsiveContainer width="100%" height={180}><ComposedChart data={annual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/><Bar dataKey="hoa" name="HOA" fill="#7C3AED" radius={[4,4,0,0]}/><Bar dataKey="duke" name="Electricidad" fill="#F59E0B" radius={[4,4,0,0]}/><Line dataKey="commission" name="Comisión" stroke="#DC2626" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
+          </div>
+          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-3">🎯 Break-Even</h3>
+            {(()=>{const lf=annual.filter(y=>y.n===12);if(!lf.length)return<p className="text-xs text-slate-400 text-center py-8">Necesita 1 año completo</p>;const ly=lf[lf.length-1];const tc=ly.commission+ly.duke+ly.water+ly.hoa+ly.maintenance+ly.vendor+annualMortgage;const adr=ly.revenue/365;const bed=adr>0?Math.ceil(tc/adr):0;const beo=bed>0?((bed/365)*100):0;return<div className="grid grid-cols-2 gap-3">
+              <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Break-Even</div><div className="text-2xl font-extrabold text-amber-700">{bed}</div><div className="text-[10px] text-amber-500">noches/año</div></div>
+              <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100"><div className="text-[10px] text-blue-600 font-bold uppercase">Ocupación Mín.</div><div className="text-2xl font-extrabold text-blue-700">{beo.toFixed(0)}%</div><div className="text-[10px] text-blue-500">para cubrir costos</div></div>
+              <div className="bg-slate-50 rounded-xl p-3 text-center border"><div className="text-[10px] text-slate-500 font-bold uppercase">ADR ({ly.year})</div><div className="text-2xl font-extrabold text-slate-800">{fm(adr)}</div><div className="text-[10px] text-slate-400">/noche</div></div>
+              <div className={`rounded-xl p-3 text-center border ${ly.net>0?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}><div className={`text-[10px] font-bold uppercase ${ly.net>0?'text-emerald-600':'text-rose-600'}`}>Net {ly.year}</div><div className={`text-2xl font-extrabold ${ly.net>0?'text-emerald-700':'text-rose-700'}`}>{fm(ly.net)}</div><div className={`text-[10px] ${ly.net>0?'text-emerald-500':'text-rose-500'}`}>{ly.revenue?((ly.net/ly.revenue)*100).toFixed(0)+'% margen':'—'}</div></div>
+            </div>})()}
+          </div>
         </div>
-      </div>})()}
+      </>}
 
       {/* PARTNER BALANCE */}
       {partners.length>1&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4"><h3 className="text-sm font-bold text-slate-700 mb-4">👥 Balance entre Socios</h3>
@@ -604,36 +589,6 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="flex items-center gap-2.5 mb-3"><div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{background:p.color}}>{p.name.charAt(0)}</div><div><div className="font-bold text-sm">{p.name}</div><div className="text-[10px] text-slate-400">{p.ownership}%</div></div></div>
           <div className="grid grid-cols-3 gap-2 text-center text-[10px]"><div className="bg-white rounded-xl p-2"><div className="text-slate-400 font-semibold">Aportado</div><div className="font-extrabold text-emerald-600 text-sm">{fm(t.cont)}</div></div><div className="bg-white rounded-xl p-2"><div className="text-slate-400 font-semibold">Gastos</div><div className="font-extrabold text-rose-500 text-sm">{fm(t.exp)}</div></div><div className="bg-white rounded-xl p-2"><div className="text-slate-400 font-semibold">Ingreso</div><div className="font-extrabold text-blue-600 text-sm">{fm(t.inc)}</div></div></div>
         </div>})}</div>
-      </div>}
-
-      {/* Cash Flow Timeline + T12 + Equity */}
-      {cfTimeline.length>3&&<div className="grid grid-cols-3 gap-4 mb-4">
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm col-span-2"><h3 className="text-sm font-bold text-slate-700 mb-4">💰 Cash Flow Acumulado</h3>
-          <ResponsiveContainer width="100%" height={200}><ComposedChart data={cfTimeline}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="period" tick={{fontSize:8,fill:'#94a3b8'}} interval={Math.max(0,Math.floor(cfTimeline.length/12))}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="net" name="Net Mensual" fill="#2563EB" radius={[3,3,0,0]} opacity={0.4}/><Line dataKey="cumulative" name="Acumulado" stroke="#059669" strokeWidth={2.5} dot={false}/></ComposedChart></ResponsiveContainer>
-        </div>
-        <div className="space-y-3">
-          {/* Trailing 12 Months */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Trailing 12 Months</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Revenue</span><span className="text-sm font-extrabold text-blue-600">{fm(t12.rev)}</span></div>
-              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Net</span><span className="text-sm font-extrabold text-emerald-600">{fm(t12.net)}</span></div>
-              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Margen</span><span className="text-sm font-extrabold text-slate-700">{t12.rev?((t12.net/t12.rev)*100).toFixed(1)+'%':'—'}</span></div>
-              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Promedio/mes</span><span className="text-sm font-extrabold text-slate-700">{t12.n?fm(t12.net/t12.n):'—'}</span></div>
-            </div>
-            <div className="text-[9px] text-slate-400 mt-2 text-center">{t12.n} meses de data</div>
-          </div>
-          {/* Equity Card */}
-          <div className={`rounded-2xl p-4 border shadow-sm ${appreciation>0?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
-            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Patrimonio</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Valor Mercado</span><span className="text-sm font-extrabold text-slate-800">{fm(marketValue)}</span></div>
-              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Equity</span><span className="text-sm font-extrabold text-emerald-600">{fm(realEquity)}</span></div>
-              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Apreciación</span><span className={`text-sm font-extrabold ${appreciation>=0?'text-emerald-600':'text-rose-500'}`}>{appreciation.toFixed(1)}%</span></div>
-              {realLTV>0&&<div className="flex justify-between items-center"><span className="text-xs text-slate-500">LTV Real</span><span className="text-sm font-extrabold text-slate-700">{realLTV.toFixed(0)}%</span></div>}
-            </div>
-          </div>
-        </div>
       </div>}
 
       {!annual.length&&!income.length&&<Empty icon={BarChart3} title="Empieza a registrar datos" desc="Carga statements, registra ingresos y gastos para ver tu dashboard financiero profesional." action="Cargar Statement" onAction={()=>{setUploadLog([]);setModal('upload')}}/>}
@@ -699,38 +654,6 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </>:<Empty icon={ClipboardList} title="Sin statements" desc="Sube PDFs o ingrésalos manualmente." action="Cargar" onAction={()=>{setUploadLog([]);setModal('upload')}}/>}
     </>})()}
 
-    {/* ═══ ANALYTICS ═══ */}
-    {view==='analytics'&&<>
-      <h1 className="text-[22px] font-extrabold text-slate-800 mb-6">📊 Análisis Financiero</h1>
-      {annual.length>0?<>
-        {Object.keys(monthly).length>0&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4"><h3 className="text-sm font-bold text-slate-700 mb-4">Revenue Mensual — YoY</h3><ResponsiveContainer width="100%" height={250}><BarChart data={M.map((m,i)=>{const e={month:m};Object.keys(monthly).forEach(y=>{e['r'+y]=monthly[y].rev[i]});return e})}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="month" tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/>{Object.keys(monthly).sort().map((y,i)=><Bar key={y} dataKey={'r'+y} name={y} fill={C[i%C.length]} radius={[4,4,0,0]}/>)}</BarChart></ResponsiveContainer></div>}
-        <div className="grid grid-cols-2 gap-4 mb-4">
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-4">Evolución del Margen</h3><ResponsiveContainer width="100%" height={200}><AreaChart data={annual.map(y=>({year:y.year+'',margin:y.revenue?(y.net/y.revenue*100):0}))}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} unit="%"/><Tooltip/><Area dataKey="margin" name="Margen %" stroke="#059669" fill="rgba(5,150,105,.1)"/></AreaChart></ResponsiveContainer></div>
-          <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-4">HOA + Electricidad</h3><ResponsiveContainer width="100%" height={200}><ComposedChart data={annual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="hoa" name="HOA" fill="#7C3AED" radius={[4,4,0,0]}/><Bar dataKey="duke" name="Electricidad" fill="#F59E0B" radius={[4,4,0,0]}/></ComposedChart></ResponsiveContainer></div>
-        </div>
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-4">Tabla Anual Detallada</h3><Tbl cols={[{label:'Año',render:r=><span className="font-extrabold">{r.year}{r.n<12?` (${r.n}m)`:''}</span>},{label:'Revenue',r:true,render:r=><span className="text-blue-600 font-bold">{fm(r.revenue)}</span>},{label:'Comisión',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},{label:'Electric.',r:true,render:r=>fm(r.duke)},{label:'HOA',r:true,render:r=>fm(r.hoa)},{label:'Maint',r:true,render:r=>fm(r.maintenance)},{label:'Agua',r:true,render:r=>fm(r.water)},{label:'Net',r:true,render:r=><span className="font-extrabold text-emerald-600">{fm(r.net)}</span>},{label:'Margen',r:true,render:r=>{const m=r.revenue?r.net/r.revenue*100:0;return<span className={`font-bold ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(1)}%</span>}}]} rows={annual}/></div>
-        {/* Break-even calculator */}
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mt-4"><h3 className="text-sm font-bold text-slate-700 mb-4">🎯 Break-Even Calculator</h3>
-          {(()=>{
-            const lastFull=annual.filter(y=>y.n===12);
-            if(!lastFull.length) return <p className="text-xs text-slate-400 text-center py-4">Necesita al menos 1 año completo de datos</p>;
-            const ly=lastFull[lastFull.length-1];
-            const totalCosts=ly.commission+ly.duke+ly.water+ly.hoa+ly.maintenance+ly.vendor+(annualMortgage||0)+totExp;
-            const avgDailyRev=ly.revenue/365;
-            const breakEvenDays=avgDailyRev>0?Math.ceil(totalCosts/avgDailyRev):0;
-            const breakEvenOcc=breakEvenDays>0?((breakEvenDays/365)*100):0;
-            const actualNetDays=ly.revenue>0?Math.round(365*(ly.net/ly.revenue)):0;
-            const cushionDays=actualNetDays>breakEvenDays?actualNetDays-breakEvenDays:0;
-            return <div className="grid grid-cols-4 gap-3">
-              <div className="bg-slate-50 rounded-xl p-4 text-center border"><div className="text-[10px] text-slate-500 font-bold uppercase">ADR Estimado</div><div className="text-xl font-extrabold text-slate-800 mt-1">{fm(avgDailyRev)}</div><div className="text-[10px] text-slate-400">/noche ({ly.year})</div></div>
-              <div className="bg-amber-50 rounded-xl p-4 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Break-Even</div><div className="text-xl font-extrabold text-amber-700 mt-1">{breakEvenDays} noches</div><div className="text-[10px] text-amber-500">{breakEvenOcc.toFixed(0)}% ocupación mínima</div></div>
-              <div className="bg-blue-50 rounded-xl p-4 text-center border border-blue-100"><div className="text-[10px] text-blue-600 font-bold uppercase">Noches Efectivas</div><div className="text-xl font-extrabold text-blue-700 mt-1">{actualNetDays}</div><div className="text-[10px] text-blue-500">que generaron net</div></div>
-              <div className={`rounded-xl p-4 text-center border ${cushionDays>30?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}><div className={`text-[10px] font-bold uppercase ${cushionDays>30?'text-emerald-600':'text-rose-600'}`}>Margen de Seguridad</div><div className={`text-xl font-extrabold mt-1 ${cushionDays>30?'text-emerald-700':'text-rose-700'}`}>{cushionDays} noches</div><div className={`text-[10px] ${cushionDays>30?'text-emerald-500':'text-rose-500'}`}>sobre break-even</div></div>
-            </div>;
-          })()}
-        </div>
-      </>:<Empty icon={BarChart3} title="Sin datos" desc="Carga statements para análisis." action="Cargar" onAction={()=>{setUploadLog([]);setModal('upload')}}/>}
-    </>}
 
     {/* ═══ EXPENSES ═══ */}
     {view==='expenses'&&<>
