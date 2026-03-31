@@ -277,7 +277,7 @@ function Onboarding({userId,onComplete}) {
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════
 function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProperty,onLogout,onAddProperty,userEmail}) {
-  const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;
+  const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);
@@ -457,22 +457,49 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
       </div>
 
+      {/* Year Filter */}
+      {annual.length>0&&<div className="flex items-center gap-1.5 mb-4 flex-wrap">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Año:</span>
+        <button onClick={()=>setDashYear('all')} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${dashYear==='all'?'bg-blue-600 text-white shadow-sm':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Todos</button>
+        {annual.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${dashYear===y.year?'bg-blue-600 text-white shadow-sm':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
+      </div>}
+
       {/* ROW 1: Core Financial KPIs */}
+      {(()=>{
+        // Filter metrics by year if selected
+        const fy=dashYear==='all'?null:annual.find(y=>y.year===dashYear);
+        const fRev=fy?fy.revenue:revenue;
+        const fNet=fy?fy.net:(stmtNet||totNet);
+        const fComm=fy?fy.commission:stmtComm;
+        const fDuke=fy?fy.duke:stmtDuke;
+        const fHoa=fy?fy.hoa:stmtHoa;
+        const fMaint=fy?fy.maintenance:stmtMaint;
+        const fWater=fy?fy.water:stmtWater;
+        const fVendor=fy?fy.vendor:stmtVendor;
+        const fOpEx=fComm+fDuke+fHoa+fMaint+fWater+fVendor+(dashYear==='all'?totExp:0);
+        const fNoi=fRev-fOpEx;
+        const fCF=fNoi-annualMortgage;
+        const fCoc=totCont>0?(fCF/totCont)*100:0;
+        const fMargin=fRev>0?(fNet/fRev)*100:0;
+        const fExpR=fRev>0?(fOpEx/fRev)*100:0;
+        const fCapR=prop.purchasePrice>0?(fNoi/prop.purchasePrice)*100:0;
+        const fADR=fy?(fy.revenue/(fy.n*30)):revenue>0?(revenue/(stmts.length*30)):0;
+        return <>
       <div className="grid grid-cols-5 gap-3 mb-4">
-        <KPI label="Revenue Total" value={fm(revenue)} sub={stmts.length?stmts.length+' statements':income.length+' ingresos'} color="blue" trend={yoyTrend}/>
-        <KPI label="NOI" value={fm(noi)} sub="Revenue - OpEx (sin mortgage)" color={noi>0?'green':'red'} alert={noi<0?'red':noi>revenue*0.4?'green':'yellow'}/>
-        <KPI label="Cash Flow" value={fm(cashFlow)} sub={mort.balance>0?'NOI - Mortgage':'Sin hipoteca = NOI'} color={cashFlow>0?'green':'red'} alert={cashFlow<0?'red':'green'}/>
-        <KPI label="Cash-on-Cash" value={coc.toFixed(1)+'%'} sub={totCont>0?'CF Anual / Capital':'Sin capital registrado'} color={coc>8?'green':coc>4?'amber':'red'} alert={coc>8?'green':coc<0?'red':null}/>
-        <KPI label="Margen Neto" value={margin.toFixed(1)+'%'} sub="Net / Revenue" color={margin>50?'green':margin>40?'amber':'red'} alert={margin<40?'red':margin>50?'green':null}/>
+        <KPI label={`Revenue ${dashYear!=='all'?dashYear:'Total'}`} value={fm(fRev)} sub={dashYear!=='all'&&fy?fy.n+' meses':(stmts.length?stmts.length+' statements':income.length+' ingresos')} color="blue" trend={yoyTrend}/>
+        <KPI label="NOI" value={fm(fNoi)} sub="Revenue - OpEx" color={fNoi>0?'green':'red'} alert={fNoi<0?'red':fNoi>fRev*0.4?'green':'yellow'}/>
+        <KPI label="Cash Flow" value={fm(fCF)} sub={mort.balance>0?'NOI - Mortgage':'Sin hipoteca'} color={fCF>0?'green':'red'} alert={fCF<0?'red':'green'}/>
+        <KPI label="Cash-on-Cash" value={fCoc.toFixed(1)+'%'} sub={totCont>0?'CF / Capital':''} color={fCoc>8?'green':fCoc>4?'amber':'red'} alert={fCoc>8?'green':fCoc<0?'red':null}/>
+        <KPI label="Margen Neto" value={fMargin.toFixed(1)+'%'} sub="Net / Revenue" color={fMargin>50?'green':fMargin>40?'amber':'red'} alert={fMargin<40?'red':fMargin>50?'green':null}/>
       </div>
 
-      {/* ROW 2: Investment KPIs */}
       <div className="grid grid-cols-4 gap-3 mb-5">
+        <KPI label="ADR Promedio" value={fm(fADR)} sub="/noche estimado" color="cyan"/>
+        <KPI label="Expense Ratio" value={fExpR.toFixed(1)+'%'} sub="OpEx / Revenue" color={fExpR<50?'green':fExpR<60?'amber':'red'}/>
+        {prop.purchasePrice>0&&<KPI label="Cap Rate" value={fCapR.toFixed(2)+'%'} sub="NOI / Precio" color={fCapR>6?'green':fCapR>4?'amber':'red'}/>}
         <KPI label="Capital Invertido" value={fm(totCont)} sub={partners.length+' socio(s)'} color="purple"/>
-        <KPI label="Expense Ratio" value={expRatio.toFixed(1)+'%'} sub="OpEx / Revenue" color={expRatio<50?'green':expRatio<60?'amber':'red'}/>
-        {prop.purchasePrice>0&&<KPI label="Cap Rate" value={capRate.toFixed(2)+'%'} sub="NOI / Precio Compra" color={capRate>6?'green':capRate>4?'amber':'red'}/>}
-        {mort.balance>0?<KPI label="Equity" value={fm(equity)} sub={'LTV: '+ltv.toFixed(0)+'%'} color="cyan"/>:<KPI label="Valor Propiedad" value={fm(prop.purchasePrice)} color="blue"/>}
       </div>
+      </>;})()}
 
       {/* SEMÁFORO ALERTS */}
       {(cashFlow<0||margin<40||expRatio>60)&&<div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-5 flex items-start gap-3">
@@ -736,7 +763,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <div className="bg-amber-50 rounded-2xl p-5 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Meses Menos</div><div className="text-3xl font-extrabold text-amber-700 mt-1">{sNE[sNE.length-1].mo-sE[sE.length-1].mo}</div></div>
           </div><ResponsiveContainer width="100%" height={260}><AreaChart data={sNE.map((d,i)=>({yr:'Año '+d.yr,sin:d.bal,con:sE[i]?.bal||0}))}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="yr" tick={{fontSize:9,fill:'#94a3b8'}} interval={4}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Area dataKey="sin" name="Sin extra" stroke="#DC2626" fill="rgba(220,38,38,.05)"/><Area dataKey="con" name={`$${extraP||0}/mes extra`} stroke="#059669" fill="rgba(5,150,105,.05)"/></AreaChart></ResponsiveContainer></>}
         </div>
-        <button onClick={()=>setModal('editMort')} className="text-sm text-blue-600 font-semibold hover:text-blue-800 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-50 transition"><Settings size={15}/> Editar datos de hipoteca</button>
+        <button onClick={()=>{setMc({bal:String(mort.balance||''),rate:String(mort.rate||''),term:String(mort.termYears||30),pay:String(mort.monthlyPayment||''),start:mort.startDate||''});setModal('editMort')}} className="text-sm text-blue-600 font-semibold hover:text-blue-800 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-50 transition"><Settings size={15}/> Editar datos de hipoteca</button>
       </>:<div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm max-w-lg">
         <div className="flex items-center gap-3 mb-5"><div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center"><Landmark size={24} className="text-blue-600"/></div><div><h3 className="text-base font-extrabold text-slate-800">Configurar Hipoteca</h3><p className="text-xs text-slate-400">Ingresa los datos de tu mortgage.</p></div></div>
         <div className="space-y-3"><div className="grid grid-cols-2 gap-3"><Inp label="Balance" value={mc.bal} onChange={v=>umc('bal',v)} prefix="$" type="number" placeholder="285,000"/><Inp label="Tasa (%)" value={mc.rate} onChange={v=>umc('rate',v)} type="number" placeholder="7.25"/></div>
@@ -1068,9 +1095,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <Inp label="Net al Owner" value={sf.net} onChange={v=>us('net',v)} prefix="$" type="number"/>
     </Mdl>}
 
-    {modal==='editMort'&&<Mdl title="Editar Hipoteca" grad="from-blue-600 to-blue-700" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={async()=>{await saveMortgage();setModal(null)}} disabled={!mc.bal||!mc.rate||!mc.pay||savingMort} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={14} className="animate-spin"/>}Guardar</button></>}>
-      <div className="grid grid-cols-2 gap-3"><Inp label="Balance" value={mc.bal||String(mort.balance||'')} onChange={v=>umc('bal',v)} prefix="$" type="number"/><Inp label="Tasa (%)" value={mc.rate||String(mort.rate||'')} onChange={v=>umc('rate',v)} type="number"/></div>
-      <div className="grid grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mc.term||String(mort.termYears||30)} onChange={v=>umc('term',v)} type="number"/><Inp label="Pago Mensual" value={mc.pay||String(mort.monthlyPayment||'')} onChange={v=>umc('pay',v)} prefix="$" type="number"/><Inp label="Inicio" value={mc.start||mort.startDate||''} onChange={v=>umc('start',v)} type="date"/></div>
+    {modal==='editMort'&&<Mdl title="Editar Hipoteca" grad="from-blue-600 to-blue-700" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={async()=>{await saveMortgage();setModal(null)}} disabled={!(parseFloat(mc.bal)>0)||!(parseFloat(mc.rate)>0)||!(parseFloat(mc.pay)>0)||savingMort} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={14} className="animate-spin"/>}Guardar</button></>}>
+      <div className="grid grid-cols-2 gap-3"><Inp label="Balance" value={mc.bal} onChange={v=>umc('bal',v)} prefix="$" type="number"/><Inp label="Tasa (%)" value={mc.rate} onChange={v=>umc('rate',v)} type="number"/></div>
+      <div className="grid grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mc.term} onChange={v=>umc('term',v)} type="number"/><Inp label="Pago Mensual" value={mc.pay} onChange={v=>umc('pay',v)} prefix="$" type="number"/><Inp label="Inicio" value={mc.start} onChange={v=>umc('start',v)} type="date"/></div>
     </Mdl>}
 
     {modal==='repair'&&<Mdl title={editId?'✏️ Editar Ticket':'🔧 Nuevo Ticket de Reparación'} grad="from-amber-500 to-amber-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...rf,amount:parseFloat(rf.amount)||0};if(editId){update('repairs',editId,data)}else{save('repairs',data)}}} disabled={!rf.title} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
