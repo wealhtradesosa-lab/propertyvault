@@ -3,7 +3,7 @@ import { db, auth } from './firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where, updateDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart, Line } from 'recharts';
-import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil } from 'lucide-react';
+import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu } from 'lucide-react';
 
 // ═══ CONSTANTS ═══
 const C=['#2563EB','#059669','#F59E0B','#7C3AED','#DC2626','#0891B2','#DB2777','#65A30D'];
@@ -280,6 +280,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
+  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);
+  const [vf,setVf]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setVf(x=>({...x,[k]:v})),[]);
+  const [settingsForm,setSettingsForm]=useState(null);
   const [mc,setMc]=useState({bal:'',rate:'',term:'30',pay:'',start:''});const [savingMort,setSavingMort]=useState(false);
   const umc=useCallback((k,v)=>setMc(x=>({...x,[k]:v})),[]);
   const partners=prop.partners||[];const mort=prop.mortgage||{};
@@ -290,7 +293,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const ue=useCallback((k,v)=>setEf(x=>({...x,[k]:v})),[]);const un=useCallback((k,v)=>setNf(x=>({...x,[k]:v})),[]);
   const uc=useCallback((k,v)=>setCf(x=>({...x,[k]:v})),[]);const us=useCallback((k,v)=>setSf(x=>({...x,[k]:v})),[]);
 
-  useEffect(()=>{const b=`properties/${propertyId}`,u=[];const L=(s,fn)=>{u.push(onSnapshot(query(collection(db,b,s),orderBy('createdAt','desc')),snap=>fn(snap.docs.map(d=>({id:d.id,...d.data()})))))};L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
+  useEffect(()=>{const b=`properties/${propertyId}`,u=[];const L=(s,fn)=>{u.push(onSnapshot(query(collection(db,b,s),orderBy('createdAt','desc')),snap=>fn(snap.docs.map(d=>({id:d.id,...d.data()})))))};L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
 
   const save=async(sub,data)=>{await addDoc(collection(db,'properties',propertyId,sub),{...data,createdAt:serverTimestamp()});setModal(null);setEditId(null)};
   const update=async(sub,id,data)=>{await updateDoc(doc(db,'properties',propertyId,sub,id),data);setModal(null);setEditId(null)};
@@ -395,27 +398,51 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   // YoY trend
   const yoyTrend=useMemo(()=>{if(annual.length<2)return null;const curr=annual[annual.length-1],prev=annual[annual.length-2];if(!prev.revenue)return null;const chg=((curr.revenue-prev.revenue)/prev.revenue*100).toFixed(1);return{dir:parseFloat(chg)>=0?'up':'down',text:chg+'% vs '+prev.year}},[annual]);
 
+  // Latest valuation & real equity
+  const latestVal=useMemo(()=>{const sorted=[...valuations].sort((a,b)=>(b.date||'').localeCompare(a.date||''));return sorted[0]||null},[valuations]);
+  const marketValue=latestVal?parseFloat(latestVal.value)||0:prop.purchasePrice||0;
+  const realEquity=marketValue-(mort.balance||0);
+  const appreciation=prop.purchasePrice>0?((marketValue-prop.purchasePrice)/prop.purchasePrice*100):0;
+  const realLTV=marketValue>0&&mort.balance>0?(mort.balance/marketValue*100):0;
+
+  // Trailing 12 months
+  const t12=useMemo(()=>{const sorted=[...stmts].sort((a,b)=>b.year*100+b.month-a.year*100-a.month).slice(0,12);return{rev:sorted.reduce((s,x)=>s+(x.revenue||0),0),net:sorted.reduce((s,x)=>s+(x.net||0),0),n:sorted.length}},[stmts]);
+
+  // Cash flow timeline (cumulative net by month)
+  const cfTimeline=useMemo(()=>{const sorted=[...stmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month);let cum=0;return sorted.map(s=>{cum+=s.net||0;return{period:M[s.month-1]+' '+String(s.year).slice(2),net:s.net||0,cumulative:cum}})},[stmts]);
+
   const mortCalc=useCallback((ex=0)=>{if(!mort.balance||!mort.rate||!mort.monthlyPayment)return[];let b=mort.balance;const mr=mort.rate/100/12;const sc=[];let ti=0;for(let i=1;i<=mort.termYears*12&&b>0;i++){const int=b*mr;const pr=Math.min(mort.monthlyPayment-int+ex,b);b=Math.max(0,b-pr);ti+=int;if(i%12===0||b===0)sc.push({yr:Math.ceil(i/12),mo:i,bal:b,ti})}return sc},[mort]);
   const sNE=useMemo(()=>mortCalc(0),[mortCalc]);
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0),[mortCalc,extraP]);
 
   const pN=id=>partners.find(p=>p.id===id)?.name||id;const pCl=id=>partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'analytics',icon:<BarChart3 size={18}/>,l:'Análisis'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'analytics',icon:<BarChart3 size={18}/>,l:'Análisis'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Valorización'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
 
   if(loading)return<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 size={36} className="animate-spin text-blue-500"/></div>;
   return <div className="min-h-screen bg-[#F8FAFC] flex">
-    {/* SIDEBAR */}
-    <div className="w-60 bg-white border-r border-slate-100 flex flex-col shrink-0">
+    {/* MOBILE HEADER */}
+    <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-200 z-40 px-4 py-3 flex items-center justify-between">
+      <button onClick={()=>setMobileNav(true)} className="p-1.5 hover:bg-slate-100 rounded-lg"><Menu size={22} className="text-slate-600"/></button>
+      <div className="flex items-center gap-2"><span className="text-sm font-extrabold text-slate-800">Owner<span className="text-blue-600">Desk</span></span></div>
+      <div className="w-8"/>
+    </div>
+
+    {/* SIDEBAR — hidden on mobile, overlay when open */}
+    {mobileNav&&<div className="md:hidden fixed inset-0 bg-black/40 z-50" onClick={()=>setMobileNav(false)}/>}
+    <div className={`fixed md:relative z-50 md:z-auto h-full transition-transform duration-300 ${mobileNav?'translate-x-0':'-translate-x-full md:translate-x-0'} w-60 bg-white border-r border-slate-100 flex flex-col shrink-0`}>
       <div className="p-4 border-b border-slate-100">
-        <div className="flex items-center gap-3 mb-3"><div className="w-10 h-10 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-xl flex items-center justify-center shadow-md shadow-blue-600/20"><span className="text-xs font-black text-white tracking-tighter">OD</span></div><div className="min-w-0"><div className="text-sm font-extrabold text-slate-800 truncate">Owner<span className="text-blue-600">Desk</span></div><div className="text-[10px] text-slate-400 truncate">{userEmail}</div></div></div>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3"><div className="w-10 h-10 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-xl flex items-center justify-center shadow-md shadow-blue-600/20"><span className="text-xs font-black text-white tracking-tighter">OD</span></div><div className="min-w-0"><div className="text-sm font-extrabold text-slate-800 truncate">Owner<span className="text-blue-600">Desk</span></div><div className="text-[10px] text-slate-400 truncate">{userEmail}</div></div></div>
+          <button onClick={()=>setMobileNav(false)} className="md:hidden p-1 hover:bg-slate-100 rounded-lg"><X size={18} className="text-slate-400"/></button>
+        </div>
         {allProperties.length>0&&<div className="relative"><select value={propertyId} onChange={e=>onSwitchProperty(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none appearance-none pr-8 cursor-pointer hover:bg-slate-100">{allProperties.map(p=><option key={p.id} value={p.id}>{p.name||'Sin nombre'}</option>)}</select><ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/></div>}
         {onAddProperty&&<button onClick={onAddProperty} className="w-full mt-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl text-[11px] font-bold hover:bg-blue-100 transition flex items-center justify-center gap-1"><Plus size={13}/>Agregar Propiedad</button>}
       </div>
-      <nav className="flex-1 p-3 space-y-0.5">{nav.map(n=><button key={n.id} onClick={()=>setView(n.id)} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] transition-all ${view===n.id?'bg-blue-50 text-blue-700 font-bold':'text-slate-500 hover:bg-slate-50 hover:text-slate-700 font-medium'}`}>{n.icon}{n.l}</button>)}</nav>
+      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">{nav.map(n=><button key={n.id} onClick={()=>{setView(n.id);setMobileNav(false)}} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] transition-all ${view===n.id?'bg-blue-50 text-blue-700 font-bold':'text-slate-500 hover:bg-slate-50 hover:text-slate-700 font-medium'}`}>{n.icon}{n.l}</button>)}</nav>
       <div className="p-3 border-t border-slate-100"><button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition font-medium"><LogOut size={16}/>Cerrar Sesión</button></div>
     </div>
 
-    <div className="flex-1 overflow-auto"><div className="p-6 max-w-[1200px]">
+    <div className="flex-1 overflow-auto"><div className="p-6 pt-[72px] md:pt-6 max-w-[1200px]">
 
     {/* ═══ DASHBOARD PREMIUM ═══ */}
     {view==='dashboard'&&<>
@@ -550,6 +577,36 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>})}</div>
       </div>}
 
+      {/* Cash Flow Timeline + T12 + Equity */}
+      {cfTimeline.length>3&&<div className="grid grid-cols-3 gap-4 mb-4">
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm col-span-2"><h3 className="text-sm font-bold text-slate-700 mb-4">💰 Cash Flow Acumulado</h3>
+          <ResponsiveContainer width="100%" height={200}><ComposedChart data={cfTimeline}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="period" tick={{fontSize:8,fill:'#94a3b8'}} interval={Math.max(0,Math.floor(cfTimeline.length/12))}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="net" name="Net Mensual" fill="#2563EB" radius={[3,3,0,0]} opacity={0.4}/><Line dataKey="cumulative" name="Acumulado" stroke="#059669" strokeWidth={2.5} dot={false}/></ComposedChart></ResponsiveContainer>
+        </div>
+        <div className="space-y-3">
+          {/* Trailing 12 Months */}
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Trailing 12 Months</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Revenue</span><span className="text-sm font-extrabold text-blue-600">{fm(t12.rev)}</span></div>
+              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Net</span><span className="text-sm font-extrabold text-emerald-600">{fm(t12.net)}</span></div>
+              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Margen</span><span className="text-sm font-extrabold text-slate-700">{t12.rev?((t12.net/t12.rev)*100).toFixed(1)+'%':'—'}</span></div>
+              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Promedio/mes</span><span className="text-sm font-extrabold text-slate-700">{t12.n?fm(t12.net/t12.n):'—'}</span></div>
+            </div>
+            <div className="text-[9px] text-slate-400 mt-2 text-center">{t12.n} meses de data</div>
+          </div>
+          {/* Equity Card */}
+          <div className={`rounded-2xl p-4 border shadow-sm ${appreciation>0?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
+            <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">Patrimonio</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Valor Mercado</span><span className="text-sm font-extrabold text-slate-800">{fm(marketValue)}</span></div>
+              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Equity</span><span className="text-sm font-extrabold text-emerald-600">{fm(realEquity)}</span></div>
+              <div className="flex justify-between items-center"><span className="text-xs text-slate-500">Apreciación</span><span className={`text-sm font-extrabold ${appreciation>=0?'text-emerald-600':'text-rose-500'}`}>{appreciation.toFixed(1)}%</span></div>
+              {realLTV>0&&<div className="flex justify-between items-center"><span className="text-xs text-slate-500">LTV Real</span><span className="text-sm font-extrabold text-slate-700">{realLTV.toFixed(0)}%</span></div>}
+            </div>
+          </div>
+        </div>
+      </div>}
+
       {!annual.length&&!income.length&&<Empty icon={BarChart3} title="Empieza a registrar datos" desc="Carga statements, registra ingresos y gastos para ver tu dashboard financiero profesional." action="Cargar Statement" onAction={()=>{setUploadLog([]);setModal('upload')}}/>}
     </>}
 
@@ -665,6 +722,81 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <button onClick={saveMortgage} disabled={!mc.bal||!mc.rate||!mc.pay||savingMort} className="w-full mt-5 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-30 transition shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={16} className="animate-spin"/>}💾 Guardar Hipoteca</button>
       </div>}
     </>}
+
+    {/* ═══ VALUATION & EQUITY ═══ */}
+    {view==='valuation'&&<>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">📈 Valorización & Equity</h1><button onClick={()=>{setVf({date:new Date().toISOString().split('T')[0],value:'',source:'manual',notes:''});setEditId(null);setModal('valuation')}} className="px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Registrar Valor</button></div>
+
+      <div className="grid grid-cols-4 gap-3 mb-5">
+        <KPI label="Precio de Compra" value={fm(prop.purchasePrice)} color="blue"/>
+        <KPI label="Valor de Mercado" value={fm(marketValue)} sub={latestVal?'Actualizado '+fmDate(latestVal.date):'Precio de compra'} color={appreciation>=0?'green':'red'}/>
+        <KPI label="Equity" value={fm(realEquity)} sub={mort.balance>0?'Valor - Hipoteca':'Sin hipoteca'} color="green" alert={realEquity>0?'green':'red'}/>
+        <KPI label="Apreciación" value={appreciation.toFixed(1)+'%'} sub={appreciation>=0?fm(marketValue-prop.purchasePrice)+' ganancia':fm(prop.purchasePrice-marketValue)+' pérdida'} color={appreciation>=0?'green':'red'} trend={{dir:appreciation>=0?'up':'down',text:fm(Math.abs(marketValue-prop.purchasePrice))}}/>
+      </div>
+
+      {mort.balance>0&&<div className="grid grid-cols-3 gap-3 mb-5">
+        <KPI label="LTV Real" value={realLTV.toFixed(1)+'%'} sub={realLTV>80?'Alto apalancamiento':realLTV>60?'Moderado':'Conservador'} color={realLTV>80?'red':realLTV>60?'amber':'green'}/>
+        <KPI label="Balance Hipoteca" value={fm(mort.balance)} color="red"/>
+        <KPI label="Valor Total Invertido" value={fm(totCont)} sub="Capital de todos los socios" color="purple"/>
+      </div>}
+
+      {/* Equity waterfall */}
+      <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4">
+        <h3 className="text-sm font-bold text-slate-700 mb-4">Composición del Equity</h3>
+        <div className="space-y-3">
+          <div className="flex justify-between py-3 px-4 bg-blue-50 rounded-xl border border-blue-100"><span className="font-bold text-blue-700">Valor de Mercado</span><span className="font-extrabold text-blue-700 text-lg">{fm(marketValue)}</span></div>
+          {mort.balance>0&&<div className="pl-6"><div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Balance Hipoteca</span><span className="font-semibold text-rose-500">{fm(mort.balance)}</span></div></div>}
+          <div className={`flex justify-between py-3 px-4 rounded-xl border ${realEquity>=0?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}><span className={`font-bold ${realEquity>=0?'text-emerald-700':'text-rose-700'}`}>= Equity Neto</span><span className={`font-extrabold text-lg ${realEquity>=0?'text-emerald-700':'text-rose-700'}`}>{fm(realEquity)}</span></div>
+          {prop.purchasePrice>0&&<div className="pl-6 space-y-1">
+            <div className="flex justify-between py-2 text-sm"><span className="text-slate-500">Capital aportado (down payment + extras)</span><span className="font-semibold">{fm(totCont)}</span></div>
+            <div className="flex justify-between py-2 text-sm"><span className="text-slate-500">Apreciación / Depreciación</span><span className={`font-semibold ${appreciation>=0?'text-emerald-600':'text-rose-500'}`}>{fm(marketValue-prop.purchasePrice)}</span></div>
+            {mort.balance>0&&<div className="flex justify-between py-2 text-sm"><span className="text-slate-500">Principal pagado (equity por amortización)</span><span className="font-semibold text-blue-600">{fm(prop.purchasePrice-mort.balance-totCont)}</span></div>}
+          </div>}
+        </div>
+      </div>
+
+      {/* Valuation History */}
+      {valuations.length>0&&<>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4"><h3 className="text-sm font-bold text-slate-700 mb-4">Historial de Valorización</h3>
+          <ResponsiveContainer width="100%" height={200}><AreaChart data={[{date:fmDate(prop.purchaseDate),value:prop.purchasePrice},...[...valuations].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(v=>({date:fmDate(v.date),value:parseFloat(v.value)||0}))]}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="date" tick={{fontSize:9,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Area dataKey="value" name="Valor" stroke="#059669" fill="rgba(5,150,105,.1)" strokeWidth={2.5}/></AreaChart></ResponsiveContainer>
+        </div>
+        <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500 font-medium">{fmDate(r.date)}</span>},{label:'Valor Estimado',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.value)}</span>},{label:'Fuente',render:r=><span className="text-xs text-slate-400">{r.source==='zillow'?'Zillow':r.source==='redfin'?'Redfin':r.source==='appraisal'?'Avalúo':r.source==='broker'?'Broker':'Manual'}</span>},{label:'Notas',key:'notes',cls:'text-xs text-slate-400'}]} rows={[...valuations].sort((a,b)=>(b.date||'').localeCompare(a.date||''))} onDel={del} dc="valuations" onEdit={r=>{setVf({date:r.date||'',value:String(r.value||''),source:r.source||'manual',notes:r.notes||''});setEditId(r.id);setModal('valuation')}}/>
+      </>}
+      {!valuations.length&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><p className="text-sm text-slate-400 text-center py-4">Registra el valor actual de tu propiedad para trackear apreciación y equity real. Puedes usar Zillow, Redfin, un avalúo o tu propia estimación.</p></div>}
+    </>}
+
+    {/* ═══ SETTINGS ═══ */}
+    {view==='settings'&&(()=>{
+      const sf2=settingsForm||{name:prop.name||'',address:prop.address||'',city:prop.city||'',state:prop.state||'FL',type:prop.type||'vacation',purchasePrice:String(prop.purchasePrice||''),manager:prop.manager||'',managerCommission:String(prop.managerCommission||15),bedrooms:String(prop.bedrooms||''),bathrooms:String(prop.bathrooms||'')};
+      const uf=(k,v)=>setSettingsForm({...sf2,[k]:v});
+      return <>
+      <h1 className="text-[22px] font-extrabold text-slate-800 mb-6">⚙️ Configuración de la Propiedad</h1>
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl">
+        <h3 className="text-base font-bold text-slate-700 mb-4">Datos Generales</h3>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3"><Inp label="Nombre" value={sf2.name} onChange={v=>uf('name',v)}/><Inp label="Dirección" value={sf2.address} onChange={v=>uf('address',v)}/></div>
+          <div className="grid grid-cols-3 gap-3"><Inp label="Ciudad" value={sf2.city} onChange={v=>uf('city',v)}/><Sel label="Estado" value={sf2.state} onChange={v=>uf('state',v)} options={US.map(s=>({v:s,l:s}))}/><Sel label="Tipo" value={sf2.type} onChange={v=>uf('type',v)} options={PT}/></div>
+          <div className="grid grid-cols-4 gap-3"><Inp label="Precio Compra" value={sf2.purchasePrice} onChange={v=>uf('purchasePrice',v)} prefix="$" type="number"/><Inp label="Property Manager" value={sf2.manager} onChange={v=>uf('manager',v)}/><Inp label="Comisión (%)" value={sf2.managerCommission} onChange={v=>uf('managerCommission',v)} type="number"/><div/></div>
+          <div className="grid grid-cols-4 gap-3"><Inp label="Habitaciones" value={sf2.bedrooms} onChange={v=>uf('bedrooms',v)} type="number"/><Inp label="Baños" value={sf2.bathrooms} onChange={v=>uf('bathrooms',v)} type="number"/></div>
+        </div>
+        <button onClick={async()=>{try{await updateDoc(doc(db,'properties',propertyId),{name:sf2.name,address:sf2.address,city:sf2.city,state:sf2.state,type:sf2.type,purchasePrice:parseFloat(sf2.purchasePrice)||0,manager:sf2.manager,managerCommission:parseFloat(sf2.managerCommission)||15,bedrooms:parseInt(sf2.bedrooms)||0,bathrooms:parseInt(sf2.bathrooms)||0});alert('Guardado. Recarga para ver los cambios.')}catch(e){alert('Error: '+e.message)}}} className="mt-5 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20">💾 Guardar Cambios</button>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl mt-4">
+        <h3 className="text-base font-bold text-slate-700 mb-2">Socios Actuales</h3>
+        <p className="text-xs text-slate-400 mb-4">Para agregar o cambiar socios, contacta al administrador.</p>
+        <div className="space-y-2">{partners.map((p,i)=><div key={p.id} className="flex items-center justify-between py-3 px-4 bg-slate-50 rounded-xl border-l-4" style={{borderLeftColor:p.color}}>
+          <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{background:p.color}}>{p.name.charAt(0)}</div><div><div className="font-semibold text-sm text-slate-700">{p.name}</div><div className="text-[10px] text-slate-400">{p.email||'Sin email'}</div></div></div>
+          <div className="text-right"><div className="font-bold text-sm text-slate-800">{p.ownership}%</div><div className="text-[10px] text-slate-400">Capital: {fm(p.initialCapital)}</div></div>
+        </div>)}</div>
+      </div>
+
+      <div className="bg-rose-50 rounded-2xl border border-rose-200 p-6 max-w-2xl mt-4">
+        <h3 className="text-base font-bold text-rose-700 mb-2">Zona de Peligro</h3>
+        <p className="text-xs text-rose-500 mb-4">Estas acciones son irreversibles.</p>
+        <button onClick={async()=>{if(!confirm('¿ELIMINAR esta propiedad y TODOS sus datos? Esta acción NO se puede deshacer.'))return;if(!confirm('¿Estás SEGURO? Se borrarán todos los statements, gastos, ingresos y aportes.'))return;for(const sub of['expenses','income','contributions','statements','valuations']){const snap=await import('firebase/firestore').then(m=>m.getDocs(collection(db,'properties',propertyId,sub)));for(const d of snap.docs)await deleteDoc(doc(db,'properties',propertyId,sub,d.id))}await deleteDoc(doc(db,'properties',propertyId));window.location.reload()}} className="px-5 py-2.5 bg-rose-600 text-white rounded-xl font-bold text-sm hover:bg-rose-700 transition">🗑️ Eliminar Propiedad</button>
+      </div>
+    </>;})()}
 
     {/* ═══ REPORTS ═══ */}
     {view==='reports'&&<>
@@ -856,6 +988,18 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {modal==='editMort'&&<Mdl title="Editar Hipoteca" grad="from-blue-600 to-blue-700" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={async()=>{await saveMortgage();setModal(null)}} disabled={!mc.bal||!mc.rate||!mc.pay||savingMort} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={14} className="animate-spin"/>}Guardar</button></>}>
       <div className="grid grid-cols-2 gap-3"><Inp label="Balance" value={mc.bal||String(mort.balance||'')} onChange={v=>umc('bal',v)} prefix="$" type="number"/><Inp label="Tasa (%)" value={mc.rate||String(mort.rate||'')} onChange={v=>umc('rate',v)} type="number"/></div>
       <div className="grid grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mc.term||String(mort.termYears||30)} onChange={v=>umc('term',v)} type="number"/><Inp label="Pago Mensual" value={mc.pay||String(mort.monthlyPayment||'')} onChange={v=>umc('pay',v)} prefix="$" type="number"/><Inp label="Inicio" value={mc.start||mort.startDate||''} onChange={v=>umc('start',v)} type="date"/></div>
+    </Mdl>}
+
+    {modal==='valuation'&&<Mdl title={editId?'✏️ Editar Valorización':'📈 Registrar Valor de Mercado'} grad="from-emerald-600 to-teal-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={date:vf.date,value:parseFloat(vf.value)||0,source:vf.source,notes:vf.notes};if(editId){update('valuations',editId,data)}else{save('valuations',data)}}} disabled={!vf.value} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <Inp label="Fecha de Estimación" value={vf.date} onChange={v=>uv('date',v)} type="date"/>
+      <Inp label="Valor Estimado de Mercado" value={vf.value} onChange={v=>uv('value',v)} prefix="$" type="number" placeholder="490,000"/>
+      <Sel label="Fuente" value={vf.source} onChange={v=>uv('source',v)} options={[{v:'manual',l:'Estimación propia'},{v:'zillow',l:'Zillow Zestimate'},{v:'redfin',l:'Redfin Estimate'},{v:'appraisal',l:'Avalúo profesional'},{v:'broker',l:'CMA de broker'},{v:'comps',l:'Comparables de mercado'}]}/>
+      <Inp label="Notas (opcional)" value={vf.notes} onChange={v=>uv('notes',v)} placeholder="Ej: Basado en venta de vecino por $500K"/>
+      {vf.value&&prop.purchasePrice>0&&<div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2 text-sm">
+        <div className="flex justify-between"><span className="text-slate-500">Precio Compra</span><span className="font-semibold">{fm(prop.purchasePrice)}</span></div>
+        <div className="flex justify-between"><span className="text-slate-500">Valor Estimado</span><span className="font-bold text-emerald-600">{fm(parseFloat(vf.value))}</span></div>
+        <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-600 font-semibold">Apreciación</span><span className={`font-extrabold ${parseFloat(vf.value)>=prop.purchasePrice?'text-emerald-600':'text-rose-500'}`}>{((parseFloat(vf.value)-prop.purchasePrice)/prop.purchasePrice*100).toFixed(1)}% ({fm(parseFloat(vf.value)-prop.purchasePrice)})</span></div>
+      </div>}
     </Mdl>}
 
     {modal==='upload'&&<Mdl title="📤 Subir Statements (PDF)" grad="from-blue-600 to-cyan-600" onClose={()=>setModal(null)}>
