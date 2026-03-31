@@ -81,98 +81,125 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs
 async function parsePDF(file) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data:buf}).promise;
-  let text = '';
+
+  // Extract text WITH positions for column detection
+  let allItems = [];
+  let fullText = '';
   for (let i=1; i<=pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    text += content.items.map(it=>it.str).join(' ') + '\n';
+    content.items.forEach(it => {
+      if (it.str.trim()) allItems.push({ text: it.str, x: Math.round(it.transform[4]), y: Math.round(it.transform[5]) });
+    });
+    fullText += content.items.map(it=>it.str).join(' ') + '\n';
   }
 
   // Year & Period
-  const ym = text.match(/Year:\s*(\d{4})\s*Period:\s*(\d+)/);
-  if (!ym || parseInt(ym[2])===0) return {error:'No es un statement mensual válido (Period=0 o no encontrado)'};
+  const ym = fullText.match(/Year:\s*(\d{4})\s*Period:\s*(\d+)/);
+  if (!ym || parseInt(ym[2])===0) return {error:'No es statement mensual (Period 0 o no encontrado)'};
   const year=parseInt(ym[1]), month=parseInt(ym[2]);
 
-  // Universal value finder — tries multiple patterns
-  const findVal = (label) => {
-    const patterns = [
-      // Pattern 1: Label followed by value with $ sign (possibly in parentheses)
-      new RegExp(label+'[\\s:]*\\(?\\$([\\d,]+\\.\\d{2})\\)?','i'),
-      // Pattern 2: Label then some chars then $ value
-      new RegExp(label+'[^\\d$]{0,30}\\(?\\$([\\d,]+\\.\\d{2})\\)?','i'),
-      // Pattern 3: Label then space then just number
-      new RegExp(label+'\\s+\\(?([\\d,]+\\.\\d{2})\\)?','i'),
-      // Pattern 4: Very loose — label anywhere near a dollar amount
-      new RegExp(label+'[\\s\\S]{0,50}?\\$([\\d,]+\\.\\d{2})','i'),
-    ];
-    for (const p of patterns) {
-      const m = text.match(p);
-      if (m) return Math.abs(parseFloat(m[1].replace(/,/g,'')));
+  // Build rows by grouping items at similar Y coordinates
+  const rowMap = {};
+  allItems.forEach(it => {
+    const ry = Math.round(it.y / 3) * 3;
+    if (!rowMap[ry]) rowMap[ry] = [];
+    rowMap[ry].push(it);
+  });
+  const rows = Object.entries(rowMap).map(([y, items]) => ({
+    y: parseInt(y),
+    items: items.sort((a,b) => a.x - b.x),
+    text: items.sort((a,b) => a.x - b.x).map(i=>i.text).join(' ')
+  })).sort((a,b) => b.y - a.y);
+
+  // Find row by label, return FIRST dollar amount (Period column, not YTD)
+  const findRow = (label) => {
+    const lbl = label.toLowerCase();
+    for (const row of rows) {
+      if (row.text.toLowerCase().includes(lbl)) {
+        const amounts = row.text.match(/\$?\(?([\d,]+\.\d{2})\)?/g);
+        if (amounts && amounts.length > 0) {
+          return parseFloat(amounts[0].replace(/[$,()]/g, ''));
+        }
+      }
     }
     return 0;
   };
 
-  // Revenue — try multiple approaches
-  let revenue = findVal('Room Charge');
+  // Revenue
+  let revenue = findRow('Room Charge');
+  const pool = findRow('Pool Heat');
+  if (pool > 0) revenue += pool;
   if (!revenue) {
-    // Try from totals line
-    const totMatch = text.match(/\$([0-9,]+\.\d{2})\s+\$([0-9,]+\.\d{2})\s*_{3,}/);
-    if (totMatch) revenue = parseFloat(totMatch[1].replace(/,/g,''));
+    const m = fullText.match(/Total\s+Charges[\s\S]{0,60}?\$([0-9,]+\.\d{2})/i);
+    if (m) revenue = parseFloat(m[1].replace(/,/g,''));
   }
-  if (!revenue) revenue = findVal('Total Revenue');
-  if (!revenue) revenue = findVal('Gross Revenue');
 
-  // Pool Heat
-  const pool = findVal('Pool Heat');
-  if (pool > 0 && revenue > 0) revenue += pool; // Pool heat is additional to room charge
-
-  // Commission
-  let commission = findVal('Commission');
-  if (!commission) commission = findVal('Management Fee');
+  // Commission — search multiple labels
+  let commission = findRow('Commission');
+  if (!commission) commission = findRow('Management Fee');
+  if (!commission) commission = findRow('Mgmt Fee');
 
   // HOA
-  let hoa = findVal('HOA');
-  if (!hoa) hoa = findVal('Association');
+  let hoa = findRow('HOA');
+  if (!hoa) hoa = findRow('Association');
 
   // Maintenance Fee
-  let maintenance = findVal('Maintenance');
-  if (!maintenance) maintenance = findVal('Maint Fee');
-  if (!maintenance) maintenance = findVal('Mgmt Fee');
+  let maintenance = findRow('Maintenance Fee');
+  if (!maintenance) maintenance = findRow('Maintenance');
 
-  // Duke Energy (may appear multiple times in vendor section)
+  // Duke Energy — find ALL rows mentioning Duke, take first $ from each
   let duke = 0;
-  const dukeMatches = text.match(/Duke\s*Energy[^$]*?\$([0-9,]+\.\d{2})/gi);
-  if (dukeMatches) dukeMatches.forEach(m => { const v = m.match(/\$([0-9,]+\.\d{2})/); if(v) duke += parseFloat(v[1].replace(',','')); });
-  if (!duke) duke = findVal('Duke Energy');
-  if (!duke) duke = findVal('Electric');
+  rows.forEach(r => {
+    if (/duke/i.test(r.text) && /energy|\$/i.test(r.text)) {
+      const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
+      if (amounts && amounts.length > 0) {
+        const val = parseFloat(amounts[0].replace(/[$,]/g, ''));
+        if (val < 1500) duke += val; // sanity check per line
+      }
+    }
+  });
+  if (!duke) duke = findRow('Electric');
 
-  // Toho Water (may appear multiple times)
+  // Toho Water — same approach
   let water = 0;
-  const tohoMatches = text.match(/Toho[^$]*?\$([0-9,]+\.\d{2})/gi);
-  if (tohoMatches) tohoMatches.forEach(m => { const v = m.match(/\$([0-9,]+\.\d{2})/); if(v) water += parseFloat(v[1].replace(',','')); });
-  if (!water) water = findVal('Toho');
-  if (!water) water = findVal('Water');
+  rows.forEach(r => {
+    if (/toho/i.test(r.text)) {
+      const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
+      if (amounts && amounts.length > 0) {
+        const val = parseFloat(amounts[0].replace(/[$,]/g, ''));
+        if (val < 500) water += val;
+      }
+    }
+  });
+  if (!water) water = findRow('Water');
 
-  // Vendor bills
-  let vendor = findVal('Vendor');
-  // Cleaning
-  const clean = findVal('Clean');
-  // Owner cleaning
-  const ownerClean = findVal('Owner Clean');
+  // Vendor
+  let vendor = findRow('Vendor');
+  const clean = findRow('Owner Clean') || findRow('Cleaning Fee') || findRow('Owner Cleaning');
 
-  // Net — try multiple labels
-  let net = findVal('Payments To Owner');
-  if (!net) net = findVal('Payment to Owner');
-  if (!net) net = findVal('Net to Owner');
-  if (!net) net = findVal('Amount Due');
-  if (!net) net = findVal('ACH Payment');
-  // Also try to find "Paid" or "Check" amounts near the end
+  // Net to Owner — try multiple patterns
+  let net = findRow('Payments To Owner');
+  if (!net) net = findRow('Payment to Owner');
+  if (!net) net = findRow('Net to Owner');
+  if (!net) net = findRow('Amount Due');
+  if (!net) net = findRow('ACH');
+  // Fallback: search last rows for payment amounts
   if (!net) {
-    const paidMatch = text.match(/(?:Paid|Check|ACH|Wire)[^$]*?\$([0-9,]+\.\d{2})/i);
-    if (paidMatch) net = parseFloat(paidMatch[1].replace(/,/g,''));
+    for (const row of rows.slice(0, 30)) {
+      if (/paid|check|ach|wire|payment/i.test(row.text)) {
+        const amounts = row.text.match(/\$?([\d,]+\.\d{2})/g);
+        if (amounts) { net = parseFloat(amounts[0].replace(/[$,]/g, '')); break; }
+      }
+    }
+  }
+  // Last resort: calculate net
+  if (!net && revenue > 0) {
+    net = revenue - commission - duke - water - hoa - maintenance - vendor - clean;
+    if (net < 0) net = 0;
   }
 
-  return {year, month, revenue, commission, duke, water, hoa, maintenance, vendor: vendor + clean + ownerClean, net, _debug: text.substring(0, 500)};
+  return {year, month, revenue, commission, duke, water, hoa, maintenance, vendor: vendor + clean, net};
 }
 
 // ═══ AUTH ═══
