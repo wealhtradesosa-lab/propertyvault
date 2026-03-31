@@ -74,6 +74,44 @@ function KPI({label,value,sub,color='blue',trend,alert}) {
   </div>;
 }
 
+// ═══ PDF PARSER (IHM Statement format) ═══
+import * as pdfjsLib from 'pdfjs-dist';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+async function parsePDF(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  let text = '';
+  for (let i=1; i<=pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(it=>it.str).join(' ') + '\n';
+  }
+  // Year & Period
+  const ym = text.match(/Year:\s*(\d{4})\s*Period:\s*(\d+)/);
+  if (!ym || parseInt(ym[2])===0) return {error:'No es un statement mensual válido'};
+  const year=parseInt(ym[1]), month=parseInt(ym[2]);
+  // Revenue from totals row
+  const totMatch = text.match(/\$([0-9,]+\.\d{2})\s+\$([0-9,]+\.\d{2})\s*_{3,}/);
+  let revenue = totMatch ? parseFloat(totMatch[1].replace(/,/g,'')) : 0;
+  // Duke Energy
+  let duke=0; const dukeM=text.match(/Duke[^$]*\$([0-9,]+\.\d{2})/gi);
+  if(dukeM) dukeM.forEach(m=>{const v=m.match(/\$([0-9,]+\.\d{2})/);if(v)duke+=parseFloat(v[1].replace(',',''))});
+  // Toho Water
+  let water=0; const tohoM=text.match(/Toho[^$]*\$([0-9,]+\.\d{2})/gi);
+  if(tohoM) tohoM.forEach(m=>{const v=m.match(/\$([0-9,]+\.\d{2})/);if(v)water+=parseFloat(v[1].replace(',',''))});
+  // Transaction Summary
+  const ts = text.match(/Transaction Summary\s+Period[\s\S]*?Net/i);
+  let commission=0,hoa=0,maintenance=0,vendor=0,net=0,clean=0,room=0;
+  if(ts) {
+    const g=s=>{const m=ts[0].match(new RegExp(s+'\\s+(-?\\$[\\d,]+\\.\\d{2})','i'));return m?Math.abs(parseFloat(m[1].replace(/[$,]/g,''))):0};
+    room=g('Room Charge'); commission=g('Commission'); hoa=g('HOA');
+    maintenance=g('Maintenance'); vendor=g('Vendor'); net=g('Payments To Owner'); clean=g('Cleaning');
+  }
+  if(!revenue && room) revenue = room;
+  return {year,month,revenue,commission,duke,water,hoa,maintenance,vendor:vendor+clean,net};
+}
+
 // ═══ AUTH ═══
 function AuthScreen() {
   const [mode,setMode]=useState('login');const [email,setEmail]=useState('');const [pw,setPw]=useState('');const [show,setShow]=useState(false);const [err,setErr]=useState('');const [busy,setBusy]=useState(false);
@@ -167,6 +205,24 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const save=async(sub,data)=>{await addDoc(collection(db,'properties',propertyId,sub),{...data,createdAt:serverTimestamp()});setModal(null)};
   const del=async(sub,id)=>{if(!confirm('¿Eliminar?'))return;await deleteDoc(doc(db,'properties',propertyId,sub,id))};
   const saveMortgage=async()=>{setSavingMort(true);try{await updateDoc(doc(db,'properties',propertyId),{mortgage:{balance:parseFloat(mc.bal)||0,rate:parseFloat(mc.rate)||0,termYears:parseInt(mc.term)||30,monthlyPayment:parseFloat(mc.pay)||0,startDate:mc.start||''}})}catch(e){alert('Error: '+e.message)}setSavingMort(false)};
+
+  // PDF Upload handler
+  const handlePDFs=async(files)=>{
+    const log=[];
+    for(const f of Array.from(files)){
+      if(!f.name.toLowerCase().endsWith('.pdf')){log.push({file:f.name,status:'error',msg:'No es un archivo PDF'});setUploadLog([...log]);continue;}
+      log.push({file:f.name,status:'processing',msg:'Procesando...'});setUploadLog([...log]);
+      try{
+        const r=await parsePDF(f);
+        if(r.error){log[log.length-1]={file:f.name,status:'error',msg:r.error};setUploadLog([...log]);continue;}
+        const exists=stmts.find(s=>s.year===r.year&&s.month===r.month);
+        if(exists){log[log.length-1]={file:f.name,status:'dup',msg:`${M[r.month-1]} ${r.year} ya existe en la base de datos`};setUploadLog([...log]);continue;}
+        await addDoc(collection(db,'properties',propertyId,'statements'),{...r,createdAt:serverTimestamp()});
+        log[log.length-1]={file:f.name,status:'ok',msg:`${M[r.month-1]} ${r.year} — Revenue: ${fm(r.revenue)} | Net: ${fm(r.net)}`};
+        setUploadLog([...log]);
+      }catch(e){log[log.length-1]={file:f.name,status:'error',msg:'Error: '+e.message};setUploadLog([...log]);}
+    }
+  };
 
   // ═══ CALCULATIONS ═══
   const pt=useMemo(()=>{const r={};partners.forEach(p=>{r[p.id]={name:p.name,color:p.color,own:p.ownership,cont:0,exp:0,inc:0}});contribs.forEach(c=>{if(r[c.paidBy])r[c.paidBy].cont+=c.amount||0});expenses.forEach(e=>{if(r[e.paidBy])r[e.paidBy].exp+=e.amount||0});const tn=income.reduce((s,i)=>s+(i.netAmount||0),0);partners.forEach(p=>{r[p.id].inc=tn*(p.ownership/100)});return r},[partners,contribs,expenses,income]);
@@ -637,9 +693,27 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div className="grid grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mc.term||String(mort.termYears||30)} onChange={v=>umc('term',v)} type="number"/><Inp label="Pago Mensual" value={mc.pay||String(mort.monthlyPayment||'')} onChange={v=>umc('pay',v)} prefix="$" type="number"/><Inp label="Inicio" value={mc.start||mort.startDate||''} onChange={v=>umc('start',v)} type="date"/></div>
     </Mdl>}
 
-    {modal==='upload'&&<Mdl title="📤 Subir Statements" grad="from-blue-600 to-cyan-600" onClose={()=>setModal(null)}>
-      <p className="text-sm text-slate-500">Usa la entrada manual por ahora. El parser de PDFs estará disponible en la versión deployada.</p>
-      <button onClick={()=>{setModal('addStmt')}} className="w-full py-3 bg-slate-700 text-white rounded-xl font-bold text-sm hover:bg-slate-800 flex items-center justify-center gap-2"><Plus size={15}/>Ingresar Statement Manualmente</button>
+    {modal==='upload'&&<Mdl title="📤 Subir Statements (PDF)" grad="from-blue-600 to-cyan-600" onClose={()=>setModal(null)}>
+      <p className="text-sm text-slate-500 mb-1">Sube los PDFs de los owner statements de tu property manager. El sistema extrae automáticamente: año, periodo, revenue, comisión, utilities, HOA, maintenance y net.</p>
+      <div className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all hover:border-blue-400 hover:bg-blue-50/50 ${uploadLog.some(l=>l.status==='processing')?'border-blue-300 bg-blue-50/30':'border-slate-200'}`}
+        onClick={()=>fileRef.current?.click()}
+        onDragOver={e=>{e.preventDefault();e.currentTarget.classList.add('border-blue-400','bg-blue-50')}}
+        onDragLeave={e=>{e.currentTarget.classList.remove('border-blue-400','bg-blue-50')}}
+        onDrop={e=>{e.preventDefault();e.currentTarget.classList.remove('border-blue-400','bg-blue-50');handlePDFs(e.dataTransfer.files)}}>
+        <Upload size={32} className="text-slate-300 mx-auto mb-2"/>
+        <div className="text-sm font-semibold text-slate-600">Arrastra PDFs aquí o haz clic</div>
+        <div className="text-xs text-slate-400 mt-1">Soporta múltiples archivos a la vez</div>
+      </div>
+      <input ref={fileRef} type="file" accept=".pdf" multiple className="hidden" onChange={e=>{if(e.target.files.length)handlePDFs(e.target.files);e.target.value=''}}/>
+      {uploadLog.length>0&&<div className="space-y-2 mt-3 max-h-[300px] overflow-y-auto">{uploadLog.map((l,i)=>(
+        <div key={i} className={`flex items-start gap-2 p-3 rounded-xl text-xs font-medium ${l.status==='ok'?'bg-emerald-50 text-emerald-700 border border-emerald-100':l.status==='dup'?'bg-amber-50 text-amber-700 border border-amber-100':l.status==='processing'?'bg-blue-50 text-blue-700 border border-blue-100':'bg-rose-50 text-rose-700 border border-rose-100'}`}>
+          <span className="shrink-0">{l.status==='ok'?'✅':l.status==='dup'?'⚠️':l.status==='processing'?'⏳':'❌'}</span>
+          <div><div className="font-bold">{l.file}</div><div className="font-normal mt-0.5">{l.msg}</div></div>
+        </div>
+      ))}</div>}
+      <div className="border-t border-slate-100 pt-3 mt-2">
+        <button onClick={()=>{setModal('addStmt')}} className="w-full py-2.5 bg-slate-100 text-slate-600 rounded-xl font-semibold text-xs hover:bg-slate-200 transition flex items-center justify-center gap-2"><Plus size={14}/>O ingresar manualmente</button>
+      </div>
     </Mdl>}
   </div>;
 }
