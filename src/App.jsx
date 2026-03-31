@@ -206,18 +206,43 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const del=async(sub,id)=>{if(!confirm('¿Eliminar?'))return;await deleteDoc(doc(db,'properties',propertyId,sub,id))};
   const saveMortgage=async()=>{setSavingMort(true);try{await updateDoc(doc(db,'properties',propertyId),{mortgage:{balance:parseFloat(mc.bal)||0,rate:parseFloat(mc.rate)||0,termYears:parseInt(mc.term)||30,monthlyPayment:parseFloat(mc.pay)||0,startDate:mc.start||''}})}catch(e){alert('Error: '+e.message)}setSavingMort(false)};
 
-  // PDF Upload handler
+  // PDF Upload handler — with robust duplicate detection
   const handlePDFs=async(files)=>{
     const log=[];
+    const uploaded=new Set(); // Track what we upload in THIS batch
+    // Also build set of existing periods from DB
+    const existingPeriods=new Set(stmts.map(s=>s.year+'-'+s.month));
+
     for(const f of Array.from(files)){
       if(!f.name.toLowerCase().endsWith('.pdf')){log.push({file:f.name,status:'error',msg:'No es un archivo PDF'});setUploadLog([...log]);continue;}
       log.push({file:f.name,status:'processing',msg:'Procesando...'});setUploadLog([...log]);
       try{
         const r=await parsePDF(f);
         if(r.error){log[log.length-1]={file:f.name,status:'error',msg:r.error};setUploadLog([...log]);continue;}
-        const exists=stmts.find(s=>s.year===r.year&&s.month===r.month);
-        if(exists){log[log.length-1]={file:f.name,status:'dup',msg:`${M[r.month-1]} ${r.year} ya existe en la base de datos`};setUploadLog([...log]);continue;}
+
+        const key=r.year+'-'+r.month;
+
+        // Check 1: Already in database
+        if(existingPeriods.has(key)){
+          log[log.length-1]={file:f.name,status:'dup',msg:`${M[r.month-1]} ${r.year} ya existe en la base de datos — se omitió`};
+          setUploadLog([...log]);continue;
+        }
+
+        // Check 2: Already uploaded in this batch
+        if(uploaded.has(key)){
+          log[log.length-1]={file:f.name,status:'dup',msg:`${M[r.month-1]} ${r.year} ya se cargó en este lote — se omitió`};
+          setUploadLog([...log]);continue;
+        }
+
+        // Check 3: Validate data makes sense
+        if(r.revenue<=0&&r.net<=0){
+          log[log.length-1]={file:f.name,status:'error',msg:`${M[r.month-1]} ${r.year} — Revenue y Net en $0, posible statement anual o vacío`};
+          setUploadLog([...log]);continue;
+        }
+
         await addDoc(collection(db,'properties',propertyId,'statements'),{...r,createdAt:serverTimestamp()});
+        uploaded.add(key);
+        existingPeriods.add(key); // Also mark as existing for rest of batch
         log[log.length-1]={file:f.name,status:'ok',msg:`${M[r.month-1]} ${r.year} — Revenue: ${fm(r.revenue)} | Net: ${fm(r.net)}`};
         setUploadLog([...log]);
       }catch(e){log[log.length-1]={file:f.name,status:'error',msg:'Error: '+e.message};setUploadLog([...log]);}
@@ -681,7 +706,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Socio</label><PPick partners={partners} selected={cf.paidBy} onChange={v=>uc('paidBy',v)}/></div>
     </Mdl>}
 
-    {modal==='addStmt'&&<Mdl title="Statement Manual" grad="from-slate-700 to-slate-800" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{save('statements',{year:parseInt(sf.year),month:parseInt(sf.month),revenue:parseFloat(sf.revenue)||0,net:parseFloat(sf.net)||0,commission:parseFloat(sf.commission)||0,duke:parseFloat(sf.duke)||0,water:parseFloat(sf.water)||0,hoa:parseFloat(sf.hoa)||0,maintenance:parseFloat(sf.maintenance)||0,vendor:parseFloat(sf.vendor)||0});setSf(x=>({...x,month:x.month<12?x.month+1:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''}))}} disabled={!sf.revenue} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">Guardar</button></>}>
+    {modal==='addStmt'&&<Mdl title="Statement Manual" grad="from-slate-700 to-slate-800" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const yr=parseInt(sf.year),mo=parseInt(sf.month);if(stmts.find(s=>s.year===yr&&s.month===mo)){alert(`Ya existe un statement para ${M[mo-1]} ${yr}. No se puede duplicar.`);return;}save('statements',{year:yr,month:mo,revenue:parseFloat(sf.revenue)||0,net:parseFloat(sf.net)||0,commission:parseFloat(sf.commission)||0,duke:parseFloat(sf.duke)||0,water:parseFloat(sf.water)||0,hoa:parseFloat(sf.hoa)||0,maintenance:parseFloat(sf.maintenance)||0,vendor:parseFloat(sf.vendor)||0});setSf(x=>({...x,month:x.month<12?x.month+1:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''}))}} disabled={!sf.revenue} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">Guardar</button></>}>
       <div className="grid grid-cols-2 gap-3"><Inp label="Año" value={sf.year} onChange={v=>us('year',v)} type="number"/><Sel label="Mes" value={sf.month} onChange={v=>us('month',v)} options={M.map((m,i)=>({v:i+1,l:m}))}/></div>
       <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100"><div className="text-[10px] font-black text-emerald-700 uppercase mb-3">Ingresos</div><Inp label="Revenue Total" value={sf.revenue} onChange={v=>us('revenue',v)} prefix="$" type="number"/></div>
       <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100"><div className="text-[10px] font-black text-rose-700 uppercase mb-3">Gastos</div><div className="grid grid-cols-2 gap-3"><Inp label="Comisión PM" value={sf.commission} onChange={v=>us('commission',v)} prefix="$" type="number"/><Inp label="Electricidad" value={sf.duke} onChange={v=>us('duke',v)} prefix="$" type="number"/><Inp label="Agua" value={sf.water} onChange={v=>us('water',v)} prefix="$" type="number"/><Inp label="HOA" value={sf.hoa} onChange={v=>us('hoa',v)} prefix="$" type="number"/><Inp label="Maintenance" value={sf.maintenance} onChange={v=>us('maintenance',v)} prefix="$" type="number"/><Inp label="Vendor/Otros" value={sf.vendor} onChange={v=>us('vendor',v)} prefix="$" type="number"/></div></div>
