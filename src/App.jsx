@@ -182,21 +182,23 @@ function Onboarding({userId,onComplete}) {
   const [step,setStep]=useState(0);
   const [busy,setBusy]=useState(false);
   const [p,setP]=useState({name:'',address:'',city:'',state:'FL',type:'vacation',price:'',date:'',beds:'',baths:'',pm:'',pmFee:'15'});
-  const [prs,setPrs]=useState([{name:'',own:'100',cap:''}]);
+  const [prs,setPrs]=useState([{name:'',email:'',own:'100',cap:''}]);
   const [mt,setMt]=useState({bal:'',rate:'',term:'30',pay:'',start:''});
   const up=useCallback((k,v)=>setP(x=>({...x,[k]:v})),[]);
   const um=useCallback((k,v)=>setMt(x=>({...x,[k]:v})),[]);
   const upPr=useCallback((i,k,v)=>setPrs(x=>{const n=[...x];n[i]={...n[i],[k]:v};return n}),[]);
-  const addPr=()=>setPrs(x=>[...x,{name:'',own:'',cap:''}]);
+  const addPr=()=>setPrs(x=>[...x,{name:'',email:'',own:'',cap:''}]);
   const rmPr=i=>setPrs(x=>x.length>1?x.filter((_,j)=>j!==i):x);
   const totOwn=prs.reduce((s,x)=>s+(parseFloat(x.own)||0),0);
 
   const finish=async()=>{
     setBusy(true);
     try{
+      const partnersList=prs.map((x,i)=>({id:'p'+i,name:x.name,email:x.email||'',ownership:parseFloat(x.own)||0,initialCapital:parseFloat(x.cap)||0,color:C[i%C.length]}));
+      const memberEmails=[auth.currentUser.email,...partnersList.map(x=>x.email).filter(Boolean)];
       const d={...p,purchasePrice:parseFloat(p.price)||0,bedrooms:parseInt(p.beds)||0,bathrooms:parseInt(p.baths)||0,
         managerCommission:parseFloat(p.pmFee)||15,manager:p.pm,purchaseDate:p.date,
-        partners:prs.map((x,i)=>({id:'p'+i,name:x.name,ownership:parseFloat(x.own)||0,initialCapital:parseFloat(x.cap)||0,color:C[i%C.length]})),
+        partners:partnersList,memberEmails,
         mortgage:{balance:parseFloat(mt.bal)||0,rate:parseFloat(mt.rate)||0,termYears:parseInt(mt.term)||30,monthlyPayment:parseFloat(mt.pay)||0,startDate:mt.start||''},
         ownerId:userId,createdAt:serverTimestamp()};
       const ref=await addDoc(collection(db,'properties'),d);
@@ -243,8 +245,11 @@ function Onboarding({userId,onComplete}) {
               <span className="text-xs font-extrabold uppercase tracking-widest" style={{color:C[i%C.length]}}>Socio {i+1}</span>
               {prs.length>1&&<button onClick={()=>rmPr(i)} className="text-slate-300 hover:text-rose-500 transition p-1 rounded-lg hover:bg-rose-50"><X size={16}/></button>}
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4 mb-3">
               <Inp label="Nombre completo" value={x.name} onChange={v=>upPr(i,'name',v)} placeholder="Juan Pérez"/>
+              <Inp label="Email (para acceso)" value={x.email} onChange={v=>upPr(i,'email',v)} placeholder="socio@email.com" type="email"/>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <Inp label="% Participación" value={x.own} onChange={v=>upPr(i,'own',v)} type="number"/>
               <Inp label="Capital Inicial (USD)" value={x.cap} onChange={v=>upPr(i,'cap',v)} prefix="$" type="number"/>
             </div>
@@ -275,7 +280,7 @@ function Onboarding({userId,onComplete}) {
 // ═══════════════════════════════════════════════════════════════
 // MAIN DASHBOARD
 // ═══════════════════════════════════════════════════════════════
-function Dashboard({propertyId,propertyData:prop,onLogout}) {
+function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProperty,onLogout,onAddProperty,userEmail}) {
   const [view,setView]=useState('dashboard');
   const [modal,setModal]=useState(null);
   const [expenses,setExpenses]=useState([]);
@@ -371,10 +376,19 @@ function Dashboard({propertyId,propertyData:prop,onLogout}) {
     {/* ── SIDEBAR ── */}
     <div className="w-60 bg-white border-r border-slate-100 flex flex-col shrink-0">
       <div className="p-5 border-b border-slate-100">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mb-3">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-md shadow-blue-500/20"><Building2 size={18} className="text-white"/></div>
-          <div className="min-w-0"><div className="text-sm font-extrabold text-slate-800 truncate">PropertyVault</div><div className="text-[10px] text-slate-400 truncate">{prop.name}</div></div>
+          <div className="min-w-0"><div className="text-sm font-extrabold text-slate-800 truncate">PropertyVault</div><div className="text-[10px] text-slate-400 truncate">{userEmail}</div></div>
         </div>
+        {/* Property Switcher */}
+        {allProperties.length>0&&<div className="relative">
+          <select value={propertyId} onChange={e=>onSwitchProperty(e.target.value)}
+            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none appearance-none pr-8 cursor-pointer hover:bg-slate-100 transition">
+            {allProperties.map(p=><option key={p.id} value={p.id}>{p.name||'Sin nombre'} · {p.city||''}, {p.state||''}</option>)}
+          </select>
+          <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/>
+        </div>}
+        {onAddProperty&&<button onClick={onAddProperty} className="w-full mt-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl text-[11px] font-bold hover:bg-blue-100 transition flex items-center justify-center gap-1.5"><Plus size={13}/>Agregar Propiedad</button>}
       </div>
       <nav className="flex-1 p-3 space-y-1">
         {nav.map(n=><button key={n.id} onClick={()=>setView(n.id)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[13px] transition-all ${view===n.id?'bg-blue-50 text-blue-700 font-bold shadow-sm':'text-slate-500 hover:bg-slate-50 hover:text-slate-700 font-medium'}`}>{n.icon}{n.l}</button>)}
@@ -591,14 +605,40 @@ function Dashboard({propertyId,propertyData:prop,onLogout}) {
 export default function App() {
   const [user,setUser]=useState(null);
   const [ready,setReady]=useState(false);
-  const [propId,setPropId]=useState(null);
-  const [propData,setPropData]=useState(null);
+  const [allProps,setAllProps]=useState([]);
+  const [activePropId,setActivePropId]=useState(null);
   const [checking,setChecking]=useState(false);
-  useEffect(()=>onAuthStateChanged(auth,u=>{setUser(u);setReady(true);if(!u){setPropId(null);setPropData(null)}}),[]);
-  useEffect(()=>{if(!user)return;setChecking(true);return onSnapshot(query(collection(db,'properties'),where('ownerId','==',user.uid)),snap=>{if(snap.docs.length>0){setPropId(snap.docs[0].id);setPropData(snap.docs[0].data())}else{setPropId(null);setPropData(null)}setChecking(false)})},[user]);
+
+  useEffect(()=>onAuthStateChanged(auth,u=>{setUser(u);setReady(true);if(!u){setAllProps([]);setActivePropId(null)}}),[]);
+
+  // Query: properties I own OR where my email is in memberEmails
+  useEffect(()=>{
+    if(!user)return;
+    setChecking(true);
+    // Listen to properties where I'm the owner
+    const q1=query(collection(db,'properties'),where('ownerId','==',user.uid));
+    // Listen to properties where I'm a member (partner)
+    const q2=query(collection(db,'properties'),where('memberEmails','array-contains',user.email));
+    let results1=[],results2=[];
+    const merge=()=>{
+      const map=new Map();
+      [...results1,...results2].forEach(d=>map.set(d.id,d));
+      const all=Array.from(map.values());
+      setAllProps(all);
+      if(!activePropId && all.length>0) setActivePropId(all[0].id);
+      setChecking(false);
+    };
+    const u1=onSnapshot(q1,snap=>{results1=snap.docs.map(d=>({id:d.id,...d.data()}));merge();});
+    const u2=onSnapshot(q2,snap=>{results2=snap.docs.map(d=>({id:d.id,...d.data()}));merge();});
+    return ()=>{u1();u2();};
+  },[user]);
+
+  const activeProp=allProps.find(p=>p.id===activePropId);
+
   if(!ready)return<div className="min-h-screen bg-[#0B1120] flex items-center justify-center"><Loader2 size={36} className="animate-spin text-blue-500"/></div>;
   if(!user)return<AuthScreen/>;
   if(checking)return<div className="min-h-screen bg-slate-50 flex items-center justify-center"><div className="text-center"><Loader2 size={36} className="animate-spin text-blue-500 mx-auto mb-4"/><p className="text-slate-400">Buscando propiedades...</p></div></div>;
-  if(!propId||!propData)return<Onboarding userId={user.uid} onComplete={id=>setPropId(id)}/>;
-  return<Dashboard propertyId={propId} propertyData={propData} onLogout={()=>signOut(auth)}/>;
+  if(!allProps.length)return<Onboarding userId={user.uid} onComplete={id=>setActivePropId(id)}/>;
+  if(!activeProp)return<Onboarding userId={user.uid} onComplete={id=>setActivePropId(id)}/>;
+  return<Dashboard propertyId={activePropId} propertyData={activeProp} allProperties={allProps} onSwitchProperty={setActivePropId} onLogout={()=>signOut(auth)} onAddProperty={()=>setActivePropId(null)} userEmail={user.email}/>;
 }
