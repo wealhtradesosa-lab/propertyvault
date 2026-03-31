@@ -478,9 +478,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {/* ═══ DASHBOARD ═══ */}
     {/* ═══ DASHBOARD ═══ */}
     {/* ═══ DASHBOARD ═══ */}
-    {/* ═══ DASHBOARD ═══ */}
     {view==='dashboard'&&(()=>{
-      try{
       const fy=dashYear==='all'?null:annual.find(y=>y.year===dashYear);
       const fStmts=dashYear==='all'?stmts:stmts.filter(s=>s.year===dashYear);
       const n=fy?fy.n:stmts.length;
@@ -493,17 +491,17 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const fWater=fy?fy.water:stmtWater;
       const fVendor=fy?fy.vendor:stmtVendor;
       const fOpEx=fComm+fDuke+fHoa+fMaint+fWater+fVendor;
+      const fNoi=fRev-fOpEx;
       const mMort=mort.monthlyPayment||0;
       const fMortP=mMort*n;
       const insExp=expenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+(e.amount||0),0);
       const taxExp=expenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+(e.amount||0),0);
       const ownerCosts=fMortP+insExp+taxExp;
-      const fUtil=fNoi-ownerCosts;  // Cash Flow = NOI - Mortgage - Insurance - Taxes
+      const fUtil=fNoi-ownerCosts;
       const fUtilMo=n>0?fUtil/n:0;
       const partial=n>0&&n<12;
       const proyAnual=partial?(fUtil/n)*12:fUtil;
       const fMargin=fRev>0?(fNet/fRev*100):0;
-      const fNoi=fRev-fOpEx;
       const noiAnual=partial?fNoi/n*12:fNoi;
       const fCapR=marketValue>0?(noiAnual/marketValue*100):0;
       const fCoc=totCont>0?(proyAnual/totCont*100):0;
@@ -712,7 +710,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       </>:<div className="text-center py-12"><Empty icon={BarChart3} title="Sin datos para mostrar" desc={`Esta propiedad tiene ${stmts.length} statements, ${expenses.length} gastos y ${income.length} ingresos registrados. ${stmts.length===0?'Carga los statements de tu administrador para ver el dashboard.':'Si ves esto con datos cargados, intenta seleccionar un año arriba.'}`} action="Cargar Statements" onAction={()=>{setUploadLog([]);setModal('upload')}}/></div>}
       <div className="hidden print-footer">OwnerDesk · {prop.name} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</div>
-    </>}catch(e){console.error('Dashboard error:',e);return<div className="bg-rose-50 border border-rose-200 rounded-2xl p-6"><h3 className="font-bold text-rose-700 mb-2">Error en dashboard</h3><p className="text-sm text-rose-600">{e.message}</p><button onClick={()=>setView('statements')} className="mt-3 px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold">Ir a Statements</button></div>}})()}
+    </>})()}
     {/* ═══ PARTNERS ═══ */}
     {view==='partners'&&<>
       <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">👥 Socios & Capital</h1><button onClick={()=>{setCf({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||''});setModal('contribution')}} className="px-4 py-2.5 bg-purple-600 text-white text-xs rounded-xl font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Aporte</button></div>
