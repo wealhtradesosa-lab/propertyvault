@@ -131,14 +131,20 @@ async function parsePDF(file) {
     return 0;
   };
 
-  // Revenue
-  let revenue = findRow('Room Charge');
+  // Revenue — Room Charge + Pool Heat + other income
+  let roomCharge = findRow('Room Charge');
   const pool = findRow('Pool Heat');
-  if (pool > 0) revenue += pool;
+  let revenue = roomCharge + pool;
   if (!revenue) {
     const m = fullText.match(/Total\s+Charges[\s\S]{0,60}?\$([0-9,]+\.\d{2})/i);
     if (m) revenue = parseFloat(m[1].replace(/,/g,''));
   }
+
+  // Nights — count from reservation headers
+  let nights = 0;
+  const nightMatches = fullText.match(/(\d+)\s*Nights?/gi);
+  if (nightMatches) nightMatches.forEach(m => { const n=parseInt(m); if(n>0&&n<60) nights+=n; });
+  const reservations = (fullText.match(/Reservation\s*#/gi)||[]).length;
 
   // Commission — search multiple labels
   let commission = findRow('Commission');
@@ -221,7 +227,10 @@ async function parsePDF(file) {
     if (net < 0) net = 0;
   }
 
-  return {year, month, revenue, commission, duke, water, hoa, maintenance, vendor: vendor + clean, net};
+  // Linen / Towels — capture from vendor bills
+  const linen = findRow('Linen') || findRow('Towel');
+
+  return {year, month, revenue, commission, duke, water, hoa, maintenance, vendor: vendor + clean + linen, net, nights, reservations, pool};
 }
 
 // ═══ AUTH ═══
@@ -416,7 +425,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const additionalExp=useMemo(()=>expenses.filter(e=>{const c=CATS.find(x=>x.v===e.category);return !c?.fixed&&e.type!=='fixed'}),[expenses]);
   const expByCat=useMemo(()=>{const r={};expenses.forEach(e=>{const c=CATS.find(x=>x.v===e.category)||{l:'Otros'};if(!r[e.category])r[e.category]={name:c.l,value:0};r[e.category].value+=e.amount||0});return Object.values(r).sort((a,b)=>b.value-a.value)},[expenses]);
 
-  const annual=useMemo(()=>{const y={};stmts.forEach(s=>{if(!y[s.year])y[s.year]={year:s.year,revenue:0,net:0,commission:0,duke:0,water:0,hoa:0,maintenance:0,vendor:0,n:0};const a=y[s.year];a.revenue+=s.revenue||0;a.net+=s.net||0;a.commission+=s.commission||0;a.duke+=s.duke||0;a.water+=s.water||0;a.hoa+=s.hoa||0;a.maintenance+=s.maintenance||0;a.vendor+=s.vendor||0;a.n++});return Object.values(y).sort((a,b)=>a.year-b.year)},[stmts]);
+  const annual=useMemo(()=>{const y={};stmts.forEach(s=>{if(!y[s.year])y[s.year]={year:s.year,revenue:0,net:0,commission:0,duke:0,water:0,hoa:0,maintenance:0,vendor:0,nights:0,reservations:0,n:0};const a=y[s.year];a.revenue+=s.revenue||0;a.net+=s.net||0;a.commission+=s.commission||0;a.duke+=s.duke||0;a.water+=s.water||0;a.hoa+=s.hoa||0;a.maintenance+=s.maintenance||0;a.vendor+=s.vendor||0;a.nights+=s.nights||0;a.reservations+=s.reservations||0;a.n++});return Object.values(y).sort((a,b)=>a.year-b.year)},[stmts]);
 
   const monthly=useMemo(()=>{const r={};stmts.forEach(s=>{if(!r[s.year])r[s.year]={rev:Array(12).fill(0),net:Array(12).fill(0)};r[s.year].rev[s.month-1]=s.revenue||0;r[s.year].net[s.month-1]=s.net||0});return r},[stmts]);
   const monthRank=useMemo(()=>{const fy=annual.filter(y=>y.n===12);if(!fy.length)return[];return M.map((m,i)=>{let s=0,c=0;fy.forEach(y=>{if(monthly[y.year]){s+=monthly[y.year].net[i];c++}});return{month:m,avg:c?s/c:0}}).sort((a,b)=>b.avg-a.avg)},[annual,monthly]);
@@ -508,7 +517,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const fCapR=marketValue>0?(noiAnual/marketValue*100):0;
       const fCoc=totCont>0?(proyAnual/totCont*100):0;
       const fDscr=mMort>0?(noiAnual/(mMort*12)):0;
-      const adr=n>0?fRev/(n*30):0;
+      const fNights=fy?(fy.nights||0):fStmts.reduce((s,x)=>s+(x.nights||0),0);
+      const fRes=fy?(fy.reservations||0):fStmts.reduce((s,x)=>s+(x.reservations||0),0);
+      const availNights=n*30;
+      const occupancy=availNights>0&&fNights>0?(fNights/availNights*100):0;
+      const adr=fNights>0?fRev/fNights:(n>0?fRev/(n*30):0);
+      const revpar=availNights>0?fRev/availNights:0;
       const prevYr=dashYear!=='all'?annual.find(y=>y.year===dashYear-1):null;
       const revChg=prevYr&&prevYr.revenue?((fRev-prevYr.revenue)/prevYr.revenue*100):null;
       const expData=[['Comisión',fComm,'#E11D48'],['Electricidad',fDuke,'#F59E0B'],['Agua',fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],['Mantenimiento',fMaint,'#10B981'],['Otros',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
@@ -613,15 +627,18 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </div>
           </div>
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Métricas de Inversión{partial?' (proy.)':''}</h3>
+            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Rendimiento STR{partial?' (proy.)':''}</h3>
             <div className="space-y-2">
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cap Rate</span><span className={`text-[11px] font-bold ${fCapR>6?'text-emerald-600':fCapR>4?'text-amber-500':'text-rose-500'}`}>{fCapR.toFixed(2)}%</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cash-on-Cash Return</span><span className={`text-[11px] font-bold ${fCoc>8?'text-emerald-600':fCoc>4?'text-amber-500':'text-rose-500'}`}>{fCoc.toFixed(1)}%</span></div>
-              {fDscr>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Debt Coverage (DSCR)</span><span className={`text-[11px] font-bold ${fDscr>1.25?'text-emerald-600':fDscr>1?'text-amber-500':'text-rose-500'}`}>{fDscr.toFixed(2)}x</span></div>}
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Expense Ratio</span><span className={`text-[11px] font-bold ${fOpEx/fRev<0.5?'text-emerald-600':fOpEx/fRev<0.6?'text-amber-500':'text-rose-500'}`}>{(fOpEx/fRev*100).toFixed(0)}%</span></div>
+              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Noches ocupadas</span><span className="text-[11px] font-bold text-slate-700">{fNights} de {availNights} <span className="text-slate-400">({occupancy.toFixed(0)}%)</span></span></div>}
+              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">ADR <span className="text-[9px] text-slate-300">(Avg Daily Rate)</span></span><span className="text-[11px] font-bold text-blue-600">{fm(adr)}</span></div>}
+              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">RevPAR <span className="text-[9px] text-slate-300">(Rev per Available)</span></span><span className={`text-[11px] font-bold ${revpar>100?'text-emerald-600':'text-amber-500'}`}>{fm(revpar)}</span></div>}
+              {fRes>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Reservaciones</span><span className="text-[11px] font-bold text-slate-700">{fRes} <span className="text-slate-400">({(fNights/fRes).toFixed(1)} noches avg)</span></span></div>}
               <div className="border-t border-slate-100 my-0.5"/>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Valor promedio/noche (ADR)</span><span className="text-[11px] font-bold text-slate-700">{fm(adr)}</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Capital total invertido</span><span className="text-[11px] font-bold text-slate-700">{fm(totCont)}</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cap Rate</span><span className={`text-[11px] font-bold ${fCapR>6?'text-emerald-600':fCapR>4?'text-amber-500':'text-rose-500'}`}>{fCapR.toFixed(2)}%</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cash-on-Cash</span><span className={`text-[11px] font-bold ${fCoc>8?'text-emerald-600':fCoc>4?'text-amber-500':'text-rose-500'}`}>{fCoc.toFixed(1)}%</span></div>
+              {fDscr>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">DSCR <span className="text-[9px] text-slate-300">(Debt Service Coverage)</span></span><span className={`text-[11px] font-bold ${fDscr>1.25?'text-emerald-600':fDscr>1?'text-amber-500':'text-rose-500'}`}>{fDscr.toFixed(2)}x</span></div>}
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Expense Ratio</span><span className={`text-[11px] font-bold ${fOpEx/fRev<0.5?'text-emerald-600':fOpEx/fRev<0.6?'text-amber-500':'text-rose-500'}`}>{(fOpEx/fRev*100).toFixed(0)}%</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Capital invertido</span><span className="text-[11px] font-bold text-slate-700">{fm(totCont)}</span></div>
             </div>
           </div>
           {/* Health indicator */}
@@ -631,6 +648,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <span className={`text-[10px] font-bold uppercase ${fCF>=0&&fNoi/fRev>0.4?'text-emerald-700':fCF<0?'text-rose-700':'text-amber-700'}`}>{fCF>=0&&fNoi/fRev>0.4?'Inversión Saludable':fCF<0?'Atención Requerida':'En Observación'}</span>
             </div>
             <div className="space-y-1 text-[10px] text-slate-600">
+              {occupancy>0&&<div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${occupancy>70?'bg-emerald-500':occupancy>50?'bg-amber-500':'bg-rose-500'}`}/>{occupancy.toFixed(0)}% ocupación ({fNights} noches)</div>}
               <div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${fNoi/fRev>0.5?'bg-emerald-500':fNoi/fRev>0.4?'bg-amber-500':'bg-rose-500'}`}/>{(fNoi/fRev*100).toFixed(0)}% margen operativo</div>
               {fDscr>0&&<div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${fDscr>1.25?'bg-emerald-500':fDscr>1?'bg-amber-500':'bg-rose-500'}`}/>{fDscr.toFixed(2)}x cobertura de deuda</div>}
               {revChg!==null&&<div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${revChg>=0?'bg-emerald-500':'bg-rose-500'}`}/>{revChg>=0?'+':''}{revChg.toFixed(0)}% ingreso vs año anterior</div>}
@@ -805,6 +823,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <Tbl cols={[
           {label:'Periodo',render:r=><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>},
           {label:'Generó',r:true,render:r=><span className="text-blue-600 font-semibold">{fm(r.revenue)}</span>},
+          {label:'Noches',r:true,render:r=>r.nights?<span className="text-slate-600">{r.nights} <span className="text-[9px] text-slate-400">({r.reservations||'—'}res)</span></span>:<span className="text-slate-300">—</span>},
           {label:'Comisión',r:true,render:r=><span className="text-rose-400">{fm(r.commission)}</span>},
           {label:'Elect.',r:true,render:r=><span className="text-slate-500">{fm(r.duke)}</span>},
           {label:'HOA',r:true,render:r=><span className="text-slate-500">{fm(r.hoa)}</span>},
