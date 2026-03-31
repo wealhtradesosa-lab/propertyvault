@@ -532,41 +532,42 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
 
       {fRev>0?<>
-      {/* ── ROW 1: The story in 4 numbers ── */}
+      {/* ── ROW 1: 4 KPIs — same language as Statements ── */}
       <div className="grid grid-cols-4 gap-4 mb-5">
         <div className="bg-white rounded-2xl p-5 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm">
-          <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Gross Income</div>
+          <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Generó</div>
           <div className="text-[26px] font-extrabold text-slate-800 mt-1">{fm(fRev)}</div>
-          <div className="text-xs text-slate-400 mt-1">Ingreso bruto · {fm(n>0?fRev/n:0)}/mes · {n}m</div>
-          {revChg!==null&&<div className={`text-[11px] font-bold mt-1.5 ${revChg>=0?'text-emerald-600':'text-rose-500'}`}>{revChg>=0?'▲':'▼'} {Math.abs(revChg).toFixed(0)}% vs {dashYear-1}</div>}
+          <div className="text-xs text-slate-400 mt-1">Ingreso bruto de la propiedad</div>
+          <div className="text-[11px] text-slate-500 mt-1">{fm(n>0?fRev/n:0)}/mes · {n} meses</div>
+          {revChg!==null&&<div className={`text-[11px] font-bold mt-1 ${revChg>=0?'text-emerald-600':'text-rose-500'}`}>{revChg>=0?'▲':'▼'} {Math.abs(revChg).toFixed(0)}% vs {dashYear-1}</div>}
         </div>
         <div className="bg-white rounded-2xl p-5 border-l-4 border-l-emerald-500 border border-slate-200 shadow-sm">
-          <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">NOI</div>
-          <div className="text-[26px] font-extrabold text-emerald-700 mt-1">{fm(fNoi)}</div>
-          <div className="text-xs text-slate-400 mt-1">Después de gastos operativos</div>
-          <div className="text-[11px] text-slate-500 mt-1">Margen operativo: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{(fRev>0?fNoi/fRev*100:0).toFixed(0)}%</b></div>
+          <div className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Ingresó a tu cuenta</div>
+          <div className="text-[26px] font-extrabold text-emerald-700 mt-1">{fm(fNet)}</div>
+          <div className="text-xs text-slate-400 mt-1">Después de costos operativos</div>
+          <div className="text-[11px] text-slate-500 mt-1">Margen: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{fMargin.toFixed(0)}%</b> · Costos: {fm(fOpEx)}</div>
         </div>
         <div className={`bg-white rounded-2xl p-5 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
           <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Cash Flow</div>
           <div className={`text-[26px] font-extrabold mt-1 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fCF)}</div>
-          <div className="text-xs text-slate-400 mt-1">Después de hipoteca, seguro, tax</div>
+          <div className="text-xs text-slate-400 mt-1">Después de hipoteca{insExp>0?', seguro':''}{taxExp>0?', impuestos':''}</div>
           <div className={`text-[11px] mt-1 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{fm(fCFmo)}/mes{partial?` · Proy: ${fm(proyAnual)}/año`:''}</div>
         </div>
         <div className="bg-white rounded-2xl p-5 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
-          <div className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">Return (CoC){partial?' proy.':''}</div>
+          <div className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">Retorno{partial?' (proy.)':''}</div>
           <div className={`text-[26px] font-extrabold mt-1 ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
-          <div className="text-xs text-slate-400 mt-1">Retorno sobre capital invertido</div>
-          <div className="text-[11px] text-slate-500 mt-1">Capital: {fm(totCont)}</div>
+          <div className="text-xs text-slate-400 mt-1">Cash-on-Cash sobre capital</div>
+          <div className="text-[11px] text-slate-500 mt-1">Invertido: {fm(totCont)}</div>
         </div>
       </div>
 
       {/* ── ROW 2: Visual P&L Cascade + Metrics ── */}
       <div className="grid grid-cols-12 gap-4 mb-4">
         <div className="col-span-7 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-4">P&L — ¿Cómo se distribuye el ingreso?{partial?` (${n} meses)`:''}</h3>
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-4">Flujo del Dinero{partial?` (${n} meses)`:''}</h3>
           <div className="space-y-1.5">
             {/* Gross Income - full bar */}
-            <div className="rounded-lg relative overflow-hidden" style={{height:'38px'}}><div className="absolute inset-0 bg-blue-500"/><div className="absolute inset-0 flex items-center justify-between px-4"><span className="text-[11px] font-bold text-white">Gross Income (ingreso bruto)</span><span className="text-[12px] font-extrabold text-white">{fm(fRev)}</span></div></div>
+            <div className="rounded-lg relative overflow-hidden" style={{height:'38px'}}><div className="absolute inset-0 bg-blue-500"/><div className="absolute inset-0 flex items-center justify-between px-4"><span className="text-[11px] font-bold text-white">Generó (ingreso bruto)</span><span className="text-[12px] font-extrabold text-white">{fm(fRev)}</span></div></div>
 
             <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5">Gastos de operación (descuenta el administrador)</div>
 
@@ -576,7 +577,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             )}
 
             {/* NOI */}
-            <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-4 bg-emerald-50"><span className="text-[11px] font-bold text-emerald-800">= NOI (ingreso operativo neto)</span><span className="text-[12px] font-extrabold text-emerald-800">{fm(fNoi)}</span></div></div>
+            <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-4 bg-emerald-50"><span className="text-[11px] font-bold text-emerald-800">= Ingresó a tu cuenta</span><span className="text-[12px] font-extrabold text-emerald-800">{fm(fNet)} <span className="text-emerald-600 text-[10px]">({fMargin.toFixed(0)}% del ingreso)</span></span></div></div>
 
             {/* Owner costs */}
             {ownerCosts>0&&<>
@@ -590,7 +591,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
               <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
               <div className="absolute inset-0 flex items-center justify-between px-4">
-                <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= CASH FLOW (utilidad neta)</span>
+                <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Cash Flow (lo que queda libre)</span>
                 <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{fm(fCF)}</span>
               </div>
             </div>
@@ -648,9 +649,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <XAxis dataKey="m" tick={{fontSize:9,fill:'#94a3b8'}} interval={mChart.length>18?2:0}/>
               <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={fm}/>
               <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
-              <Bar dataKey="rev" name="Ingreso" fill="#BFDBFE" radius={[3,3,0,0]}/>
-              <Bar dataKey="net" name="Net Admin." fill="#6EE7B7" radius={[3,3,0,0]}/>
-              {mMort>0&&<Line dataKey="libre" name="Utilidad libre" stroke="#1E293B" strokeWidth={2} dot={{r:2,fill:'#1E293B'}}/>}
+              <Bar dataKey="rev" name="Generó" fill="#BFDBFE" radius={[3,3,0,0]}/>
+              <Bar dataKey="net" name="Ingresó" fill="#6EE7B7" radius={[3,3,0,0]}/>
+              {mMort>0&&<Line dataKey="libre" name="Cash Flow" stroke="#1E293B" strokeWidth={2} dot={{r:2,fill:'#1E293B'}}/>}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
@@ -693,8 +694,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <XAxis dataKey="year" tick={{fontSize:11,fill:'#64748b'}}/>
               <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={fm}/>
               <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
-              <Bar dataKey="revenue" name="Ingreso" fill="#93C5FD" radius={[4,4,0,0]}/>
-              <Bar dataKey="net" name="Net Admin." fill="#6EE7B7" radius={[4,4,0,0]}/>
+              <Bar dataKey="revenue" name="Generó" fill="#93C5FD" radius={[4,4,0,0]}/>
+              <Bar dataKey="net" name="Ingresó" fill="#6EE7B7" radius={[4,4,0,0]}/>
               <Line dataKey="hoa" name="HOA" stroke="#8B5CF6" strokeWidth={2} dot={{r:3}}/>
             </ComposedChart>
           </ResponsiveContainer>
