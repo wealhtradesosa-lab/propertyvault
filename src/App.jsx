@@ -87,14 +87,13 @@ async function parsePDF(file) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data:buf}).promise;
 
-  // Extract text WITH positions for column detection
   let allItems = [];
   let fullText = '';
   for (let i=1; i<=pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
     content.items.forEach(it => {
-      if (it.str.trim()) allItems.push({ text: it.str, x: Math.round(it.transform[4]), y: Math.round(it.transform[5]) });
+      if (it.str.trim()) allItems.push({ text: it.str, x: Math.round(it.transform[4]), y: Math.round(it.transform[5]), page: i });
     });
     fullText += content.items.map(it=>it.str).join(' ') + '\n';
   }
@@ -104,133 +103,136 @@ async function parsePDF(file) {
   if (!ym || parseInt(ym[2])===0) return {error:'No es statement mensual (Period 0 o no encontrado)'};
   const year=parseInt(ym[1]), month=parseInt(ym[2]);
 
-  // Build rows by grouping items at similar Y coordinates
+  // Build rows by page + Y coordinate
   const rowMap = {};
   allItems.forEach(it => {
-    const ry = Math.round(it.y / 3) * 3;
-    if (!rowMap[ry]) rowMap[ry] = [];
-    rowMap[ry].push(it);
+    const key = it.page + '_' + Math.round(it.y / 3) * 3;
+    if (!rowMap[key]) rowMap[key] = [];
+    rowMap[key].push(it);
   });
-  const rows = Object.entries(rowMap).map(([y, items]) => ({
-    y: parseInt(y),
+  const rows = Object.entries(rowMap).map(([key, items]) => ({
+    key,
+    page: parseInt(key.split('_')[0]),
+    y: parseInt(key.split('_')[1]),
     items: items.sort((a,b) => a.x - b.x),
     text: items.sort((a,b) => a.x - b.x).map(i=>i.text).join(' ')
-  })).sort((a,b) => b.y - a.y);
+  })).sort((a,b) => a.page===b.page ? b.y-a.y : a.page-b.page);
 
-  // Find row by label, return FIRST dollar amount (Period column, not YTD)
-  const findRow = (label) => {
+  // ═══ STRATEGY: Parse from Transaction Summary (consolidated totals) ═══
+  // Transaction Summary rows have NO date prefix and usually TWO amounts (Period + YTD)
+  const findSummary = (label) => {
     const lbl = label.toLowerCase();
     for (const row of rows) {
-      if (row.text.toLowerCase().includes(lbl)) {
-        const amounts = row.text.match(/\$?\(?([\d,]+\.\d{2})\)?/g);
-        if (amounts && amounts.length > 0) {
-          return parseFloat(amounts[0].replace(/[$,()]/g, ''));
-        }
+      if (!row.text.toLowerCase().includes(lbl)) continue;
+      // Skip detail rows (they start with a date like 02/04/2026)
+      if (/^\d{2}\/\d{2}\/\d{4}/.test(row.text.trim())) continue;
+      const amounts = row.text.match(/\$?-?([\d,]+\.\d{2})/g);
+      if (amounts && amounts.length >= 1) {
+        // First amount = Period column, second = YTD
+        const val = parseFloat(amounts[0].replace(/[$,-]/g, ''));
+        if (val > 0) return val;
       }
     }
     return 0;
   };
 
-  // Revenue — Room Charge + Pool Heat + other income
-  let roomCharge = findRow('Room Charge');
-  const pool = findRow('Pool Heat');
+  // For items in the detail section (have date prefix)
+  const findDetail = (label) => {
+    const lbl = label.toLowerCase();
+    for (const row of rows) {
+      if (!row.text.toLowerCase().includes(lbl)) continue;
+      if (!/^\d{2}\/\d{2}\/\d{4}/.test(row.text.trim())) continue;
+      const amounts = row.text.match(/\$?([\d,]+\.\d{2})/g);
+      if (amounts && amounts.length > 0) {
+        return parseFloat(amounts[0].replace(/[$,]/g, ''));
+      }
+    }
+    return 0;
+  };
+
+  // ═══ GROSS REVENUE from Transaction Summary ═══
+  const roomCharge = findSummary('Room Charge');
+  const pool = findSummary('Pool Heat');
   let revenue = roomCharge + pool;
+  // Fallback: sum individual Room Charges if no summary
   if (!revenue) {
-    const m = fullText.match(/Total\s+Charges[\s\S]{0,60}?\$([0-9,]+\.\d{2})/i);
-    if (m) revenue = parseFloat(m[1].replace(/,/g,''));
+    rows.forEach(r => {
+      if (r.text.toLowerCase().includes('room charge') && /^\d{2}\//.test(r.text.trim())) {
+        const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
+        if (amounts) revenue += parseFloat(amounts[0].replace(/[$,]/g, ''));
+      }
+    });
   }
 
-  // Nights — count from reservation headers
+  // ═══ OPERATING EXPENSES from Transaction Summary ═══
+  const commission = findSummary('Commission');
+  const hoa = findSummary('HOA') || findSummary('Association');
+  const maintenance = findSummary('Maintenance');
+  const vendorTotal = findSummary('Vendor Bills') || findSummary('Vendor');
+
+  // ═══ DUKE & WATER from detail lines (Vendor Bills breakdown) ═══
+  let duke = 0;
+  rows.forEach(r => {
+    const rt = r.text.toLowerCase();
+    if ((rt.includes('duke') || rt.includes('electric') || rt.includes('energy')) 
+        && !rt.includes('commission') && !rt.includes('transaction') && !rt.includes('summary')
+        && /^\d{2}\//.test(r.text.trim())) {
+      const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
+      if (amounts) { const v=parseFloat(amounts[0].replace(/[$,]/g,'')); if(v>0&&v<2000) duke+=v; }
+    }
+  });
+  // Fallback: search non-detail rows but exclude Transaction Summary row
+  if (!duke) {
+    rows.forEach(r => {
+      const rt = r.text.toLowerCase();
+      if ((rt.includes('duke') || rt.includes('electric')) && !rt.includes('commission') && !/^\d{2}\//.test(r.text.trim())) {
+        const amounts = r.text.match(/\$?-?([\d,]+\.\d{2})/g);
+        if (amounts) { const v=parseFloat(amounts[0].replace(/[$,-]/g,'')); if(v>0&&v<2000) duke=v; }
+      }
+    });
+  }
+  console.log(`[PDF ${year}-${month}] Duke Energy: $${duke}`);
+
+  let water = 0;
+  rows.forEach(r => {
+    const rt = r.text.toLowerCase();
+    if ((rt.includes('toho') || (rt.includes('water') && !rt.includes('pool') && !rt.includes('heater')))
+        && /^\d{2}\//.test(r.text.trim())) {
+      const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
+      if (amounts) { const v=parseFloat(amounts[0].replace(/[$,]/g,'')); if(v>0&&v<500) water+=v; }
+    }
+  });
+  if (!water) water = findSummary('Toho') || findSummary('Water');
+
+  // Vendor "other" = vendorTotal - duke - water (linen, supplies, etc.)
+  const vendorOther = Math.max(0, vendorTotal - duke - water);
+
+  // ═══ ACH PAYMENT (what was deposited to owner) ═══
+  let net = 0;
+  // Look for ACH Payment detail line
+  rows.forEach(r => {
+    if (r.text.toLowerCase().includes('ach') && r.text.toLowerCase().includes('payment') && /^\d{2}\//.test(r.text.trim())) {
+      const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
+      if (amounts) net = parseFloat(amounts[0].replace(/[$,]/g, ''));
+    }
+  });
+  // Fallback: Payments To Owner from Transaction Summary
+  if (!net) net = findSummary('Payments To Owner') || findSummary('Payment to Owner');
+  // Last resort: calculate
+  if (!net && revenue > 0) {
+    net = revenue - commission - duke - water - hoa - maintenance - vendorOther;
+    if (net < 0) net = 0;
+  }
+
+  // ═══ NIGHTS & RESERVATIONS ═══
   let nights = 0;
   const nightMatches = fullText.match(/(\d+)\s*Nights?/gi);
   if (nightMatches) nightMatches.forEach(m => { const n=parseInt(m); if(n>0&&n<60) nights+=n; });
   const reservations = (fullText.match(/Reservation\s*#/gi)||[]).length;
 
-  // Commission — search multiple labels
-  let commission = findRow('Commission');
-  if (!commission) commission = findRow('Management Fee');
-  if (!commission) commission = findRow('Mgmt Fee');
+  console.log(`[PDF ${year}-${month}] Parsed: Rev=$${revenue} (Room=$${roomCharge} Pool=$${pool}) | Comm=$${commission} | Duke=$${duke} | Water=$${water} | HOA=$${hoa} | Maint=$${maintenance} | VendorOther=$${vendorOther} | ACH=$${net} | ${nights}nights/${reservations}res`);
 
-  // HOA
-  let hoa = findRow('HOA');
-  if (!hoa) hoa = findRow('Association');
-
-  // Maintenance Fee
-  let maintenance = findRow('Maintenance Fee');
-  if (!maintenance) maintenance = findRow('Maintenance');
-
-  // Duke Energy — ultra flexible matching + debug
-  let duke = 0;
-  // First pass: search all rows for anything electricity-related
-  const dukeRows = rows.filter(r => {
-    const rt = r.text.toLowerCase();
-    return rt.includes('duke') || rt.includes('electric') || rt.includes('power bill') || rt.includes('utility') || rt.includes('energy');
-  }).filter(r => !r.text.toLowerCase().includes('commission') && !r.text.toLowerCase().includes('transaction'));
-  console.log(`[PDF ${year}-${month}] Electric rows found:`, dukeRows.map(r=>r.text));
-  dukeRows.forEach(r => {
-    const amounts = r.text.match(/\$?\s*([\d,]+\.\d{2})/g);
-    if (amounts) {
-      const val = parseFloat(amounts[0].replace(/[$,\s]/g, ''));
-      if (val > 0 && val < 1500) duke += val;
-    }
-  });
-  // Fallback: search full text
-  if (!duke) {
-    const dukeRx = fullText.match(/(?:duke|electric|electricity|power|energy)\s*(?:energy)?\s*[^$\d]{0,40}?\$?\s*([\d,]+\.\d{2})/gi);
-    console.log(`[PDF ${year}-${month}] Electric regex fallback:`, dukeRx);
-    if (dukeRx) {
-      const m = dukeRx[0].match(/([\d,]+\.\d{2})/);
-      if (m) duke = parseFloat(m[1].replace(',',''));
-    }
-  }
-  if (!duke) duke = findRow('OUC');
-  if (!duke) duke = findRow('FPL');
-  if (!duke) console.warn(`[PDF ${year}-${month}] ⚠ No electricity found. Full text snippet:`, fullText.substring(0,800));
-
-  // Toho Water — flexible matching
-  let water = 0;
-  rows.forEach(r => {
-    const rt = r.text.toLowerCase();
-    if (rt.includes('toho') || (rt.includes('water') && !rt.includes('pool') && !rt.includes('heater'))) {
-      const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
-      if (amounts && amounts.length > 0) {
-        const val = parseFloat(amounts[0].replace(/[$,]/g, ''));
-        if (val > 0 && val < 500) water += val;
-      }
-    }
-  });
-  if (!water) water = findRow('Toho');
-  if (!water) water = findRow('Water');
-
-  // Vendor
-  let vendor = findRow('Vendor');
-  const clean = findRow('Owner Clean') || findRow('Cleaning Fee') || findRow('Owner Cleaning');
-
-  // Net to Owner — try multiple patterns
-  let net = findRow('Payments To Owner');
-  if (!net) net = findRow('Payment to Owner');
-  if (!net) net = findRow('Net to Owner');
-  if (!net) net = findRow('Amount Due');
-  if (!net) net = findRow('ACH');
-  // Fallback: search last rows for payment amounts
-  if (!net) {
-    for (const row of rows.slice(0, 30)) {
-      if (/paid|check|ach|wire|payment/i.test(row.text)) {
-        const amounts = row.text.match(/\$?([\d,]+\.\d{2})/g);
-        if (amounts) { net = parseFloat(amounts[0].replace(/[$,]/g, '')); break; }
-      }
-    }
-  }
-  // Last resort: calculate net
-  if (!net && revenue > 0) {
-    net = revenue - commission - duke - water - hoa - maintenance - vendor - clean;
-    if (net < 0) net = 0;
-  }
-
-  // Linen / Towels — capture from vendor bills
-  const linen = findRow('Linen') || findRow('Towel');
-
-  return {year, month, revenue, commission, duke, water, hoa, maintenance, vendor: vendor + clean + linen, net, nights, reservations, pool};
+  return {year, month, revenue, commission, duke, water, hoa, maintenance, vendor: vendorOther, net, nights, reservations, pool, roomCharge};
 }
 
 // ═══ AUTH ═══
