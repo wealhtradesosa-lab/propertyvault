@@ -339,15 +339,19 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const handlePDFs=async(files)=>{
     const log=[];
     const uploaded=new Set();
-    // Query Firestore FRESH to avoid stale state after deletes
-    const freshSnap=await getDocs(collection(db,'properties',propertyId,'statements'));
-    const existingPeriods=new Set(freshSnap.docs.map(d=>{const s=d.data();return s.year+'-'+s.month}));
+    let existingPeriods=new Set();
+    try{
+      const freshSnap=await getDocs(collection(db,'properties',propertyId,'statements'));
+      existingPeriods=new Set(freshSnap.docs.map(d=>{const s=d.data();return s.year+'-'+s.month}));
+    }catch(e){console.error('Error checking existing:',e);}
 
     for(const f of Array.from(files)){
       if(!f.name.toLowerCase().endsWith('.pdf')){log.push({file:f.name,status:'error',msg:'No es un archivo PDF'});setUploadLog([...log]);continue;}
       log.push({file:f.name,status:'processing',msg:'Procesando...'});setUploadLog([...log]);
       try{
+        console.log('[Upload] Parsing:', f.name);
         const r=await parsePDF(f);
+        console.log('[Upload] Result:', JSON.stringify(r));
         if(r.error){log[log.length-1]={file:f.name,status:'error',msg:r.error};setUploadLog([...log]);continue;}
 
         const key=r.year+'-'+r.month;
@@ -380,7 +384,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         if(missing.length)msg+=` ⚠️ Sin: ${missing.join(', ')}`;
         log[log.length-1]={file:f.name,status:missing.length?'warn':'ok',msg};
         setUploadLog([...log]);
-      }catch(e){log[log.length-1]={file:f.name,status:'error',msg:'Error: '+e.message};setUploadLog([...log]);}
+      }catch(e){console.error('[Upload] ERROR:', f.name, e);log[log.length-1]={file:f.name,status:'error',msg:'Error: '+e.message};setUploadLog([...log]);}
     }
   };
 
