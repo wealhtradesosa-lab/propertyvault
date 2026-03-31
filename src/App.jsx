@@ -801,7 +801,18 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
 
       {paged.length>0?<>
-        <Tbl cols={[{label:'Periodo',render:r=><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>},{label:'Revenue',r:true,render:r=><span className="text-blue-600 font-semibold">{fm(r.revenue)}</span>},{label:'Comisión',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},{label:'Electric.',r:true,render:r=>fm(r.duke)},{label:'Agua',r:true,render:r=>fm(r.water)},{label:'HOA',r:true,render:r=>fm(r.hoa)},{label:'Maint',r:true,render:r=>fm(r.maintenance)},{label:'Vendor',r:true,render:r=>fm(r.vendor)},{label:'Net',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.net)}</span>}]} rows={paged} onDel={del} dc="statements" onEdit={r=>{setSf({year:r.year,month:r.month,revenue:String(r.revenue||''),net:String(r.net||''),commission:String(r.commission||''),duke:String(r.duke||''),water:String(r.water||''),hoa:String(r.hoa||''),maintenance:String(r.maintenance||''),vendor:String(r.vendor||'')});setEditId(r.id);setModal('addStmt')}}/>
+        <Tbl cols={[
+          {label:'Periodo',render:r=><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>},
+          {label:'Generó',r:true,render:r=><span className="text-blue-600 font-semibold">{fm(r.revenue)}</span>},
+          {label:'Comisión',r:true,render:r=><span className="text-rose-400">{fm(r.commission)}</span>},
+          {label:'Elect.',r:true,render:r=><span className="text-slate-500">{fm(r.duke)}</span>},
+          {label:'HOA',r:true,render:r=><span className="text-slate-500">{fm(r.hoa)}</span>},
+          {label:'Agua',r:true,render:r=><span className="text-slate-500">{fm(r.water)}</span>},
+          {label:'Maint',r:true,render:r=><span className="text-slate-500">{fm(r.maintenance)}</span>},
+          {label:'Total Costos',r:true,render:r=>{const tc=(r.commission||0)+(r.duke||0)+(r.water||0)+(r.hoa||0)+(r.maintenance||0)+(r.vendor||0);return<span className="font-semibold text-rose-500">{fm(tc)}</span>}},
+          {label:'Ingresó a tu cuenta',r:true,render:r=><span className="font-extrabold text-emerald-700">{fm(r.net)}</span>},
+          {label:'Margen',r:true,render:r=>{const m=r.revenue?(r.net/r.revenue*100):0;return<span className={`font-bold text-xs ${m<40?'text-rose-500':m<50?'text-amber-500':'text-emerald-500'}`}>{m.toFixed(0)}%</span>}},
+        ]} rows={paged} onDel={del} dc="statements" onEdit={r=>{setSf({year:r.year,month:r.month,revenue:String(r.revenue||''),net:String(r.net||''),commission:String(r.commission||''),duke:String(r.duke||''),water:String(r.water||''),hoa:String(r.hoa||''),maintenance:String(r.maintenance||''),vendor:String(r.vendor||'')});setEditId(r.id);setModal('addStmt')}}/>
 
         {/* Pagination */}
         {totalPages>1&&<div className="flex items-center justify-between mt-4">
@@ -815,13 +826,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           </div>
         </div>}
 
-        {/* Page totals */}
+        {/* Totals */}
         <div className="bg-slate-50 rounded-xl p-3 mt-3 flex justify-between items-center text-xs border border-slate-100">
-          <span className="text-slate-400 font-semibold">{stmtYearFilter==='all'?'Total general':'Total '+stmtYearFilter}:</span>
-          <div className="flex gap-6">
-            <span>Revenue: <b className="text-blue-600">{fm(filtered.reduce((s,x)=>s+(x.revenue||0),0))}</b></span>
-            <span>Gastos: <b className="text-rose-500">{fm(filtered.reduce((s,x)=>s+(x.revenue||0)-(x.net||0),0))}</b></span>
-            <span>Net: <b className="text-emerald-600">{fm(filtered.reduce((s,x)=>s+(x.net||0),0))}</b></span>
+          <span className="text-slate-400 font-semibold">{stmtYearFilter==='all'?'Total general':'Total '+stmtYearFilter} ({filtered.length} meses):</span>
+          <div className="flex gap-5">
+            <span>Generó: <b className="text-blue-600">{fm(filtered.reduce((s,x)=>s+(x.revenue||0),0))}</b></span>
+            <span>Costos: <b className="text-rose-500">{fm(filtered.reduce((s,x)=>s+(x.revenue||0)-(x.net||0),0))}</b></span>
+            <span>Ingresó: <b className="text-emerald-600">{fm(filtered.reduce((s,x)=>s+(x.net||0),0))}</b></span>
+            <span>Margen: <b className="text-slate-700">{(()=>{const r=filtered.reduce((s,x)=>s+(x.revenue||0),0),n=filtered.reduce((s,x)=>s+(x.net||0),0);return r?((n/r)*100).toFixed(0)+'%':'—'})()}</b></span>
             <span>Margen: <b className="text-slate-700">{(()=>{const r=filtered.reduce((s,x)=>s+(x.revenue||0),0),n=filtered.reduce((s,x)=>s+(x.net||0),0);return r?((n/r)*100).toFixed(1)+'%':'—'})()}</b></span>
           </div>
         </div>
