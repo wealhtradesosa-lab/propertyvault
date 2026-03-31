@@ -712,14 +712,69 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div className="hidden print-footer">OwnerDesk · {prop.name} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</div>
     </>}catch(e){console.error('Dashboard error:',e);return<div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 m-6"><h3 className="font-bold text-rose-700 mb-2">Error en el dashboard</h3><p className="text-sm text-rose-600 mb-3">{e.message}</p><p className="text-xs text-slate-400 mb-3">Stmts: {stmts.length} · Revenue: {revenue} · Annual: {annual.length}</p><button onClick={()=>setView('statements')} className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold">Ir a Statements</button></div>}})()}
     {/* ═══ PARTNERS ═══ */}
-    {view==='partners'&&<>
+    {view==='partners'&&(()=>{
+      // Calculate what each partner has put in and what they should have put based on ownership %
+      const totalPutAll=Object.values(pt).reduce((s,t)=>s+(t.cont||0)+(t.exp||0),0);
+      const partnerBalances=partners.map(p=>{
+        const t=pt[p.id]||{cont:0,exp:0,inc:0};
+        const put=(t.cont||0)+(t.exp||0);  // what they actually put in
+        const fairShare=totalPutAll*(p.ownership/100);  // what they should have put
+        const diff=put-fairShare;  // positive = overpaid, negative = underpaid
+        return{...p,t,put,fairShare,diff};
+      });
+      // Calculate debts between partners
+      const debts=[];
+      const overpaid=partnerBalances.filter(p=>p.diff>0);
+      const underpaid=partnerBalances.filter(p=>p.diff<0);
+      underpaid.forEach(u=>{
+        overpaid.forEach(o=>{
+          if(Math.abs(u.diff)>1&&o.diff>1){
+            const amount=Math.min(Math.abs(u.diff),o.diff)*(Math.abs(u.diff)/(underpaid.reduce((s,x)=>s+Math.abs(x.diff),0)||1));
+            if(amount>1)debts.push({from:u.name,fromColor:u.color,to:o.name,toColor:o.color,amount});
+          }
+        });
+      });
+
+      return <>
       <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">👥 Socios & Capital</h1><button onClick={()=>{setCf({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||''});setModal('contribution')}} className="px-4 py-2.5 bg-purple-600 text-white text-xs rounded-xl font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Aporte</button></div>
-      <div className="grid gap-4 mb-6" style={{gridTemplateColumns:`repeat(${Math.min(partners.length,3)},1fr)`}}>{partners.map(p=>{const t=pt[p.id]||{};const n=(t.cont||0)+(t.exp||0);return<div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+
+      {/* Partner cards */}
+      <div className="grid gap-4 mb-5" style={{gridTemplateColumns:`repeat(${Math.min(partners.length,3)},1fr)`}}>{partnerBalances.map(p=>{
+        return<div key={p.id} className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
         <div className="flex items-center gap-3 mb-4"><div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-lg font-black shadow-md" style={{background:`linear-gradient(135deg,${p.color},${p.color}cc)`}}>{p.name.charAt(0)}</div><div><div className="font-bold text-slate-800">{p.name}</div><div className="text-xs text-slate-400">{p.ownership}%</div></div></div>
-        <div className="grid grid-cols-2 gap-3 text-center mb-3"><div className="bg-emerald-50 rounded-xl p-3"><div className="text-[10px] text-emerald-600 font-bold uppercase">Aportado</div><div className="text-xl font-extrabold text-emerald-700">{fm(t.cont)}</div></div><div className="bg-rose-50 rounded-xl p-3"><div className="text-[10px] text-rose-500 font-bold uppercase">Gastos</div><div className="text-xl font-extrabold text-rose-600">{fm(t.exp)}</div></div></div>
-        <div className="text-center bg-slate-50 rounded-xl p-3 border"><span className="text-xs text-slate-400">Total invertido: </span><span className="text-lg font-extrabold text-slate-800">{fm(n)}</span></div></div>})}</div>
-      {contribs.length>0&&<Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},{label:'Socio',render:r=><span className="font-semibold" style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>},{label:'Concepto',key:'concept',cls:'text-slate-600'},{label:'Monto',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.amount)}</span>}]} rows={contribs} onDel={del} dc="contributions" onEdit={r=>{setCf({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||''});setEditId(r.id);setModal('contribution')}}/>}
-    </>}
+        <div className="grid grid-cols-3 gap-2 text-center mb-3">
+          <div className="bg-emerald-50 rounded-xl p-2.5"><div className="text-[9px] text-emerald-600 font-bold uppercase">Aportó</div><div className="text-base font-extrabold text-emerald-700">{fm(p.t.cont)}</div></div>
+          <div className="bg-rose-50 rounded-xl p-2.5"><div className="text-[9px] text-rose-500 font-bold uppercase">Gastos</div><div className="text-base font-extrabold text-rose-600">{fm(p.t.exp)}</div></div>
+          <div className="bg-blue-50 rounded-xl p-2.5"><div className="text-[9px] text-blue-500 font-bold uppercase">Total</div><div className="text-base font-extrabold text-blue-700">{fm(p.put)}</div></div>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-3 border text-center space-y-1">
+          <div className="flex justify-between text-[11px]"><span className="text-slate-400">Le corresponde ({p.ownership}%)</span><span className="font-bold text-slate-600">{fm(p.fairShare)}</span></div>
+          <div className="flex justify-between text-[11px]"><span className="text-slate-400">Ha puesto</span><span className="font-bold text-slate-600">{fm(p.put)}</span></div>
+          <div className={`flex justify-between text-[11px] pt-1 border-t border-slate-200`}><span className="font-bold text-slate-500">Balance</span><span className={`font-extrabold ${p.diff>0?'text-emerald-600':p.diff<0?'text-rose-500':'text-slate-600'}`}>{p.diff>0?'A favor: +':p.diff<0?'Debe: ':''}{fm(Math.abs(p.diff))}</span></div>
+        </div>
+      </div>})}</div>
+
+      {/* Debts between partners */}
+      {debts.length>0&&<div className="bg-white rounded-2xl border border-amber-200 p-5 shadow-sm mb-5">
+        <h3 className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle size={14}/> Cuentas Pendientes entre Socios</h3>
+        <div className="space-y-2">{debts.map((d,i)=><div key={i} className="flex items-center gap-3 py-3 px-4 bg-amber-50 rounded-xl border border-amber-100">
+          <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{background:d.fromColor}}>{d.from.charAt(0)}</div>
+          <div className="flex-1"><span className="text-sm font-bold text-slate-700">{d.from}</span><span className="text-sm text-slate-400 mx-2">le debe a</span><span className="text-sm font-bold text-slate-700">{d.to}</span></div>
+          <div className="text-lg font-extrabold text-amber-700">{fm(d.amount)}</div>
+        </div>)}</div>
+      </div>}
+
+      {/* All balanced */}
+      {partners.length>1&&debts.length===0&&totalPutAll>0&&<div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-4 mb-5 flex items-center gap-3">
+        <CheckCircle size={18} className="text-emerald-500"/>
+        <span className="text-sm font-bold text-emerald-700">Cuentas al día — todos los socios han aportado proporcionalmente a su participación.</span>
+      </div>}
+
+      {/* Contribution history */}
+      {contribs.length>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Historial de Movimientos</h3>
+        <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},{label:'Socio',render:r=><span className="font-semibold" style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>},{label:'Concepto',key:'concept',cls:'text-slate-600'},{label:'Monto',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.amount)}</span>}]} rows={contribs} onDel={del} dc="contributions" onEdit={r=>{setCf({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||''});setEditId(r.id);setModal('contribution')}}/>
+      </>}
+    </>})()}
 
     {/* ═══ STATEMENTS ═══ */}
     {view==='statements'&&(()=>{
