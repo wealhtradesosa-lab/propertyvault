@@ -3,7 +3,7 @@ import { db, auth } from './firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where, updateDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart, Line } from 'recharts';
-import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu } from 'lucide-react';
+import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock } from 'lucide-react';
 
 // ═══ CONSTANTS ═══
 const C=['#2563EB','#059669','#F59E0B','#7C3AED','#DC2626','#0891B2','#DB2777','#65A30D'];
@@ -280,8 +280,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
-  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);
+  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);
   const [vf,setVf]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setVf(x=>({...x,[k]:v})),[]);
+  const [rf,setRf]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRf(x=>({...x,[k]:v})),[]);
+  const [tf,setTf]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});const ut=useCallback((k,v)=>setTf(x=>({...x,[k]:v})),[]);
   const [settingsForm,setSettingsForm]=useState(null);
   const [mc,setMc]=useState({bal:'',rate:'',term:'30',pay:'',start:''});const [savingMort,setSavingMort]=useState(false);
   const umc=useCallback((k,v)=>setMc(x=>({...x,[k]:v})),[]);
@@ -293,7 +295,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const ue=useCallback((k,v)=>setEf(x=>({...x,[k]:v})),[]);const un=useCallback((k,v)=>setNf(x=>({...x,[k]:v})),[]);
   const uc=useCallback((k,v)=>setCf(x=>({...x,[k]:v})),[]);const us=useCallback((k,v)=>setSf(x=>({...x,[k]:v})),[]);
 
-  useEffect(()=>{const b=`properties/${propertyId}`,u=[];const L=(s,fn)=>{u.push(onSnapshot(query(collection(db,b,s),orderBy('createdAt','desc')),snap=>fn(snap.docs.map(d=>({id:d.id,...d.data()})))))};L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
+  useEffect(()=>{const b=`properties/${propertyId}`,u=[];const L=(s,fn)=>{u.push(onSnapshot(query(collection(db,b,s),orderBy('createdAt','desc')),snap=>fn(snap.docs.map(d=>({id:d.id,...d.data()})))))};L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
 
   const save=async(sub,data)=>{await addDoc(collection(db,'properties',propertyId,sub),{...data,createdAt:serverTimestamp()});setModal(null);setEditId(null)};
   const update=async(sub,id,data)=>{await updateDoc(doc(db,'properties',propertyId,sub,id),data);setModal(null);setEditId(null)};
@@ -416,7 +418,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0),[mortCalc,extraP]);
 
   const pN=id=>partners.find(p=>p.id===id)?.name||id;const pCl=id=>partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'analytics',icon:<BarChart3 size={18}/>,l:'Análisis'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Valorización'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'analytics',icon:<BarChart3 size={18}/>,l:'Análisis'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'repairs',icon:<Wrench size={18}/>,l:'Reparaciones'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Valorización'},{id:'pipeline',icon:<Clock size={18}/>,l:'Pipeline'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
 
   if(loading)return<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 size={36} className="animate-spin text-blue-500"/></div>;
   return <div className="min-h-screen bg-[#F8FAFC] flex">
@@ -680,6 +682,26 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-4">HOA + Electricidad</h3><ResponsiveContainer width="100%" height={200}><ComposedChart data={annual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="hoa" name="HOA" fill="#7C3AED" radius={[4,4,0,0]}/><Bar dataKey="duke" name="Electricidad" fill="#F59E0B" radius={[4,4,0,0]}/></ComposedChart></ResponsiveContainer></div>
         </div>
         <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><h3 className="text-sm font-bold text-slate-700 mb-4">Tabla Anual Detallada</h3><Tbl cols={[{label:'Año',render:r=><span className="font-extrabold">{r.year}{r.n<12?` (${r.n}m)`:''}</span>},{label:'Revenue',r:true,render:r=><span className="text-blue-600 font-bold">{fm(r.revenue)}</span>},{label:'Comisión',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},{label:'Electric.',r:true,render:r=>fm(r.duke)},{label:'HOA',r:true,render:r=>fm(r.hoa)},{label:'Maint',r:true,render:r=>fm(r.maintenance)},{label:'Agua',r:true,render:r=>fm(r.water)},{label:'Net',r:true,render:r=><span className="font-extrabold text-emerald-600">{fm(r.net)}</span>},{label:'Margen',r:true,render:r=>{const m=r.revenue?r.net/r.revenue*100:0;return<span className={`font-bold ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(1)}%</span>}}]} rows={annual}/></div>
+        {/* Break-even calculator */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mt-4"><h3 className="text-sm font-bold text-slate-700 mb-4">🎯 Break-Even Calculator</h3>
+          {(()=>{
+            const lastFull=annual.filter(y=>y.n===12);
+            if(!lastFull.length) return <p className="text-xs text-slate-400 text-center py-4">Necesita al menos 1 año completo de datos</p>;
+            const ly=lastFull[lastFull.length-1];
+            const totalCosts=ly.commission+ly.duke+ly.water+ly.hoa+ly.maintenance+ly.vendor+(annualMortgage||0)+totExp;
+            const avgDailyRev=ly.revenue/365;
+            const breakEvenDays=avgDailyRev>0?Math.ceil(totalCosts/avgDailyRev):0;
+            const breakEvenOcc=breakEvenDays>0?((breakEvenDays/365)*100):0;
+            const actualNetDays=ly.revenue>0?Math.round(365*(ly.net/ly.revenue)):0;
+            const cushionDays=actualNetDays>breakEvenDays?actualNetDays-breakEvenDays:0;
+            return <div className="grid grid-cols-4 gap-3">
+              <div className="bg-slate-50 rounded-xl p-4 text-center border"><div className="text-[10px] text-slate-500 font-bold uppercase">ADR Estimado</div><div className="text-xl font-extrabold text-slate-800 mt-1">{fm(avgDailyRev)}</div><div className="text-[10px] text-slate-400">/noche ({ly.year})</div></div>
+              <div className="bg-amber-50 rounded-xl p-4 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Break-Even</div><div className="text-xl font-extrabold text-amber-700 mt-1">{breakEvenDays} noches</div><div className="text-[10px] text-amber-500">{breakEvenOcc.toFixed(0)}% ocupación mínima</div></div>
+              <div className="bg-blue-50 rounded-xl p-4 text-center border border-blue-100"><div className="text-[10px] text-blue-600 font-bold uppercase">Noches Efectivas</div><div className="text-xl font-extrabold text-blue-700 mt-1">{actualNetDays}</div><div className="text-[10px] text-blue-500">que generaron net</div></div>
+              <div className={`rounded-xl p-4 text-center border ${cushionDays>30?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}><div className={`text-[10px] font-bold uppercase ${cushionDays>30?'text-emerald-600':'text-rose-600'}`}>Margen de Seguridad</div><div className={`text-xl font-extrabold mt-1 ${cushionDays>30?'text-emerald-700':'text-rose-700'}`}>{cushionDays} noches</div><div className={`text-[10px] ${cushionDays>30?'text-emerald-500':'text-rose-500'}`}>sobre break-even</div></div>
+            </div>;
+          })()}
+        </div>
       </>:<Empty icon={BarChart3} title="Sin datos" desc="Carga statements para análisis." action="Cargar" onAction={()=>{setUploadLog([]);setModal('upload')}}/>}
     </>}
 
@@ -723,6 +745,29 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
     </>}
 
+    {/* ═══ REPAIRS & CAPEX ═══ */}
+    {view==='repairs'&&<>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">🔧 Reparaciones & CapEx</h1><button onClick={()=>{setRf({date:new Date().toISOString().split('T')[0],title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:partners[0]?.id||''});setEditId(null);setModal('repair')}} className="px-4 py-2.5 bg-amber-600 text-white text-xs rounded-xl font-bold hover:bg-amber-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Nuevo Ticket</button></div>
+
+      {repairs.length>0&&<div className="grid grid-cols-4 gap-3 mb-5">
+        <KPI label="Total Reparaciones" value={fm(repairs.reduce((s,r)=>s+(parseFloat(r.amount)||0),0))} sub={repairs.length+' tickets'} color="amber"/>
+        <KPI label="Pendientes" value={String(repairs.filter(r=>r.status==='pending').length)} color="red" alert={repairs.filter(r=>r.status==='pending').length>0?'red':null}/>
+        <KPI label="En Progreso" value={String(repairs.filter(r=>r.status==='progress').length)} color="blue"/>
+        <KPI label="Completados" value={String(repairs.filter(r=>r.status==='done').length)} color="green"/>
+      </div>}
+
+      {repairs.length>0?<Tbl cols={[
+        {label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},
+        {label:'Estado',render:r=><span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${r.status==='done'?'bg-emerald-100 text-emerald-700':r.status==='progress'?'bg-blue-100 text-blue-700':'bg-amber-100 text-amber-700'}`}>{r.status==='done'?'✓ Completado':r.status==='progress'?'⏳ En Progreso':'⚠ Pendiente'}</span>},
+        {label:'Título',render:r=><span className="font-semibold text-slate-700">{r.title}</span>},
+        {label:'Tipo',render:r=><span className="text-xs text-slate-400">{r.category==='capex'?'📈 CapEx':r.category==='preventive'?'🛡️ Preventivo':'🔧 Reparación'}</span>},
+        {label:'Vendor',key:'vendor',cls:'text-xs text-slate-500'},
+        {label:'Pagó',render:r=>r.paidBy?<span className="font-medium" style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>:<span className="text-slate-300">—</span>},
+        {label:'Monto',r:true,render:r=><span className="font-bold text-amber-600">{fm(r.amount)}</span>},
+      ]} rows={repairs} onDel={del} dc="repairs" onEdit={r=>{setRf({date:r.date||'',title:r.title||'',description:r.description||'',amount:String(r.amount||''),vendor:r.vendor||'',category:r.category||'repair',status:r.status||'pending',paidBy:r.paidBy||''});setEditId(r.id);setModal('repair')}}/>
+      :<Empty icon={Wrench} title="Sin reparaciones" desc="Registra mantenimientos, reparaciones y mejoras de capital (CapEx) de tu propiedad." action="Crear Ticket" onAction={()=>{setRf({date:new Date().toISOString().split('T')[0],title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:partners[0]?.id||''});setModal('repair')}}/>}
+    </>}
+
     {/* ═══ VALUATION & EQUITY ═══ */}
     {view==='valuation'&&<>
       <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">📈 Valorización & Equity</h1><button onClick={()=>{setVf({date:new Date().toISOString().split('T')[0],value:'',source:'manual',notes:''});setEditId(null);setModal('valuation')}} className="px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Registrar Valor</button></div>
@@ -763,6 +808,44 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500 font-medium">{fmDate(r.date)}</span>},{label:'Valor Estimado',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.value)}</span>},{label:'Fuente',render:r=><span className="text-xs text-slate-400">{r.source==='zillow'?'Zillow':r.source==='redfin'?'Redfin':r.source==='appraisal'?'Avalúo':r.source==='broker'?'Broker':'Manual'}</span>},{label:'Notas',key:'notes',cls:'text-xs text-slate-400'}]} rows={[...valuations].sort((a,b)=>(b.date||'').localeCompare(a.date||''))} onDel={del} dc="valuations" onEdit={r=>{setVf({date:r.date||'',value:String(r.value||''),source:r.source||'manual',notes:r.notes||''});setEditId(r.id);setModal('valuation')}}/>
       </>}
       {!valuations.length&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm"><p className="text-sm text-slate-400 text-center py-4">Registra el valor actual de tu propiedad para trackear apreciación y equity real. Puedes usar Zillow, Redfin, un avalúo o tu propia estimación.</p></div>}
+    </>}
+
+    {/* ═══ PIPELINE ═══ */}
+    {view==='pipeline'&&<>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">📋 Pipeline de Tareas</h1><button onClick={()=>{setTf({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Nueva Tarea</button></div>
+
+      {tasks.length>0&&<div className="grid grid-cols-4 gap-3 mb-5">
+        <KPI label="Total Tareas" value={String(tasks.length)} color="blue"/>
+        <KPI label="Pendientes" value={String(tasks.filter(t=>t.status==='pending').length)} color="red" alert={tasks.filter(t=>t.status==='pending').length>2?'red':null}/>
+        <KPI label="En Progreso" value={String(tasks.filter(t=>t.status==='progress').length)} color="amber"/>
+        <KPI label="Completadas" value={String(tasks.filter(t=>t.status==='done').length)} color="green"/>
+      </div>}
+
+      {/* Kanban-style columns */}
+      {tasks.length>0?<div className="grid grid-cols-3 gap-4">
+        {[['pending','⚠ Pendientes','bg-amber-50 border-amber-200'],['progress','⏳ En Progreso','bg-blue-50 border-blue-200'],['done','✓ Completadas','bg-emerald-50 border-emerald-200']].map(([st,label,cls])=>(
+          <div key={st} className={`rounded-2xl border p-4 ${cls} min-h-[200px]`}>
+            <h3 className="text-sm font-bold text-slate-700 mb-3">{label} ({tasks.filter(t=>t.status===st).length})</h3>
+            <div className="space-y-2">{tasks.filter(t=>t.status===st).map(t=>(
+              <div key={t.id} className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 hover:shadow-md transition-all">
+                <div className="flex justify-between items-start mb-1">
+                  <span className="font-semibold text-sm text-slate-700">{t.title}</span>
+                  <div className="flex gap-0.5">
+                    <button onClick={()=>{setTf({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||''});setEditId(t.id);setModal('task')}} className="text-slate-300 hover:text-blue-500 p-1 rounded"><Pencil size={12}/></button>
+                    <button onClick={()=>del('tasks',t.id)} className="text-slate-300 hover:text-red-500 p-1 rounded"><Trash2 size={12}/></button>
+                  </div>
+                </div>
+                {t.notes&&<p className="text-[11px] text-slate-400 mb-2">{t.notes}</p>}
+                <div className="flex justify-between items-center">
+                  {t.dueDate&&<span className="text-[10px] text-slate-400 flex items-center gap-1"><Calendar size={10}/>{fmDate(t.dueDate)}</span>}
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${t.priority==='high'?'bg-rose-100 text-rose-600':t.priority==='low'?'bg-slate-100 text-slate-500':'bg-amber-100 text-amber-600'}`}>{t.priority==='high'?'Alta':t.priority==='low'?'Baja':'Media'}</span>
+                </div>
+                {t.status!=='done'&&<div className="flex gap-1 mt-2">{t.status==='pending'&&<button onClick={()=>update('tasks',t.id,{status:'progress'})} className="flex-1 py-1 bg-blue-100 text-blue-600 rounded-lg text-[10px] font-bold hover:bg-blue-200">Iniciar →</button>}{t.status!=='done'&&<button onClick={()=>update('tasks',t.id,{status:'done'})} className="flex-1 py-1 bg-emerald-100 text-emerald-600 rounded-lg text-[10px] font-bold hover:bg-emerald-200">Completar ✓</button>}</div>}
+              </div>
+            ))}</div>
+          </div>
+        ))}
+      </div>:<Empty icon={Clock} title="Sin tareas" desc="Crea tareas para llevar control de pagos pendientes, renovaciones de seguro, inspecciones y más." action="Nueva Tarea" onAction={()=>{setTf({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});setModal('task')}}/>}
     </>}
 
     {/* ═══ SETTINGS ═══ */}
@@ -988,6 +1071,31 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {modal==='editMort'&&<Mdl title="Editar Hipoteca" grad="from-blue-600 to-blue-700" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={async()=>{await saveMortgage();setModal(null)}} disabled={!mc.bal||!mc.rate||!mc.pay||savingMort} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={14} className="animate-spin"/>}Guardar</button></>}>
       <div className="grid grid-cols-2 gap-3"><Inp label="Balance" value={mc.bal||String(mort.balance||'')} onChange={v=>umc('bal',v)} prefix="$" type="number"/><Inp label="Tasa (%)" value={mc.rate||String(mort.rate||'')} onChange={v=>umc('rate',v)} type="number"/></div>
       <div className="grid grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mc.term||String(mort.termYears||30)} onChange={v=>umc('term',v)} type="number"/><Inp label="Pago Mensual" value={mc.pay||String(mort.monthlyPayment||'')} onChange={v=>umc('pay',v)} prefix="$" type="number"/><Inp label="Inicio" value={mc.start||mort.startDate||''} onChange={v=>umc('start',v)} type="date"/></div>
+    </Mdl>}
+
+    {modal==='repair'&&<Mdl title={editId?'✏️ Editar Ticket':'🔧 Nuevo Ticket de Reparación'} grad="from-amber-500 to-amber-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...rf,amount:parseFloat(rf.amount)||0};if(editId){update('repairs',editId,data)}else{save('repairs',data)}}} disabled={!rf.title} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <Inp label="Título" value={rf.title} onChange={v=>ur('title',v)} placeholder="Ej: Reparación de AC, Pintura exterior"/>
+      <div className="grid grid-cols-2 gap-3">
+        <Inp label="Fecha" value={rf.date} onChange={v=>ur('date',v)} type="date"/>
+        <Inp label="Monto (USD)" value={rf.amount} onChange={v=>ur('amount',v)} prefix="$" type="number"/>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Sel label="Tipo" value={rf.category} onChange={v=>ur('category',v)} options={[{v:'repair',l:'🔧 Reparación urgente'},{v:'preventive',l:'🛡️ Mantenimiento preventivo'},{v:'capex',l:'📈 Mejora / CapEx'}]}/>
+        <Sel label="Estado" value={rf.status} onChange={v=>ur('status',v)} options={[{v:'pending',l:'⚠ Pendiente'},{v:'progress',l:'⏳ En Progreso'},{v:'done',l:'✓ Completado'}]}/>
+      </div>
+      <Inp label="Vendor / Proveedor" value={rf.vendor} onChange={v=>ur('vendor',v)} placeholder="Ej: ABC Plumbing, Home Depot"/>
+      <Inp label="Descripción (opcional)" value={rf.description} onChange={v=>ur('description',v)} placeholder="Detalles adicionales..."/>
+      {partners.length>0&&<div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={rf.paidBy} onChange={v=>ur('paidBy',v)}/></div>}
+    </Mdl>}
+
+    {modal==='task'&&<Mdl title={editId?'✏️ Editar Tarea':'📋 Nueva Tarea'} grad="from-indigo-500 to-indigo-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...tf};if(editId){update('tasks',editId,data)}else{save('tasks',data)}}} disabled={!tf.title} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <Inp label="Título" value={tf.title} onChange={v=>ut('title',v)} placeholder="Ej: Renovar seguro, Pagar property tax"/>
+      <div className="grid grid-cols-2 gap-3">
+        <Inp label="Fecha límite" value={tf.dueDate} onChange={v=>ut('dueDate',v)} type="date"/>
+        <Sel label="Prioridad" value={tf.priority} onChange={v=>ut('priority',v)} options={[{v:'high',l:'🔴 Alta'},{v:'medium',l:'🟡 Media'},{v:'low',l:'🟢 Baja'}]}/>
+      </div>
+      <Sel label="Estado" value={tf.status} onChange={v=>ut('status',v)} options={[{v:'pending',l:'⚠ Pendiente'},{v:'progress',l:'⏳ En Progreso'},{v:'done',l:'✓ Completada'}]}/>
+      <Inp label="Notas (opcional)" value={tf.notes} onChange={v=>ut('notes',v)} placeholder="Detalles adicionales..."/>
     </Mdl>}
 
     {modal==='valuation'&&<Mdl title={editId?'✏️ Editar Valorización':'📈 Registrar Valor de Mercado'} grad="from-emerald-600 to-teal-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={date:vf.date,value:parseFloat(vf.value)||0,source:vf.source,notes:vf.notes};if(editId){update('valuations',editId,data)}else{save('valuations',data)}}} disabled={!vf.value} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
