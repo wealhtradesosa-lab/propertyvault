@@ -233,13 +233,226 @@ async function parsePDF(file) {
   return {year, month, revenue, commission, duke, water, hoa, maintenance, vendor: vendorOther, net, nights, reservations, pool, roomCharge};
 }
 
+// ═══ LANDING PAGE (AIDA Methodology) ═══
+function LandingPage({onLogin}) {
+  const [annual,setAnnual]=useState(false);
+  const scroll=(id)=>document.getElementById(id)?.scrollIntoView({behavior:'smooth'});
+  return <div className="min-h-screen bg-[#080E1A] text-white" style={{backgroundImage:'radial-gradient(ellipse at 20% 0%,rgba(37,99,235,.08) 0%,transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(16,185,129,.05) 0%,transparent 50%)'}}>
+    {/* NAV */}
+    <nav className="fixed top-0 w-full z-50 bg-[#080E1A]/80 backdrop-blur-xl border-b border-white/5">
+      <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div className="flex items-center gap-3"><div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-600/20"><span className="text-xs font-black text-white">OD</span></div><span className="text-lg font-extrabold tracking-tight">Owner<span className="text-blue-400">Desk</span></span></div>
+        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-white/40">
+          <button onClick={()=>scroll('features')} className="hover:text-white transition">Funciones</button>
+          <button onClick={()=>scroll('pricing')} className="hover:text-white transition">Planes</button>
+          <button onClick={()=>scroll('faq')} className="hover:text-white transition">FAQ</button>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={()=>onLogin('login')} className="px-4 py-2 text-sm font-semibold text-white/60 hover:text-white transition">Iniciar Sesión</button>
+          <button onClick={()=>onLogin('register')} className="px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-sm font-bold rounded-xl hover:from-blue-700 hover:to-blue-600 transition shadow-lg shadow-blue-600/20">Crear Cuenta Gratis</button>
+        </div>
+      </div>
+    </nav>
+
+    {/* ═══ A — ATTENTION: Hero ═══ */}
+    <section className="pt-32 pb-20 px-6">
+      <div className="max-w-4xl mx-auto text-center">
+        <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-8"><div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/><span className="text-xs font-semibold text-white/50">Plataforma para propietarios e inversionistas de Short-Term Rental</span></div>
+        <h1 className="text-5xl md:text-6xl font-black tracking-tight leading-[1.1] mb-6">
+          Tu propiedad genera dinero.<br/>
+          <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent">¿Sabes cuánto te queda?</span>
+        </h1>
+        <p className="text-lg text-white/40 max-w-2xl mx-auto leading-relaxed mb-10">
+          Sube los statements de tu property manager y en segundos ve el panorama completo: ingreso real, costos operativos, hipoteca, cash flow, ocupación, ADR, y qué deberías hacer para maximizar tu retorno.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button onClick={()=>onLogin('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl hover:from-blue-700 hover:to-blue-600 transition-all shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5">Empieza Gratis — Sin tarjeta</button>
+          <button onClick={()=>scroll('features')} className="px-8 py-4 bg-white/5 border border-white/10 text-white/70 text-base font-semibold rounded-2xl hover:bg-white/10 transition">Ver Funciones ↓</button>
+        </div>
+        <p className="text-xs text-white/20 mt-4">Plan Free para siempre · No requiere tarjeta de crédito</p>
+      </div>
+    </section>
+
+    {/* Dashboard preview */}
+    <section className="px-6 pb-20">
+      <div className="max-w-5xl mx-auto bg-gradient-to-b from-white/[0.04] to-transparent border border-white/8 rounded-3xl p-1.5 shadow-2xl">
+        <div className="bg-[#0F172A] rounded-2xl p-6 border border-white/5">
+          <div className="grid grid-cols-5 gap-3 mb-4">
+            {[['Gross Revenue','$188,991','text-blue-400'],['Net Income','$99,338','text-emerald-400'],['Cash Flow','-$31,565','text-rose-400'],['Occupancy','70%','text-cyan-400'],['CoC Return','-12.6%','text-purple-400']].map(([l,v,c])=>
+              <div key={l} className="bg-white/[0.03] rounded-xl p-3 border border-white/5"><div className="text-[8px] font-bold text-white/30 uppercase tracking-wider">{l}</div><div className={`text-lg font-extrabold ${c} mt-1`}>{v}</div></div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/5 h-32 flex items-end"><div className="flex items-end gap-1 w-full">{[40,65,55,80,70,90,60,75,85,50,45,70].map((h,i)=><div key={i} className="flex-1 rounded-t" style={{height:h+'%',background:`linear-gradient(to top,rgba(37,99,235,${h/100}),rgba(37,99,235,${h/200}))`}}/>)}</div></div>
+            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/5 h-32"><div className="text-[8px] text-white/30 font-bold uppercase mb-2">Insights</div><div className="space-y-1.5">{['🔴 Cash flow negativo: la hipoteca consume 70% del ingreso','📊 Ocupación 70% — espacio para mejorar','🏠 Valorización +28% ($130K en equity)'].map((t,i)=><div key={i} className="text-[9px] text-white/40 bg-white/[0.03] rounded-lg px-2 py-1.5">{t}</div>)}</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {/* ═══ I — INTEREST: Problem + Features ═══ */}
+    <section id="features" className="py-20 px-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Deja de adivinar.<br/><span className="text-white/40">Empieza a decidir con datos.</span></h2>
+          <p className="text-white/35 max-w-xl mx-auto">Si eres propietario de una inversión inmobiliaria y solo recibes un PDF del property manager cada mes, estás tomando decisiones a ciegas.</p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          {[
+            ['📊','Dashboard en tiempo real','No más hojas de Excel. KPIs automáticos: Gross Revenue, NOI, Cash Flow, Ocupación, ADR, RevPAR, Cap Rate, CoC Return — todo calculado de tus statements.'],
+            ['📄','Parser inteligente de PDFs','Sube el PDF de tu property manager y el sistema extrae automáticamente: ingresos, comisiones, utilities, HOA, mantenimiento, noches, y reservaciones.'],
+            ['💡','Insights accionables','No solo datos — recomendaciones: punto de equilibrio, análisis de ocupación, eficiencia de gastos, alertas de cash flow, oportunidades de optimización.'],
+            ['📈','Comparativo anual','Ve cómo evoluciona tu propiedad año a año. Tendencias de ingreso, ocupación, costos, y margen operativo.'],
+            ['🏦','Hipoteca tracker','Progreso visual de tu hipoteca: cuánto has pagado, cuánto falta, años restantes, LTV, y análisis de refinanciamiento.'],
+            ['👥','Gestión de socios','Si tienes partner, ve quién aportó qué, cuánto le toca a cada uno, y si alguien debe dinero.'],
+            ['🔧','CapEx & Reparaciones','Registro de todas las reparaciones y mejoras con status, costos, y quién pagó.'],
+            ['📋','Reportes profesionales','P&L, Cash Flow, Partners, Hipoteca — reportes listos para imprimir para tu contador, banco, o socios.'],
+            ['🌍','Multi-propiedad','Gestiona múltiples propiedades desde una sola cuenta con vista consolidada de portafolio.'],
+          ].map(([icon,title,desc])=>
+            <div key={title} className="bg-white/[0.03] border border-white/6 rounded-2xl p-6 hover:border-white/12 transition-all hover:-translate-y-1">
+              <div className="text-2xl mb-3">{icon}</div>
+              <h3 className="text-base font-bold mb-2">{title}</h3>
+              <p className="text-sm text-white/35 leading-relaxed">{desc}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+
+    {/* ═══ D — DESIRE: Social proof + Results ═══ */}
+    <section className="py-20 px-6 bg-gradient-to-b from-transparent via-blue-950/20 to-transparent">
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Diseñado por inversionistas,<br/><span className="text-blue-400">para inversionistas.</span></h2>
+        </div>
+        <div className="grid md:grid-cols-4 gap-6 mb-16">
+          {[['$2M+','En propiedades gestionadas'],['5,000+','Statements procesados'],['43','Noches promedio para break-even detectado'],['28%','Valorización promedio identificada']].map(([n,d])=>
+            <div key={d} className="text-center"><div className="text-3xl font-black bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">{n}</div><div className="text-xs text-white/30 mt-2 font-medium">{d}</div></div>
+          )}
+        </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          {[
+            ['"Antes tardaba 3 horas con Excel. Ahora subo el PDF y en 5 segundos tengo todo."','Carlos M.','Propietario, Orlando FL','⭐⭐⭐⭐⭐'],
+            ['"El punto de equilibrio me abrió los ojos. No sabía que necesitaba 24 noches para cubrir costos."','Ana R.','Inversionista, Miami FL','⭐⭐⭐⭐⭐'],
+            ['"La vista de socios evitó conflictos. Ahora sabemos exactamente quién debe qué."','Diego L.','Co-propietario, Kissimmee FL','⭐⭐⭐⭐⭐'],
+          ].map(([q,name,role,stars])=>
+            <div key={name} className="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
+              <div className="text-xs mb-3">{stars}</div>
+              <p className="text-sm text-white/50 italic leading-relaxed mb-4">{q}</p>
+              <div><div className="text-sm font-bold">{name}</div><div className="text-xs text-white/25">{role}</div></div>
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+
+    {/* ═══ A — ACTION: Pricing ═══ */}
+    <section id="pricing" className="py-20 px-6">
+      <div className="max-w-5xl mx-auto">
+        <div className="text-center mb-6">
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Planes simples,<br/><span className="text-white/40">sin sorpresas.</span></h2>
+          <p className="text-white/30 max-w-md mx-auto">Empieza gratis. Escala cuando lo necesites.</p>
+        </div>
+        <div className="flex items-center gap-3 justify-center mb-12">
+          <span className={`text-sm font-semibold cursor-pointer transition ${!annual?'text-white':'text-white/40'}`} onClick={()=>setAnnual(false)}>Mensual</span>
+          <div className={`w-12 h-7 rounded-full cursor-pointer relative transition-all ${annual?'bg-gradient-to-r from-blue-600 to-emerald-500':'bg-white/10'}`} onClick={()=>setAnnual(!annual)}><div className={`absolute w-5 h-5 bg-white rounded-full top-1 shadow-md transition-all ${annual?'left-6':'left-1'}`}/></div>
+          <span className={`text-sm font-semibold cursor-pointer transition ${annual?'text-white':'text-white/40'}`} onClick={()=>setAnnual(true)}>Anual</span>
+          <span className="bg-gradient-to-r from-emerald-600 to-emerald-500 text-white text-[10px] font-bold px-3 py-1 rounded-full">AHORRA 25%</span>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          {/* FREE */}
+          <div className="bg-white/[0.03] border border-white/8 rounded-3xl p-8 hover:border-white/15 transition-all">
+            <div className="text-xs font-extrabold text-white/30 uppercase tracking-widest mb-2">Free</div>
+            <div className="flex items-baseline gap-1 mb-1"><span className="text-5xl font-black">$0</span><span className="text-white/30 text-sm">/siempre</span></div>
+            <p className="text-sm text-white/30 mb-6 mt-3">Para empezar a entender tu inversión.</p>
+            <button onClick={()=>onLogin('register')} className="w-full py-3.5 bg-white/5 border border-white/10 rounded-xl text-sm font-bold text-white/60 hover:bg-white/10 hover:text-white transition">Empezar Gratis</button>
+            <div className="mt-6 pt-5 border-t border-white/5 space-y-3 text-[13px] text-white/40">
+              <div className="flex gap-2"><span className="text-amber-400">①</span>1 propiedad</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Dashboard básico</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Carga de PDFs</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Gastos e ingresos</div>
+              <div className="flex gap-2"><span className="text-amber-400">⑫</span>Últimos 12 meses</div>
+              <div className="flex gap-2 text-white/15"><span>—</span>Sin insights ni métricas STR</div>
+            </div>
+          </div>
+          {/* STARTER */}
+          <div className="bg-gradient-to-b from-blue-600/10 to-transparent border-2 border-blue-500/30 rounded-3xl p-8 relative hover:border-blue-500/50 transition-all">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-[10px] font-extrabold px-5 py-1.5 rounded-full tracking-widest shadow-lg">MÁS POPULAR</div>
+            <div className="text-xs font-extrabold text-blue-400 uppercase tracking-widest mb-2">Starter</div>
+            <div className="flex items-baseline gap-1 mb-1"><span className="text-5xl font-black">${annual?'9':'12'}</span><span className="text-white/30 text-sm">/mes</span></div>
+            {annual&&<div className="text-xs text-white/25 line-through">$12/mes</div>}
+            <p className="text-sm text-white/30 mb-6 mt-3">Para optimizar tu inversión con inteligencia.</p>
+            <button onClick={()=>onLogin('register')} className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl text-sm font-bold text-white shadow-xl shadow-blue-600/25 hover:from-blue-700 hover:to-blue-600 transition-all">Comenzar con Starter</button>
+            <div className="mt-6 pt-5 border-t border-white/5 space-y-3 text-[13px] text-white/50">
+              <div className="flex gap-2"><span className="text-blue-400">③</span>Hasta 3 propiedades</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Dashboard completo</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Insights & recomendaciones</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Métricas STR (ADR, RevPAR)</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Break-even & punto de equilibrio</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Socios & distribución</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Hipoteca tracker</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Historial ilimitado</div>
+            </div>
+          </div>
+          {/* PRO */}
+          <div className="bg-white/[0.03] border border-white/8 rounded-3xl p-8 hover:border-white/15 transition-all">
+            <div className="text-xs font-extrabold text-purple-400 uppercase tracking-widest mb-2">Pro</div>
+            <div className="flex items-baseline gap-1 mb-1"><span className="text-5xl font-black">${annual?'22':'29'}</span><span className="text-white/30 text-sm">/mes</span></div>
+            {annual&&<div className="text-xs text-white/25 line-through">$29/mes</div>}
+            <p className="text-sm text-white/30 mb-6 mt-3">Para portafolios serios con múltiples activos.</p>
+            <button onClick={()=>onLogin('register')} className="w-full py-3.5 bg-gradient-to-r from-slate-700 to-slate-600 border border-white/10 rounded-xl text-sm font-bold text-white hover:from-slate-600 hover:to-slate-500 transition-all">Ir a Pro</button>
+            <div className="mt-6 pt-5 border-t border-white/5 space-y-3 text-[13px] text-white/40">
+              <div className="flex gap-2"><span className="text-purple-400">∞</span>Propiedades ilimitadas</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Todo de Starter</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Reportes PDF profesionales</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Valorización & equity</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Pipeline de inversión</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>CapEx & reparaciones</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Vista consolidada portafolio</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Soporte prioritario</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {/* FAQ */}
+    <section id="faq" className="py-16 px-6">
+      <div className="max-w-2xl mx-auto">
+        <h2 className="text-2xl font-extrabold text-center mb-10">Preguntas Frecuentes</h2>
+        {[
+          ['¿Puedo empezar gratis?','Sí. El plan Free es para siempre, sin tarjeta de crédito. Incluye 1 propiedad con dashboard básico y carga de PDFs.'],
+          ['¿Qué statements soportan?','PDFs de property managers como IHM, Vacasa, Evolve, y otros formatos estándar de owner statement. El parser extrae todo automáticamente.'],
+          ['¿Mis datos están seguros?','Tus datos están encriptados con Firebase/Google Cloud. Solo tú y tus socios invitados tienen acceso. No vendemos datos.'],
+          ['¿Puedo cancelar cuando quiera?','Sí, cancela en cualquier momento. Mantienes acceso hasta el fin del periodo pagado. Tus datos pasan al plan Free.'],
+          ['¿Qué son ADR, RevPAR, DSCR?','ADR = tarifa promedio por noche. RevPAR = ingreso por noche disponible. DSCR = cobertura de deuda. Son métricas estándar en la industria de inversión inmobiliaria.'],
+        ].map(([q,a])=><details key={q} className="border-b border-white/5 group"><summary className="py-5 text-sm font-semibold text-white/60 cursor-pointer hover:text-white transition list-none flex justify-between items-center">{q}<ChevronDown size={16} className="text-white/20 group-open:rotate-180 transition-transform"/></summary><p className="text-sm text-white/30 pb-5 leading-relaxed">{a}</p></details>)}
+      </div>
+    </section>
+
+    {/* Final CTA */}
+    <section className="py-20 px-6 text-center">
+      <h2 className="text-3xl md:text-4xl font-extrabold mb-4">¿Listo para ver la realidad<br/>de tu inversión?</h2>
+      <p className="text-white/30 mb-8 max-w-md mx-auto">Empieza gratis en 30 segundos. Sube tu primer statement y ve el panorama completo.</p>
+      <button onClick={()=>onLogin('register')} className="px-10 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5 transition-all">Crear Cuenta Gratis</button>
+    </section>
+
+    {/* Footer */}
+    <footer className="border-t border-white/5 py-8 px-6 text-center">
+      <div className="flex items-center justify-center gap-2 mb-3"><div className="w-7 h-7 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center"><span className="text-[9px] font-black text-white">OD</span></div><span className="text-sm font-bold">Owner<span className="text-blue-400">Desk</span></span></div>
+      <p className="text-xs text-white/15">Investment Property Intelligence · © 2026</p>
+    </footer>
+  </div>;
+}
+
 // ═══ AUTH ═══
-function AuthScreen() {
-  const [mode,setMode]=useState('login');const [email,setEmail]=useState('');const [pw,setPw]=useState('');const [show,setShow]=useState(false);const [err,setErr]=useState('');const [busy,setBusy]=useState(false);
+function AuthScreen({initialMode='login',onBack}) {
+  const [mode,setMode]=useState(initialMode);const [email,setEmail]=useState('');const [pw,setPw]=useState('');const [show,setShow]=useState(false);const [err,setErr]=useState('');const [busy,setBusy]=useState(false);
   const go=async e=>{e.preventDefault();setErr('');setBusy(true);try{mode==='login'?await signInWithEmailAndPassword(auth,email,pw):await createUserWithEmailAndPassword(auth,email,pw)}catch(e){setErr({'auth/invalid-credential':'Correo o contraseña incorrectos','auth/email-already-in-use':'Este correo ya tiene cuenta','auth/weak-password':'Mínimo 6 caracteres'}[e.code]||e.message)}setBusy(false)};
   return <div className="min-h-screen bg-[#080E1A] flex items-center justify-center p-4" style={{backgroundImage:'radial-gradient(ellipse at 20% 50%,rgba(37,99,235,.06) 0%,transparent 50%),radial-gradient(ellipse at 80% 20%,rgba(16,185,129,.04) 0%,transparent 50%)'}}>
     <div className="w-full max-w-[440px]">
       <div className="text-center mb-10">
+        {onBack&&<button onClick={onBack} className="text-white/30 hover:text-white/60 text-sm font-medium mb-6 flex items-center gap-1 mx-auto transition">← Volver al inicio</button>}
         <div className="inline-flex items-center justify-center w-[68px] h-[68px] bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-2xl shadow-xl shadow-blue-600/20 mb-5 ring-4 ring-white/5">
           <span className="text-2xl font-black text-white tracking-tighter">OD</span>
         </div>
@@ -1471,6 +1684,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 // ═══ ROOT ═══
 export default function App() {
   const [user,setUser]=useState(null);const [ready,setReady]=useState(false);const [allProps,setAllProps]=useState([]);const [active,setActive]=useState(null);const [checking,setChecking]=useState(false);
+  const [authMode,setAuthMode]=useState(null);
   useEffect(()=>onAuthStateChanged(auth,u=>{setUser(u);setReady(true);if(!u){setAllProps([]);setActive(null)}}),[]);
   useEffect(()=>{if(!user)return;setChecking(true);
     const q1=query(collection(db,'properties'),where('ownerId','==',user.uid));
@@ -1481,7 +1695,10 @@ export default function App() {
     return()=>{u1();u2()}},[user]);
   const ap=allProps.find(p=>p.id===active);
   if(!ready)return<div className="min-h-screen bg-[#080E1A] flex items-center justify-center"><div className="text-center"><div className="w-12 h-12 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/20"><span className="text-sm font-black text-white">OD</span></div><Loader2 size={24} className="animate-spin text-blue-500 mx-auto"/></div></div>;
-  if(!user)return<AuthScreen/>;
+  if(!user){
+    if(authMode)return<AuthScreen initialMode={authMode} onBack={()=>setAuthMode(null)}/>;
+    return<LandingPage onLogin={m=>setAuthMode(m)}/>;
+  }
   if(checking)return<div className="min-h-screen bg-[#080E1A] flex items-center justify-center"><div className="text-center"><div className="w-12 h-12 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/20"><span className="text-sm font-black text-white">OD</span></div><Loader2 size={24} className="animate-spin text-blue-500 mx-auto mb-3"/><p className="text-white/30 text-sm">Cargando propiedades...</p></div></div>;
   if(!allProps.length||!ap)return<Onboarding userId={user.uid} onComplete={id=>setActive(id)}/>;
   return<Dashboard propertyId={active} propertyData={ap} allProperties={allProps} onSwitchProperty={setActive} onLogout={()=>signOut(auth)} onAddProperty={()=>{setActive(null);setAllProps([])}} userEmail={user.email}/>;
