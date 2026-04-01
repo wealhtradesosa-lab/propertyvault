@@ -156,10 +156,13 @@ async function parsePDF(file) {
     if(!dateMatch) return {error:'No se encontró fecha en el statement de Host U'};
     const year=parseInt(dateMatch[2]),month=monthMap[dateMatch[1]];
 
-    const findVal=(label)=>{
+    const findVal=(label,exclude)=>{
       const lbl=label.toLowerCase();
+      const exc=exclude?exclude.toLowerCase():null;
       for(const row of rows){
-        if(!row.text.toLowerCase().includes(lbl)) continue;
+        const rt=row.text.toLowerCase();
+        if(!rt.includes(lbl)) continue;
+        if(exc&&rt.includes(exc)) continue;
         const amounts=row.text.match(/-?\$([\d,]+\.\d{2})/g);
         if(amounts&&amounts.length>0) return parseFloat(amounts[0].replace(/[$,-]/g,''));
       }
@@ -168,8 +171,7 @@ async function parsePDF(file) {
 
     const revenue=findVal('Rental Income');
     const commissionFee=findVal('Management Fee');
-    const mgmt=findVal('Management');
-    const management=(mgmt>0&&mgmt!==commissionFee)?mgmt:0;
+    const management=findVal('Management','Management Fee');
     const supplies=findVal('Supplies');
     const net=findVal('Payment due to owner')||findVal('Ending balance')||findVal('Statement balance');
 
@@ -549,9 +551,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         await addDoc(collection(db,'properties',propertyId,'statements'),{...stmtData,createdAt:serverTimestamp()});
         uploaded.add(key);
         existingPeriods.add(key);
+        const fmt=r.format||'Unknown';
         const missing=[];
-        if(!r.commission)missing.push('Comisión');if(!r.duke)missing.push('Electricidad');if(!r.maintenance)missing.push('Maint');if(!r.net)missing.push('Net');
-        let msg=`${M[r.month-1]} ${r.year} — Rev: ${fm(r.revenue)} | Comm: ${fm(r.commission)} | Duke: ${fm(r.duke)} | Water: ${fm(r.water)} | HOA: ${fm(r.hoa)} | Maint: ${fm(r.maintenance)} | Net: ${fm(r.net)}`;
+        if(fmt==='IHM'){if(!r.duke)missing.push('Electricidad');if(!r.maintenance)missing.push('Maint');}
+        if(!r.commission)missing.push('Comisión');if(!r.net)missing.push('Net');
+        let msg=`[${fmt}] ${M[r.month-1]} ${r.year} — Rev: ${fm(r.revenue)} | Net: ${fm(r.net)} | ${r.nights||0} noches`;
+        if(missing.length)msg+=` ⚠️ Sin: ${missing.join(', ')}`;
         if(missing.length)msg+=` ⚠️ Sin: ${missing.join(', ')}`;
         log[log.length-1]={file:f.name,status:missing.length?'warn':'ok',msg};
         setUploadLog([...log]);
