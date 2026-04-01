@@ -3,7 +3,7 @@ import { db, auth } from './firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where, updateDoc, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart, Line } from 'recharts';
-import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer } from 'lucide-react';
+import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer, MessageSquare, Send } from 'lucide-react';
 
 // ═══ CONSTANTS ═══
 const ADMIN_EMAILS=['santiagososa1@me.com','crestrepoz@gmail.com','management@hostu.biz'];
@@ -457,6 +457,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);
+  const [tickets,setTickets]=useState([]);const [ticketForm,setTicketForm]=useState({type:'bug',subject:'',message:'',priority:'medium'});
   const [vf,setVf]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setVf(x=>({...x,[k]:v})),[]);
   const [rf,setRf]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRf(x=>({...x,[k]:v})),[]);
   const [tf,setTf]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});const ut=useCallback((k,v)=>setTf(x=>({...x,[k]:v})),[]);
@@ -473,6 +474,13 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const uc=useCallback((k,v)=>setCf(x=>({...x,[k]:v})),[]);const us=useCallback((k,v)=>setSf(x=>({...x,[k]:v})),[]);
 
   useEffect(()=>{const b=`properties/${propertyId}`,u=[];const L=(s,fn)=>{u.push(onSnapshot(query(collection(db,b,s),orderBy('createdAt','desc')),snap=>fn(snap.docs.map(d=>({id:d.id,...d.data()})))))};L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
+
+  // Tickets listener (global collection)
+  useEffect(()=>{
+    const q=isAdmin?query(collection(db,'tickets'),orderBy('createdAt','desc')):query(collection(db,'tickets'),where('userEmail','==',userEmail),orderBy('createdAt','desc'));
+    const unsub=onSnapshot(q,snap=>setTickets(snap.docs.map(d=>({id:d.id,...d.data()}))),()=>setTickets([]));
+    return()=>unsub();
+  },[userEmail,isAdmin]);
 
   const save=async(sub,data)=>{await addDoc(collection(db,'properties',propertyId,sub),{...data,createdAt:serverTimestamp()});setModal(null);setEditId(null)};
   const update=async(sub,id,data)=>{await updateDoc(doc(db,'properties',propertyId,sub,id),data);setModal(null);setEditId(null)};
@@ -610,7 +618,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>partners.find(p=>p.id===id)?.name||id;const pCl=id=>partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'repairs',icon:<Wrench size={18}/>,l:'Reparaciones'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Valorización'},{id:'pipeline',icon:<Clock size={18}/>,l:'Pipeline'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'repairs',icon:<Wrench size={18}/>,l:'Reparaciones'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Valorización'},{id:'pipeline',icon:<Clock size={18}/>,l:'Pipeline'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'support',icon:<MessageSquare size={18}/>,l:'Soporte'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
 
   if(loading)return<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 size={36} className="animate-spin text-blue-500"/></div>;
   return <div className="min-h-screen bg-[#F8FAFC] flex">
@@ -1334,6 +1342,66 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           </div>
         ))}
       </div>:<Empty icon={Clock} title="Sin tareas" desc="Crea tareas para llevar control de pagos pendientes, renovaciones de seguro, inspecciones y más." action="Nueva Tarea" onAction={()=>{setTf({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});setModal('task')}}/>}
+    </>}
+
+    {/* ═══ SUPPORT / TICKETS ═══ */}
+    {view==='support'&&<>
+      <div className="flex justify-between items-start mb-6">
+        <div><h1 className="text-[22px] font-extrabold text-slate-800">💬 Soporte{isAdmin?' — Panel Admin':''}</h1><p className="text-sm text-slate-400 mt-1">{isAdmin?'Todos los tickets de usuarios':'Reporta bugs, sugiere mejoras, o haz preguntas'}</p></div>
+      </div>
+
+      {/* New ticket form */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl mb-6">
+        <h3 className="text-base font-bold text-slate-700 mb-4">Nuevo Ticket</h3>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tipo</label>
+              <div className="grid grid-cols-3 gap-2">{[['bug','🐛 Bug'],['feature','💡 Mejora'],['question','❓ Pregunta']].map(([v,l])=><button key={v} type="button" onClick={()=>setTicketForm(f=>({...f,type:v}))} className={`py-2 rounded-xl border-2 text-xs font-medium transition ${ticketForm.type===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500 hover:border-slate-300'}`}>{l}</button>)}</div>
+            </div>
+            <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Prioridad</label>
+              <div className="grid grid-cols-3 gap-2">{[['low','🟢 Baja'],['medium','🟡 Media'],['high','🔴 Alta']].map(([v,l])=><button key={v} type="button" onClick={()=>setTicketForm(f=>({...f,priority:v}))} className={`py-2 rounded-xl border-2 text-xs font-medium transition ${ticketForm.priority===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500 hover:border-slate-300'}`}>{l}</button>)}</div>
+            </div>
+          </div>
+          <Inp label="Asunto" value={ticketForm.subject} onChange={v=>setTicketForm(f=>({...f,subject:v}))} placeholder="Ej: El parser no lee mi statement"/>
+          <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Descripción</label>
+            <textarea value={ticketForm.message} onChange={e=>setTicketForm(f=>({...f,message:e.target.value}))} rows={4} className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 resize-none" placeholder="Describe el problema o sugerencia con el mayor detalle posible..."/>
+          </div>
+        </div>
+        <button onClick={async()=>{
+          if(!ticketForm.subject||!ticketForm.message){alert('Llena asunto y descripción');return;}
+          try{
+            await addDoc(collection(db,'tickets'),{...ticketForm,userEmail,propertyName:prop.name||'',propertyId,status:'open',createdAt:serverTimestamp()});
+            setTicketForm({type:'bug',subject:'',message:'',priority:'medium'});
+            alert('✅ Ticket enviado correctamente');
+          }catch(e){alert('Error: '+e.message)}
+        }} disabled={!ticketForm.subject||!ticketForm.message} className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20 disabled:opacity-30 flex items-center gap-2"><Send size={15}/> Enviar Ticket</button>
+      </div>
+
+      {/* Tickets list */}
+      {tickets.length>0&&<div className="max-w-2xl">
+        <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wider mb-3">{isAdmin?'Todos los Tickets':'Mis Tickets'} ({tickets.length})</h3>
+        <div className="space-y-2">{tickets.map(t=><div key={t.id} className={`bg-white rounded-2xl border shadow-sm p-4 ${t.status==='open'?'border-blue-200':'border-slate-200'}`}>
+          <div className="flex justify-between items-start mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm">{t.type==='bug'?'🐛':t.type==='feature'?'💡':'❓'}</span>
+              <span className="text-sm font-bold text-slate-800">{t.subject}</span>
+              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${t.status==='open'?'bg-blue-100 text-blue-700':t.status==='resolved'?'bg-emerald-100 text-emerald-700':'bg-slate-100 text-slate-500'}`}>{t.status==='open'?'ABIERTO':t.status==='resolved'?'RESUELTO':'CERRADO'}</span>
+              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${t.priority==='high'?'bg-rose-100 text-rose-700':t.priority==='medium'?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700'}`}>{t.priority==='high'?'ALTA':t.priority==='medium'?'MEDIA':'BAJA'}</span>
+            </div>
+            <span className="text-[10px] text-slate-400">{t.createdAt?.toDate?t.createdAt.toDate().toLocaleDateString('es'):''}</span>
+          </div>
+          <p className="text-sm text-slate-500 leading-relaxed">{t.message}</p>
+          {isAdmin&&<div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+            <div className="text-[10px] text-slate-400"><span className="font-bold text-slate-500">{t.userEmail}</span> · {t.propertyName}</div>
+            <div className="flex gap-1">
+              {t.status==='open'&&<button onClick={async()=>{await updateDoc(doc(db,'tickets',t.id),{status:'resolved'})}} className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg hover:bg-emerald-100 transition">✓ Resolver</button>}
+              <button onClick={async()=>{if(confirm('¿Eliminar ticket?'))await deleteDoc(doc(db,'tickets',t.id))}} className="text-[10px] font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-lg hover:bg-rose-100 transition">Eliminar</button>
+            </div>
+          </div>}
+        </div>)}</div>
+      </div>}
+
+      {tickets.length===0&&<div className="max-w-2xl"><Empty icon={MessageSquare} title="Sin tickets" desc="No hay tickets registrados. Usa el formulario arriba para reportar un bug o sugerir una mejora."/></div>}
     </>}
 
     {/* ═══ SETTINGS ═══ */}
