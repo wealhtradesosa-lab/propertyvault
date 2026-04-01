@@ -189,10 +189,10 @@ function LandingPage({onLogin}) {
     {/* ═══ A — ATTENTION: Hero ═══ */}
     <section className="pt-32 pb-20 px-6">
       <div className="max-w-4xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-8"><div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/><span className="text-xs font-semibold text-white/50">Plataforma de gestión financiera para propiedades de inversión</span></div>
+        <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-5 py-2 mb-8"><div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/><span className="text-sm font-semibold text-white/50">El copiloto financiero de tu propiedad de inversión</span></div>
         <h1 className="text-5xl md:text-6xl font-black tracking-tight leading-[1.1] mb-6">
-          Convierte los statements de<br/>tu propiedad en
-          <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent"> decisiones inteligentes.</span>
+          Tus statements tienen la verdad.<br/>
+          <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent">Nosotros te la mostramos.</span>
         </h1>
         <p className="text-lg text-white/40 max-w-2xl mx-auto leading-relaxed mb-10">
           Sube el PDF que te manda tu property manager y al instante ve el panorama real: dónde ganas, dónde pierdes, cuánto se lleva la hipoteca, y qué ajustar para que tu inversión sea más rentable.
