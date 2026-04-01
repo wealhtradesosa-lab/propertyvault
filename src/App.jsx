@@ -1309,17 +1309,17 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     </Mdl>}
 
     {modal==='upload'&&<Mdl title="📤 Subir Statements (PDF)" grad="from-blue-600 to-cyan-600" onClose={()=>setModal(null)}>
-      <p className="text-sm text-slate-500 mb-1">Sube los PDFs de los owner statements de tu property manager. El sistema extrae automáticamente: año, periodo, revenue, comisión, utilities, HOA, maintenance y net.</p>
-      <div className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all hover:border-blue-400 hover:bg-blue-50/50 ${uploadLog.some(l=>l.status==='processing')?'border-blue-300 bg-blue-50/30':'border-slate-200'}`}
-        onClick={()=>fileRef.current?.click()}
-        onDragOver={e=>{e.preventDefault();e.currentTarget.classList.add('border-blue-400','bg-blue-50')}}
-        onDragLeave={e=>{e.currentTarget.classList.remove('border-blue-400','bg-blue-50')}}
-        onDrop={e=>{e.preventDefault();e.currentTarget.classList.remove('border-blue-400','bg-blue-50');handlePDFs(e.dataTransfer.files)}}>
-        <Upload size={32} className="text-slate-300 mx-auto mb-2"/>
-        <div className="text-sm font-semibold text-slate-600">Arrastra PDFs aquí o haz clic</div>
-        <div className="text-xs text-slate-400 mt-1">Soporta múltiples archivos a la vez</div>
-      </div>
-      <input ref={fileRef} type="file" accept=".pdf" multiple className="hidden" onChange={e=>{if(e.target.files.length)handlePDFs(e.target.files);e.target.value=''}}/>
+      <p className="text-sm text-slate-500 mb-3">Sube los PDFs de los owner statements de tu property manager.</p>
+      <label className="block border-2 border-dashed border-blue-300 rounded-2xl p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
+        <Upload size={32} className="text-blue-400 mx-auto mb-2"/>
+        <div className="text-sm font-semibold text-blue-600">Haz clic aquí para seleccionar PDFs</div>
+        <div className="text-xs text-slate-400 mt-1">Soporta múltiples archivos</div>
+        <input type="file" accept=".pdf" multiple className="hidden" onChange={e=>{
+          console.log('[UPLOAD] Files selected:', e.target.files.length);
+          if(e.target.files.length) handlePDFs(e.target.files);
+          e.target.value='';
+        }}/>
+      </label>
       {uploadLog.length>0&&<div className="space-y-2 mt-3 max-h-[300px] overflow-y-auto">{uploadLog.map((l,i)=>(
         <div key={i} className={`flex items-start gap-2 p-3 rounded-xl text-xs font-medium ${l.status==='ok'?'bg-emerald-50 text-emerald-700 border border-emerald-100':l.status==='warn'?'bg-amber-50 text-amber-700 border border-amber-100':l.status==='dup'?'bg-slate-50 text-slate-600 border border-slate-200':l.status==='processing'?'bg-blue-50 text-blue-700 border border-blue-100':'bg-rose-50 text-rose-700 border border-rose-100'}`}>
           <span className="shrink-0">{l.status==='ok'?'✅':l.status==='warn'?'⚠️':l.status==='dup'?'🔄':l.status==='processing'?'⏳':'❌'}</span>
