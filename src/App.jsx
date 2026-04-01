@@ -397,8 +397,8 @@ function LandingPage({onLogin}) {
           {/* PRO */}
           <div className="bg-white/[0.03] border border-white/8 rounded-3xl p-8 hover:border-white/15 transition-all">
             <div className="text-xs font-extrabold text-purple-400 uppercase tracking-widest mb-2">Pro</div>
-            <div className="flex items-baseline gap-1 mb-1"><span className="text-5xl font-black">${annual?'22':'29'}</span><span className="text-white/30 text-sm">/mes</span></div>
-            {annual&&<div className="text-xs text-white/25 line-through">$29/mes</div>}
+            <div className="flex items-baseline gap-1 mb-1"><span className="text-5xl font-black">${annual?'16':'21'}</span><span className="text-white/30 text-sm">/mes</span></div>
+            {annual&&<div className="text-xs text-white/25 line-through">$21/mes</div>}
             <p className="text-sm text-white/30 mb-6 mt-3">Para portafolios serios con múltiples activos.</p>
             <button onClick={()=>onLogin('register')} className="w-full py-3.5 bg-gradient-to-r from-slate-700 to-slate-600 border border-white/10 rounded-xl text-sm font-bold text-white hover:from-slate-600 hover:to-slate-500 transition-all">Ir a Pro</button>
             <div className="mt-6 pt-5 border-t border-white/5 space-y-3 text-[13px] text-white/40">
