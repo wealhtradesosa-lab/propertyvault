@@ -84,8 +84,11 @@ import * as pdfjsLib from 'pdfjs-dist';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 async function parsePDF(file) {
+  console.log('[PARSER] Starting:', file.name);
   const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  console.log('[PARSER] ArrayBuffer size:', buf.byteLength);
+  const pdf = await pdfjsLib.getDocument({data: new Uint8Array(buf)}).promise;
+  console.log('[PARSER] PDF loaded, pages:', pdf.numPages);
 
   let allItems = [];
   let fullText = '';
@@ -337,22 +340,26 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   // PDF Upload handler — with robust duplicate detection
   const handlePDFs=async(files)=>{
-    console.log('[UPLOAD] Processing', files.length, 'files');
+    console.log('[UPLOAD] START — files:', files.length);
     const log=[];
     const uploaded=new Set();
     let existingPeriods=new Set();
     try{
+      console.log('[UPLOAD] Checking existing statements...');
       const freshSnap=await getDocs(collection(db,'properties',propertyId,'statements'));
       existingPeriods=new Set(freshSnap.docs.map(d=>{const s=d.data();return s.year+'-'+s.month}));
-    }catch(e){console.error('Error checking existing:',e);}
+      console.log('[UPLOAD] Existing periods:', [...existingPeriods]);
+    }catch(e){console.error('[UPLOAD] getDocs error:', e);}
 
-    for(const f of Array.from(files)){
+    const fileArr=Array.from(files);
+    for(let fi=0; fi<fileArr.length; fi++){
+      const f=fileArr[fi];
+      console.log(`[UPLOAD] File ${fi+1}/${fileArr.length}: ${f.name}`);
       if(!f.name.toLowerCase().endsWith('.pdf')){log.push({file:f.name,status:'error',msg:'No es un archivo PDF'});setUploadLog([...log]);continue;}
-      log.push({file:f.name,status:'processing',msg:'Procesando...'});setUploadLog([...log]);
+      log.push({file:f.name,status:'processing',msg:`Procesando... (${fi+1}/${fileArr.length})`});setUploadLog([...log]);
       try{
-        console.log('[Upload] Parsing:', f.name);
         const r=await parsePDF(f);
-        console.log('[Upload] Result:', JSON.stringify(r));
+        console.log('[UPLOAD] Parsed:', f.name, '→', r.error||`Rev:${r.revenue} Net:${r.net} Nights:${r.nights}`);
         if(r.error){log[log.length-1]={file:f.name,status:'error',msg:r.error};setUploadLog([...log]);continue;}
 
         const key=r.year+'-'+r.month;
@@ -385,7 +392,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         if(missing.length)msg+=` ⚠️ Sin: ${missing.join(', ')}`;
         log[log.length-1]={file:f.name,status:missing.length?'warn':'ok',msg};
         setUploadLog([...log]);
-      }catch(e){console.error('[Upload] ERROR:', f.name, e);log[log.length-1]={file:f.name,status:'error',msg:'Error: '+e.message};setUploadLog([...log]);}
+      }catch(e){console.error('[UPLOAD] CRASH on', f.name, e);log[log.length-1]={file:f.name,status:'error',msg:'Error: '+(e.message||String(e))};setUploadLog([...log]);}
     }
   };
 
