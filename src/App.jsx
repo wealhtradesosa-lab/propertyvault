@@ -531,6 +531,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [rf,setRf]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRf(x=>({...x,[k]:v})),[]);
   const [tf,setTf]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});const ut=useCallback((k,v)=>setTf(x=>({...x,[k]:v})),[]);
   const [settingsForm,setSettingsForm]=useState(null);
+  const [editPartners,setEditPartners]=useState(null);
   const [mc,setMc]=useState({bal:'',rate:'',term:'30',pay:'',start:''});const [savingMort,setSavingMort]=useState(false);
   const umc=useCallback((k,v)=>setMc(x=>({...x,[k]:v})),[]);
   const partners=prop.partners||[];const mort=prop.mortgage||{};
@@ -1404,30 +1405,52 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ SETTINGS ═══ */}
     {view==='settings'&&(()=>{
-      const sf2=settingsForm||{name:prop.name||'',address:prop.address||'',city:prop.city||'',state:prop.state||'FL',type:prop.type||'vacation',purchasePrice:String(prop.purchasePrice||''),manager:prop.manager||'',managerCommission:String(prop.managerCommission||15),bedrooms:String(prop.bedrooms||''),bathrooms:String(prop.bathrooms||'')};
+      const sf2=settingsForm||{name:prop.name||'',address:prop.address||'',city:prop.city||'',state:prop.state||'FL',type:prop.type||'vacation',purchasePrice:String(prop.purchasePrice||''),purchaseDate:prop.purchaseDate||'',marketValue:String(latestVal?latestVal.value:prop.purchasePrice||''),manager:prop.manager||'',managerCommission:String(prop.managerCommission||15),bedrooms:String(prop.bedrooms||''),bathrooms:String(prop.bathrooms||'')};
       const uf=(k,v)=>setSettingsForm({...sf2,[k]:v});
+      const ep=editPartners||partners.map(p=>({...p,email:p.email||''}));
+      const upEp=(i,k,v)=>{const n=[...ep];n[i]={...n[i],[k]:v};setEditPartners(n)};
       return <>
       <h1 className="text-[22px] font-extrabold text-slate-800 mb-6">⚙️ Configuración de la Propiedad</h1>
+
+      {/* General */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl">
         <h3 className="text-base font-bold text-slate-700 mb-4">Datos Generales</h3>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3"><Inp label="Nombre" value={sf2.name} onChange={v=>uf('name',v)}/><Inp label="Dirección" value={sf2.address} onChange={v=>uf('address',v)}/></div>
           <div className="grid grid-cols-3 gap-3"><Inp label="Ciudad" value={sf2.city} onChange={v=>uf('city',v)}/><Sel label="Estado" value={sf2.state} onChange={v=>uf('state',v)} options={US.map(s=>({v:s,l:s}))}/><Sel label="Tipo" value={sf2.type} onChange={v=>uf('type',v)} options={PT}/></div>
-          <div className="grid grid-cols-4 gap-3"><Inp label="Precio Precio de Compra" value={sf2.purchasePrice} onChange={v=>uf('purchasePrice',v)} prefix="$" type="number"/><Inp label="Property Manager" value={sf2.manager} onChange={v=>uf('manager',v)}/><Inp label="Comisión (%)" value={sf2.managerCommission} onChange={v=>uf('managerCommission',v)} type="number"/><div/></div>
-          <div className="grid grid-cols-4 gap-3"><Inp label="Habitaciones" value={sf2.bedrooms} onChange={v=>uf('bedrooms',v)} type="number"/><Inp label="Baños" value={sf2.bathrooms} onChange={v=>uf('bathrooms',v)} type="number"/></div>
+          <div className="grid grid-cols-3 gap-3"><Inp label="Precio de Compra" value={sf2.purchasePrice} onChange={v=>uf('purchasePrice',v)} prefix="$" type="number"/><Inp label="Fecha de Compra" value={sf2.purchaseDate} onChange={v=>uf('purchaseDate',v)} type="date"/><Inp label="Valor Comercial Actual" value={sf2.marketValue} onChange={v=>uf('marketValue',v)} prefix="$" type="number"/></div>
+          <div className="grid grid-cols-4 gap-3"><Inp label="Property Manager" value={sf2.manager} onChange={v=>uf('manager',v)}/><Inp label="Comisión (%)" value={sf2.managerCommission} onChange={v=>uf('managerCommission',v)} type="number"/><Inp label="Habitaciones" value={sf2.bedrooms} onChange={v=>uf('bedrooms',v)} type="number"/><Inp label="Baños" value={sf2.bathrooms} onChange={v=>uf('bathrooms',v)} type="number"/></div>
         </div>
-        <button onClick={async()=>{try{await updateDoc(doc(db,'properties',propertyId),{name:sf2.name,address:sf2.address,city:sf2.city,state:sf2.state,type:sf2.type,purchasePrice:parseFloat(sf2.purchasePrice)||0,manager:sf2.manager,managerCommission:parseFloat(sf2.managerCommission)||15,bedrooms:parseInt(sf2.bedrooms)||0,bathrooms:parseInt(sf2.bathrooms)||0});alert('Guardado. Recarga para ver los cambios.')}catch(e){alert('Error: '+e.message)}}} className="mt-5 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20">💾 Guardar Cambios</button>
+        <button onClick={async()=>{try{
+          const updates={name:sf2.name,address:sf2.address,city:sf2.city,state:sf2.state,type:sf2.type,purchasePrice:parseFloat(sf2.purchasePrice)||0,purchaseDate:sf2.purchaseDate||'',manager:sf2.manager,managerCommission:parseFloat(sf2.managerCommission)||15,bedrooms:parseInt(sf2.bedrooms)||0,bathrooms:parseInt(sf2.bathrooms)||0};
+          await updateDoc(doc(db,'properties',propertyId),updates);
+          const mv=parseFloat(sf2.marketValue)||0;
+          if(mv>0&&mv!==(latestVal?latestVal.value:prop.purchasePrice)){await addDoc(collection(db,'properties',propertyId,'valuations'),{date:new Date().toISOString().split('T')[0],value:mv,source:'manual',notes:'Actualizado desde Configuración',createdAt:serverTimestamp()})}
+          alert('✅ Guardado correctamente')
+        }catch(e){alert('Error: '+e.message)}}} className="mt-5 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20">💾 Guardar Cambios</button>
       </div>
 
+      {/* Partners — editable */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl mt-4">
-        <h3 className="text-base font-bold text-slate-700 mb-2">Socios Actuales</h3>
-        <p className="text-xs text-slate-400 mb-4">Para agregar o cambiar socios, contacta al administrador.</p>
-        <div className="space-y-2">{partners.map((p,i)=><div key={p.id} className="flex items-center justify-between py-3 px-4 bg-slate-50 rounded-xl border-l-4" style={{borderLeftColor:p.color}}>
-          <div className="flex items-center gap-3"><div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{background:p.color}}>{p.name.charAt(0)}</div><div><div className="font-semibold text-sm text-slate-700">{p.name}</div><div className="text-[10px] text-slate-400">{p.email||'Sin email'}</div></div></div>
-          <div className="text-right"><div className="font-bold text-sm text-slate-800">{p.ownership}%</div><div className="text-[10px] text-slate-400">Capital: {fm(p.initialCapital)}</div></div>
+        <div className="flex justify-between items-center mb-4"><h3 className="text-base font-bold text-slate-700">Socios</h3></div>
+        <div className="space-y-3">{ep.map((p,i)=><div key={p.id} className="rounded-xl p-4 bg-slate-50 border-l-4" style={{borderLeftColor:p.color}}>
+          <div className="grid grid-cols-4 gap-3">
+            <Inp label="Nombre" value={p.name} onChange={v=>upEp(i,'name',v)}/>
+            <Inp label="Email (para acceso)" value={p.email} onChange={v=>upEp(i,'email',v)} type="email" placeholder="socio@email.com"/>
+            <Inp label="Participación (%)" value={String(p.ownership)} onChange={v=>upEp(i,'ownership',v)} type="number"/>
+            <Inp label="Capital Inicial" value={String(p.initialCapital||'')} onChange={v=>upEp(i,'initialCapital',v)} prefix="$" type="number"/>
+          </div>
         </div>)}</div>
+        <button onClick={async()=>{try{
+          const updatedPartners=ep.map(p=>({id:p.id,name:p.name,email:p.email||'',ownership:parseFloat(p.ownership)||0,initialCapital:parseFloat(p.initialCapital)||0,color:p.color}));
+          const memberEmails=[auth.currentUser.email,...updatedPartners.map(x=>x.email).filter(Boolean)];
+          await updateDoc(doc(db,'properties',propertyId),{partners:updatedPartners,memberEmails});
+          alert('✅ Socios actualizados. Los emails agregados ahora pueden acceder a esta propiedad.')
+        }catch(e){alert('Error: '+e.message)}}} className="mt-4 px-6 py-3 bg-purple-600 text-white rounded-xl font-bold text-sm hover:bg-purple-700 transition shadow-lg shadow-purple-500/20">👥 Guardar Socios</button>
+        <p className="text-[10px] text-slate-400 mt-2">El email del socio le permite acceder a esta propiedad con su propia cuenta de OwnerDesk.</p>
       </div>
 
+      {/* Danger zone */}
       <div className="bg-rose-50 rounded-2xl border border-rose-200 p-6 max-w-2xl mt-4">
         <h3 className="text-base font-bold text-rose-700 mb-2">Zona de Peligro</h3>
         <p className="text-xs text-rose-500 mb-4">Estas acciones son irreversibles.</p>
