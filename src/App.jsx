@@ -60,6 +60,7 @@ function Tbl({cols,rows,onDel,dc,onEdit}) {
   return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full"><thead><tr className="bg-slate-50/80">{cols.map((c,i)=><th key={i} className={`py-3.5 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider ${c.r?'text-right':'text-left'}`}>{c.label}</th>)}{(onDel||onEdit)&&<th className="w-16"/>}</tr></thead><tbody className="divide-y divide-slate-100">{rows.map((r,ri)=><tr key={r.id||ri} className="hover:bg-blue-50/30 transition-colors">{cols.map((c,ci)=><td key={ci} className={`py-3 px-4 text-sm ${c.r?'text-right':''} ${c.cls||''}`}>{c.render?c.render(r):r[c.key]}</td>)}{(onDel||onEdit)&&<td className="py-3 pr-3"><div className="flex items-center gap-0.5 justify-end">{onEdit&&<button onClick={()=>onEdit(r)} className="text-slate-300 hover:text-blue-500 p-1.5 rounded-lg hover:bg-blue-50 transition"><Pencil size={13}/></button>}{onDel&&<button onClick={()=>onDel(dc,r.id)} className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition"><Trash2 size={13}/></button>}</div></td>}</tr>)}</tbody></table></div></div>;
 }
 const Tip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div className="bg-slate-800 rounded-xl px-4 py-3 shadow-xl border border-slate-700"><div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1.5">{label}</div>{payload.map((p,i)=><div key={i} className="text-xs" style={{color:p.color}}>{p.name}: <b className="text-white">{fm(p.value)}</b></div>)}</div>};
+function UpgradeBanner({plan,feature}){const needed=feature==='insights'||feature==='str_metrics'||feature==='breakeven'?'Starter':'Pro';return<div className="relative bg-white rounded-2xl border border-slate-200 shadow-sm p-8 text-center overflow-hidden"><div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white/90 backdrop-blur-[2px] z-10"/><div className="relative z-20"><Lock size={28} className="text-slate-300 mx-auto mb-3"/><h3 className="text-base font-bold text-slate-700 mb-1">Disponible en plan {needed}</h3><p className="text-sm text-slate-400 mb-4">Desbloquea {feature==='insights'?'insights y recomendaciones inteligentes':feature==='reports'?'reportes profesionales PDF':'esta función'} para optimizar tu inversión.</p><a href="https://ownerdesk.web.app/#pricing" className="inline-block px-6 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20">Ver Planes</a></div></div>}
 
 // Semáforo KPI component
 function KPI({label,value,sub,color='blue',trend,alert,help}) {
@@ -453,6 +454,11 @@ function Onboarding({userId,onComplete}) {
 // ═══════════════════════════════════════════════════════════════
 function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProperty,onLogout,onAddProperty,userEmail}) {
   const isAdmin=ADMIN_EMAILS.includes(userEmail);
+  const [userPlan,setUserPlan]=useState(isAdmin?'pro':'free');
+  // Fetch user plan from Firestore
+  useEffect(()=>{if(isAdmin)return;const unsub=onSnapshot(doc(db,'users',userEmail.toLowerCase()),snap=>{if(snap.exists()){const d=snap.data();if(d.status==='active'||d.status==='past_due')setUserPlan(d.plan||'free');else setUserPlan('free');}},()=>{});return()=>unsub()},[userEmail,isAdmin]);
+  const plan=isAdmin?'pro':userPlan;
+  const canUse=(feature)=>{if(isAdmin)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio']};return(access[plan]||access.free).includes(feature);};
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
@@ -634,7 +640,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     <div className={`fixed md:relative z-50 md:z-auto h-full transition-transform duration-300 ${mobileNav?'translate-x-0':'-translate-x-full md:translate-x-0'} w-60 bg-white border-r border-slate-100 flex flex-col shrink-0`}>
       <div className="p-4 border-b border-slate-100">
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3"><div className="w-10 h-10 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-xl flex items-center justify-center shadow-md shadow-blue-600/20"><span className="text-xs font-black text-white tracking-tighter">OD</span></div><div className="min-w-0"><div className="text-sm font-extrabold text-slate-800 truncate">Owner<span className="text-blue-600">Desk</span></div><div className="text-[10px] text-slate-400 truncate">{userEmail}</div>{isAdmin&&<div className="text-[9px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full inline-block mt-1">OWNER · PRO ∞</div>}</div></div>
+          <div className="flex items-center gap-3"><div className="w-10 h-10 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-xl flex items-center justify-center shadow-md shadow-blue-600/20"><span className="text-xs font-black text-white tracking-tighter">OD</span></div><div className="min-w-0"><div className="text-sm font-extrabold text-slate-800 truncate">Owner<span className="text-blue-600">Desk</span></div><div className="text-[10px] text-slate-400 truncate">{userEmail}</div>{isAdmin?<div className="text-[9px] font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full inline-block mt-1">OWNER · PRO ∞</div>:<div className={`text-[9px] font-bold px-2 py-0.5 rounded-full inline-block mt-1 ${plan==='pro'?'text-purple-600 bg-purple-50':plan==='starter'?'text-blue-600 bg-blue-50':'text-slate-500 bg-slate-100'}`}>{plan==='pro'?'PRO':plan==='starter'?'STARTER':'FREE'}</div>}</div></div>
           <button onClick={()=>setMobileNav(false)} className="md:hidden p-1 hover:bg-slate-100 rounded-lg"><X size={18} className="text-slate-400"/></button>
         </div>
         {allProperties.length>0&&<div className="relative"><select value={propertyId} onChange={e=>onSwitchProperty(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none appearance-none pr-8 cursor-pointer hover:bg-slate-100">{allProperties.map(p=><option key={p.id} value={p.id}>{p.name||'Sin nombre'}</option>)}</select><ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/></div>}
@@ -822,7 +828,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>
 
       {/* ── ROW 3: INSIGHTS — What the data tells you ── */}
-      {n>=2&&<div className="grid grid-cols-12 gap-4 mb-4">
+      {n>=2&&(canUse('insights')?<div className="grid grid-cols-12 gap-4 mb-4">
         {/* Smart Insights */}
         <div className="col-span-8 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
           <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Insights & Recomendaciones</h3>
@@ -930,7 +936,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             })()}
           </div>
         </div>
-      </div>}
+      </div>:<div className="mb-4"><UpgradeBanner plan={plan} feature="insights"/></div>)}
 
       {/* ── ROW 4: Monthly Chart + Property + Seasonality ── */}
       <div className="grid grid-cols-12 gap-4 mb-4">
