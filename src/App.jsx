@@ -802,10 +802,39 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               {appreciation!==0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Valorización</span><span className={`text-[11px] font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{appreciation.toFixed(1)}% ({fm(marketValue-prop.purchasePrice)})</span></div>}
               <div className="border-t border-slate-100 my-0.5"/>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Equity</span><span className="text-[11px] font-extrabold text-emerald-600">{fm(realEquity)}</span></div>
-              {mort.balance>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Deuda Hipoteca</span><span className="text-[11px] font-bold text-slate-500">{fm(mort.balance)}</span></div>}
               {realLTV>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">LTV</span><span className={`text-[11px] font-bold ${realLTV>80?'text-rose-500':realLTV>60?'text-amber-500':'text-emerald-500'}`}>{realLTV.toFixed(0)}%</span></div>}
             </div>
           </div>
+          {/* Mortgage Progress */}
+          {mort.balance>0&&<div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Hipoteca</h3>
+            {(()=>{
+              const origBal=prop.purchasePrice*(realLTV>0?realLTV/100:0.8);
+              const paidPrincipal=origBal>mort.balance?origBal-mort.balance:0;
+              const pctPaid=origBal>0?(paidPrincipal/origBal*100):0;
+              const monthsStart=mort.startDate?Math.round((new Date()-new Date(mort.startDate))/(30.44*24*60*60*1000)):0;
+              const monthsLeft=mort.monthlyPayment>0?Math.ceil(mort.balance/(mort.monthlyPayment*0.3)):mort.termYears*12;
+              const yearsLeft=Math.round(monthsLeft/12);
+              const totalInterest=mort.monthlyPayment>0?(mort.monthlyPayment*monthsLeft)-mort.balance:0;
+              return <div className="space-y-2">
+                <div className="flex justify-between items-end">
+                  <div><div className="text-lg font-extrabold text-slate-800">{fm(mort.balance)}</div><div className="text-[10px] text-slate-400">Balance actual</div></div>
+                  <div className="text-right"><div className="text-sm font-bold text-emerald-600">{fm(mMort)}/mes</div><div className="text-[10px] text-slate-400">{mort.rate}% · {mort.termYears} años</div></div>
+                </div>
+                {/* Progress bar */}
+                <div>
+                  <div className="flex justify-between text-[9px] text-slate-400 mb-1"><span>Pagado {pctPaid.toFixed(0)}%</span><span>Restante {(100-pctPaid).toFixed(0)}%</span></div>
+                  <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all" style={{width:Math.max(2,pctPaid)+'%'}}/></div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-center mt-1">
+                  <div className="bg-emerald-50 rounded-lg p-1.5"><div className="text-[9px] text-emerald-600 font-bold">PAGADO</div><div className="text-xs font-extrabold text-emerald-700">{fm(paidPrincipal)}</div></div>
+                  <div className="bg-slate-50 rounded-lg p-1.5"><div className="text-[9px] text-slate-500 font-bold">RESTANTE</div><div className="text-xs font-extrabold text-slate-700">{fm(mort.balance)}</div></div>
+                  <div className="bg-blue-50 rounded-lg p-1.5"><div className="text-[9px] text-blue-500 font-bold">AÑOS REST.</div><div className="text-xs font-extrabold text-blue-700">~{yearsLeft}</div></div>
+                </div>
+                {monthsStart>0&&<div className="text-[10px] text-slate-400 text-center">{Math.round(monthsStart/12)} años de {mort.termYears} transcurridos{mort.startDate?` · Desde ${mort.startDate.split('-')[0]}`:''}</div>}
+              </div>;
+            })()}
+          </div>}
           {/* Seasonality */}
           {monthRank.length>=6&&<div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
             <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Estacionalidad (histórico)</h3>
