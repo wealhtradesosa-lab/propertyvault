@@ -1321,9 +1321,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="text-sm font-semibold text-blue-600">Haz clic aquí para seleccionar PDFs</div>
         <div className="text-xs text-slate-400 mt-1">Soporta múltiples archivos</div>
         <input type="file" accept=".pdf" multiple className="hidden" onChange={async e=>{
-          const f=e.target.files;
-          if(f&&f.length) await handlePDFs(f);
+          const arr=[...e.target.files];
+          console.log('[INPUT] Copied', arr.length, 'files to array');
           e.target.value='';
+          if(arr.length) await handlePDFs(arr);
         }}/>
       </label>
       {uploadLog.length>0&&<div className="space-y-2 mt-3 max-h-[300px] overflow-y-auto">{uploadLog.map((l,i)=>(
