@@ -189,13 +189,13 @@ function LandingPage({onLogin}) {
     {/* ═══ A — ATTENTION: Hero ═══ */}
     <section className="pt-32 pb-20 px-6">
       <div className="max-w-4xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-8"><div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/><span className="text-xs font-semibold text-white/50">El copiloto financiero de tu propiedad de inversión</span></div>
+        <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-8"><div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/><span className="text-xs font-semibold text-white/50">Plataforma de gestión financiera para propiedades de inversión</span></div>
         <h1 className="text-5xl md:text-6xl font-black tracking-tight leading-[1.1] mb-6">
-          Cada mes recibes un PDF.<br/>
-          <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent">¿Realmente sabes si ganas o pierdes?</span>
+          Convierte los statements de<br/>tu propiedad en
+          <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent"> decisiones inteligentes.</span>
         </h1>
         <p className="text-lg text-white/40 max-w-2xl mx-auto leading-relaxed mb-10">
-          OwnerDesk lee tus statements, detecta fugas de dinero, y te dice exactamente qué hacer para que tu propiedad sea más rentable. Dónde ganas. Dónde pierdes. Qué cambiar hoy.
+          Sube el PDF que te manda tu property manager y al instante ve el panorama real: dónde ganas, dónde pierdes, cuánto te come la hipoteca, y qué ajustar para que tu inversión sea más rentable.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button onClick={()=>onLogin('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl hover:from-blue-700 hover:to-blue-600 transition-all shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5">Analiza tu propiedad gratis</button>
@@ -226,8 +226,8 @@ function LandingPage({onLogin}) {
     <section id="features" className="py-20 px-6">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Tu property manager te manda un PDF.<br/><span className="text-white/40">OwnerDesk te dice qué significa.</span></h2>
-          <p className="text-white/35 max-w-xl mx-auto">Sube el statement, la plataforma extrae cada número, cruza los datos con tu hipoteca, y te muestra exactamente dónde estás parado.</p>
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Un PDF entra.<br/><span className="text-white/40">Un diagnóstico completo sale.</span></h2>
+          <p className="text-white/35 max-w-xl mx-auto">OwnerDesk extrae cada número del statement de tu administrador, lo cruza con tu hipoteca, y te muestra exactamente cómo está tu inversión — y qué hacer para mejorarla.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
           {[
