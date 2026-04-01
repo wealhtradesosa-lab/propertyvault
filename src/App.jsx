@@ -84,11 +84,8 @@ import * as pdfjsLib from 'pdfjs-dist';
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 async function parsePDF(file) {
-  console.log('[PARSER] Starting:', file.name);
   const buf = await file.arrayBuffer();
-  console.log('[PARSER] ArrayBuffer size:', buf.byteLength);
   const pdf = await pdfjsLib.getDocument({data: new Uint8Array(buf)}).promise;
-  console.log('[PARSER] PDF loaded, pages:', pdf.numPages);
 
   let allItems = [];
   let fullText = '';
@@ -170,7 +167,7 @@ async function parsePDF(file) {
   // ═══ OPERATING EXPENSES from Transaction Summary ═══
   const commission = findSummary('Commission');
   const hoa = findSummary('HOA') || findSummary('Association');
-  const maintenance = findSummary('Maintenance');
+  const maintenance = findSummary('Mantenimiento');
   const vendorTotal = findSummary('Vendor Bills') || findSummary('Vendor');
 
   // ═══ DUKE & WATER from detail lines (Vendor Bills breakdown) ═══
@@ -194,7 +191,6 @@ async function parsePDF(file) {
       }
     });
   }
-  console.log(`[PDF ${year}-${month}] Duke Energy: $${duke}`);
 
   let water = 0;
   rows.forEach(r => {
@@ -233,7 +229,6 @@ async function parsePDF(file) {
   if (nightMatches) nightMatches.forEach(m => { const n=parseInt(m); if(n>0&&n<60) nights+=n; });
   const reservations = (fullText.match(/Reservation\s*#/gi)||[]).length;
 
-  console.log(`[PDF ${year}-${month}] Parsed: Rev=$${revenue} (Room=$${roomCharge} Pool=$${pool}) | Comm=$${commission} | Duke=$${duke} | Water=$${water} | HOA=$${hoa} | Maint=$${maintenance} | VendorOther=$${vendorOther} | ACH=$${net} | ${nights}nights/${reservations}res`);
 
   return {year, month, revenue, commission, duke, water, hoa, maintenance, vendor: vendorOther, net, nights, reservations, pool, roomCharge};
 }
@@ -343,23 +338,20 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     // CRITICAL: Convert FileList to Array IMMEDIATELY before any await
     // FileList is a live reference — if the input is cleared, it becomes empty
     const fileArr=Array.from(files);
-    console.log('[UPLOAD] START —', fileArr.length, 'files:', fileArr.map(f=>f.name));
     const log=[];
     const uploaded=new Set();
     let existingPeriods=new Set();
     try{
       const freshSnap=await getDocs(collection(db,'properties',propertyId,'statements'));
       existingPeriods=new Set(freshSnap.docs.map(d=>{const s=d.data();return s.year+'-'+s.month}));
-    }catch(e){console.error('[UPLOAD] getDocs error:', e);}
+    }catch(e){/* ignore */}
 
     for(let fi=0; fi<fileArr.length; fi++){
       const f=fileArr[fi];
-      console.log(`[UPLOAD] File ${fi+1}/${fileArr.length}: ${f.name}`);
       if(!f.name.toLowerCase().endsWith('.pdf')){log.push({file:f.name,status:'error',msg:'No es un archivo PDF'});setUploadLog([...log]);continue;}
       log.push({file:f.name,status:'processing',msg:`Procesando... (${fi+1}/${fileArr.length})`});setUploadLog([...log]);
       try{
         const r=await parsePDF(f);
-        console.log('[UPLOAD] Parsed:', f.name, '→', r.error||`Rev:${r.revenue} Net:${r.net} Nights:${r.nights}`);
         if(r.error){log[log.length-1]={file:f.name,status:'error',msg:r.error};setUploadLog([...log]);continue;}
 
         const key=r.year+'-'+r.month;
@@ -392,7 +384,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         if(missing.length)msg+=` ⚠️ Sin: ${missing.join(', ')}`;
         log[log.length-1]={file:f.name,status:missing.length?'warn':'ok',msg};
         setUploadLog([...log]);
-      }catch(e){console.error('[UPLOAD] CRASH on', f.name, e);log[log.length-1]={file:f.name,status:'error',msg:'Error: '+(e.message||String(e))};setUploadLog([...log]);}
+      }catch(e){log[log.length-1]={file:f.name,status:'error',msg:'Error: '+(e.message||String(e))};setUploadLog([...log]);}
     }
   };
 
@@ -421,7 +413,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   // Cash Flow = NOI - Annual Mortgage Payment
   const annualMortgage = (mort.monthlyPayment||0) * 12;
   const cashFlow = noi - annualMortgage;
-  // Cash-on-Cash = Annual Cash Flow / Total Capital Invested
+  // Cash-on-Cash = Annual Cash Flow / Capital Invertido Invested
   const coc = totCont > 0 ? (cashFlow / totCont) * 100 : 0;
   // Margin
   const margin = revenue > 0 ? (stmtNet || totNet) / revenue * 100 : 0;
@@ -469,7 +461,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>partners.find(p=>p.id===id)?.name||id;const pCl=id=>partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'repairs',icon:<Wrench size={18}/>,l:'Reparaciones'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Appreciation'},{id:'pipeline',icon:<Clock size={18}/>,l:'Pipeline'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'repairs',icon:<Wrench size={18}/>,l:'Reparaciones'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Valorización'},{id:'pipeline',icon:<Clock size={18}/>,l:'Pipeline'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
 
   if(loading)return<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 size={36} className="animate-spin text-blue-500"/></div>;
   return <div className="min-h-screen bg-[#F8FAFC] flex">
@@ -564,25 +556,25 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="bg-white rounded-2xl p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm">
           <div className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">Gross Revenue</div>
           <div className="text-[22px] font-extrabold text-slate-800 mt-1">{fm(fRev)}</div>
-          <div className="text-[10px] text-slate-400 mt-1">Ingreso bruto total · {n}m</div>
+          <div className="text-[10px] text-slate-400 mt-1">Ingreso bruto de la propiedad · {n}m</div>
           {revChg!==null&&<div className={`text-[10px] font-bold mt-1 ${revChg>=0?'text-emerald-600':'text-rose-500'}`}>{revChg>=0?'▲':'▼'} {Math.abs(revChg).toFixed(0)}% YoY</div>}
         </div>
         <div className="bg-white rounded-2xl p-4 border-l-4 border-l-emerald-500 border border-slate-200 shadow-sm">
           <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Net Income</div>
           <div className="text-[22px] font-extrabold text-emerald-700 mt-1">{fm(fNet)}</div>
-          <div className="text-[10px] text-slate-400 mt-1">Depositado a tu cuenta</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Op. Margin: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{fMargin.toFixed(0)}%</b></div>
+          <div className="text-[10px] text-slate-400 mt-1">Lo que depositó el PM</div>
+          <div className="text-[10px] text-slate-500 mt-0.5">Margen Op.: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{fMargin.toFixed(0)}%</b></div>
         </div>
         <div className={`bg-white rounded-2xl p-4 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
           <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Cash Flow</div>
           <div className={`text-[22px] font-extrabold mt-1 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fCF)}</div>
-          <div className="text-[10px] text-slate-400 mt-1">NOI − Debt Service − Insurance</div>
+          <div className="text-[10px] text-slate-400 mt-1">NOI − Debt Service − Seguro</div>
           <div className={`text-[10px] mt-0.5 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{fm(fCFmo)}/mo{partial?` · Ann: ${fm(proyAnual)}`:''}</div>
         </div>
         <div className="bg-white rounded-2xl p-4 border-l-4 border-l-blue-400 border border-slate-200 shadow-sm">
           <div className="text-[9px] font-bold text-blue-500 uppercase tracking-widest">Occupancy</div>
           <div className="text-[22px] font-extrabold text-slate-800 mt-1">{fNights>0?occupancy.toFixed(0)+'%':'—'}</div>
-          <div className="text-[10px] text-slate-400 mt-1">{fNights>0?`${fNights} de ${availNights} noches`:`Re-upload PDFs to see`}</div>
+          <div className="text-[10px] text-slate-400 mt-1">{fNights>0?`${fNights} de ${availNights} noches`:`Re-sube PDFs para ver`}</div>
           {fNights>0&&<div className="text-[10px] text-slate-500 mt-0.5">ADR: <b className="text-blue-600">{fm(adr)}</b></div>}
         </div>
         <div className="bg-white rounded-2xl p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
@@ -598,75 +590,75 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="col-span-7 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
           <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-4">P&L — Profit & Loss{partial?` (${n} meses)`:''}</h3>
           <div className="space-y-1.5">
-            <div className="rounded-lg relative overflow-hidden" style={{height:'38px'}}><div className="absolute inset-0 bg-blue-500"/><div className="absolute inset-0 flex items-center justify-between px-4"><span className="text-[11px] font-bold text-white">Gross Revenue</span><span className="text-[12px] font-extrabold text-white">{fm(fRev)}</span></div></div>
+            <div className="rounded-lg relative overflow-hidden" style={{height:'38px'}}><div className="absolute inset-0 bg-blue-500"/><div className="absolute inset-0 flex items-center justify-between px-4"><span className="text-[11px] font-bold text-white">Ingreso Bruto</span><span className="text-[12px] font-extrabold text-white">{fm(fRev)}</span></div></div>
 
-            <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5">Operating Expenses (PM deducts from revenue)</div>
+            <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5">Gastos Operativos (descuenta el administrador)</div>
 
-            {[[`PM Commission (${prop.managerCommission||15}%)`,fComm,'bg-rose-400'],['Electricity (Duke Energy)',fDuke,'bg-amber-400'],['Water (Toho)',fWater,'bg-cyan-400'],['HOA Dues',fHoa,'bg-purple-400'],['Maintenance',fMaint,'bg-teal-400'],['Vendor / Supplies',fVendor,'bg-slate-400']].filter(([_,v])=>v>0).map(([l,v,bg])=>
+            {[[`Comisión PM (${prop.managerCommission||15}%)`,fComm,'bg-rose-400'],['Electricidad (Duke Energy)',fDuke,'bg-amber-400'],['Agua (Toho)',fWater,'bg-cyan-400'],['HOA',fHoa,'bg-purple-400'],['Mantenimiento',fMaint,'bg-teal-400'],['Vendor / Suministros',fVendor,'bg-slate-400']].filter(([_,v])=>v>0).map(([l,v,bg])=>
               <div key={l} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className={`absolute inset-y-0 left-0 ${bg} opacity-75`} style={{width:Math.max(2,v/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-4"><span className="text-[10px] text-slate-600">{l}</span><span className="text-[10px] font-bold text-slate-700">{fm(v)} <span className="text-slate-400">({(v/fRev*100).toFixed(0)}%)</span></span></div></div>
             )}
 
-            <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-4 bg-emerald-50"><span className="text-[11px] font-bold text-emerald-800">= NOI <span className="text-[9px] font-normal">(Net Operating Income)</span></span><span className="text-[12px] font-extrabold text-emerald-800">{fm(fNoi)} <span className="text-emerald-600 text-[10px]">{(fRev>0?(fNoi/fRev*100):0).toFixed(0)}%</span></span></div></div>
+            <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-4 bg-emerald-50"><span className="text-[11px] font-bold text-emerald-800">= NOI <span className="text-[9px] font-normal">(Ingreso Operativo Neto)</span></span><span className="text-[12px] font-extrabold text-emerald-800">{fm(fNoi)} <span className="text-emerald-600 text-[10px]">{(fRev>0?(fNoi/fRev*100):0).toFixed(0)}%</span></span></div></div>
 
             {/* Owner costs */}
             {ownerCosts>0&&<>
-              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Debt Service & Owner Expenses</div>
-              {fMortP>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-4"><span className="text-[10px] text-slate-600">Mortgage ({fm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{fm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>}
-              {insExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,insExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-4"><span className="text-[10px] text-slate-600">Insurance</span><span className="text-[10px] font-bold text-slate-700">{fm(insExp)}</span></div></div>}
-              {taxExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-violet-400 opacity-75" style={{width:Math.max(2,taxExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-4"><span className="text-[10px] text-slate-600">Property Tax</span><span className="text-[10px] font-bold text-slate-700">{fm(taxExp)}</span></div></div>}
+              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Hipoteca y Gastos del Propietario</div>
+              {fMortP>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-4"><span className="text-[10px] text-slate-600">Hipoteca ({fm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{fm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>}
+              {insExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,insExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-4"><span className="text-[10px] text-slate-600">Seguro</span><span className="text-[10px] font-bold text-slate-700">{fm(insExp)}</span></div></div>}
+              {taxExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-violet-400 opacity-75" style={{width:Math.max(2,taxExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-4"><span className="text-[10px] text-slate-600">Impuestos</span><span className="text-[10px] font-bold text-slate-700">{fm(taxExp)}</span></div></div>}
             </>}
 
             {/* Cash Flow */}
             <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
               <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
               <div className="absolute inset-0 flex items-center justify-between px-4">
-                <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Net Cash Flow</span>
+                <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Cash Flow Neto</span>
                 <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{fm(fCF)}</span>
               </div>
             </div>
-            {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded py-1.5 mt-1">Partial period ({n} meses) · Annualized projection: <b>{fm(proyAnual)}</b></div>}
+            {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded py-1.5 mt-1">Periodo parcial ({n} meses) · Proyección anualizada: <b>{fm(proyAnual)}</b></div>}
           </div>
         </div>
 
         {/* Right: Property + Metrics + Health */}
         <div className="col-span-5 space-y-3">
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Property Propiedad & Patrimonio Equity</h3>
+            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Propiedad & Patrimonio</h3>
             <div className="space-y-2">
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Market Value</span><span className="text-[11px] font-extrabold text-slate-800">{fm(marketValue)}</span></div>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Purchase Price</span><span className="text-[11px] font-bold text-slate-500">{fm(prop.purchasePrice)}</span></div>
-              {appreciation!==0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Appreciation</span><span className={`text-[11px] font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{appreciation.toFixed(1)}% ({fm(marketValue-prop.purchasePrice)})</span></div>}
+              {appreciation!==0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Valorización</span><span className={`text-[11px] font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{appreciation.toFixed(1)}% ({fm(marketValue-prop.purchasePrice)})</span></div>}
               <div className="border-t border-slate-100 my-0.5"/>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Equity</span><span className="text-[11px] font-extrabold text-emerald-600">{fm(realEquity)}</span></div>
-              {mort.balance>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Mortgage Balance</span><span className="text-[11px] font-bold text-slate-500">{fm(mort.balance)} <span className="text-slate-400">· LTV {realLTV.toFixed(0)}%</span></span></div>}
+              {mort.balance>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Deuda Hipoteca</span><span className="text-[11px] font-bold text-slate-500">{fm(mort.balance)} <span className="text-slate-400">· LTV {realLTV.toFixed(0)}%</span></span></div>}
             </div>
           </div>
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">STR Performance{partial?' (proy.)':''}</h3>
+            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Rendimiento STR{partial?' (proy.)':''}</h3>
             <div className="space-y-2">
-              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Occupied Nights</span><span className="text-[11px] font-bold text-slate-700">{fNights} de {availNights} <span className="text-slate-400">({occupancy.toFixed(0)}%)</span></span></div>}
-              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">ADR <span className="text-[9px] text-slate-300">(Avg Daily Rate)</span></span><span className="text-[11px] font-bold text-blue-600">{fm(adr)}</span></div>}
-              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">RevPAR <span className="text-[9px] text-slate-300">(Rev per Available)</span></span><span className={`text-[11px] font-bold ${revpar>100?'text-emerald-600':'text-amber-500'}`}>{fm(revpar)}</span></div>}
-              {fRes>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Bookings</span><span className="text-[11px] font-bold text-slate-700">{fRes} <span className="text-slate-400">({(fNights/fRes).toFixed(1)} avg nights)</span></span></div>}
+              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Noches Ocupadas</span><span className="text-[11px] font-bold text-slate-700">{fNights} de {availNights} <span className="text-slate-400">({occupancy.toFixed(0)}%)</span></span></div>}
+              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">ADR <span className="text-[9px] text-slate-300">(Tarifa Promedio/Noche)</span></span><span className="text-[11px] font-bold text-blue-600">{fm(adr)}</span></div>}
+              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">RevPAR <span className="text-[9px] text-slate-300">(Ingreso/Noche Disponible)</span></span><span className={`text-[11px] font-bold ${revpar>100?'text-emerald-600':'text-amber-500'}`}>{fm(revpar)}</span></div>}
+              {fRes>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Reservaciones</span><span className="text-[11px] font-bold text-slate-700">{fRes} <span className="text-slate-400">({(fNights/fRes).toFixed(1)} noches prom.)</span></span></div>}
               <div className="border-t border-slate-100 my-0.5"/>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cap Rate</span><span className={`text-[11px] font-bold ${fCapR>6?'text-emerald-600':fCapR>4?'text-amber-500':'text-rose-500'}`}>{fCapR.toFixed(2)}%</span></div>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cash-on-Cash</span><span className={`text-[11px] font-bold ${fCoc>8?'text-emerald-600':fCoc>4?'text-amber-500':'text-rose-500'}`}>{fCoc.toFixed(1)}%</span></div>
               {fDscr>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">DSCR <span className="text-[9px] text-slate-300">(Debt Service Coverage)</span></span><span className={`text-[11px] font-bold ${fDscr>1.25?'text-emerald-600':fDscr>1?'text-amber-500':'text-rose-500'}`}>{fDscr.toFixed(2)}x</span></div>}
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Expense Ratio</span><span className={`text-[11px] font-bold ${fOpEx/fRev<0.5?'text-emerald-600':fOpEx/fRev<0.6?'text-amber-500':'text-rose-500'}`}>{(fOpEx/fRev*100).toFixed(0)}%</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Total Capital</span><span className="text-[11px] font-bold text-slate-700">{fm(totCont)}</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Ratio de Gastos</span><span className={`text-[11px] font-bold ${fOpEx/fRev<0.5?'text-emerald-600':fOpEx/fRev<0.6?'text-amber-500':'text-rose-500'}`}>{(fOpEx/fRev*100).toFixed(0)}%</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Capital Invertido</span><span className="text-[11px] font-bold text-slate-700">{fm(totCont)}</span></div>
             </div>
           </div>
           {/* Health indicator */}
           <div className={`rounded-2xl p-3 border ${fCF>=0&&fNoi/fRev>0.4?'bg-emerald-50 border-emerald-200':fCF<0?'bg-rose-50 border-rose-200':'bg-amber-50 border-amber-200'}`}>
             <div className="flex items-center gap-2 mb-1.5">
               {fCF>=0&&fNoi/fRev>0.4?<CheckCircle size={15} className="text-emerald-500"/>:<AlertTriangle size={15} className={fCF<0?'text-rose-500':'text-amber-500'}/>}
-              <span className={`text-[10px] font-bold uppercase ${fCF>=0&&fNoi/fRev>0.4?'text-emerald-700':fCF<0?'text-rose-700':'text-amber-700'}`}>{fCF>=0&&fNoi/fRev>0.4?'Healthy Investment':fCF<0?'Attention Required':'Under Review'}</span>
+              <span className={`text-[10px] font-bold uppercase ${fCF>=0&&fNoi/fRev>0.4?'text-emerald-700':fCF<0?'text-rose-700':'text-amber-700'}`}>{fCF>=0&&fNoi/fRev>0.4?'Inversión Saludable':fCF<0?'Requiere Atención':'En Observación'}</span>
             </div>
             <div className="space-y-1 text-[10px] text-slate-600">
               {occupancy>0&&<div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${occupancy>70?'bg-emerald-500':occupancy>50?'bg-amber-500':'bg-rose-500'}`}/>{occupancy.toFixed(0)}% ocupación ({fNights} noches)</div>}
-              <div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${fNoi/fRev>0.5?'bg-emerald-500':fNoi/fRev>0.4?'bg-amber-500':'bg-rose-500'}`}/>{(fNoi/fRev*100).toFixed(0)}% operating margin</div>
-              {fDscr>0&&<div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${fDscr>1.25?'bg-emerald-500':fDscr>1?'bg-amber-500':'bg-rose-500'}`}/>{fDscr.toFixed(2)}x debt coverage</div>}
-              {revChg!==null&&<div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${revChg>=0?'bg-emerald-500':'bg-rose-500'}`}/>{revChg>=0?'+':''}{revChg.toFixed(0)}% revenue vs prior year</div>}
+              <div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${fNoi/fRev>0.5?'bg-emerald-500':fNoi/fRev>0.4?'bg-amber-500':'bg-rose-500'}`}/>{(fNoi/fRev*100).toFixed(0)}% margen operativo</div>
+              {fDscr>0&&<div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${fDscr>1.25?'bg-emerald-500':fDscr>1?'bg-amber-500':'bg-rose-500'}`}/>{fDscr.toFixed(2)}x cobertura de deuda</div>}
+              {revChg!==null&&<div className="flex items-center gap-1.5"><div className={`w-1.5 h-1.5 rounded-full ${revChg>=0?'bg-emerald-500':'bg-rose-500'}`}/>{revChg>=0?'+':''}{revChg.toFixed(0)}% ingreso vs año anterior</div>}
             </div>
           </div>
         </div>
@@ -675,66 +667,63 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {/* ── ROW 3: Monthly Chart + Property + Metrics ── */}
       <div className="grid grid-cols-12 gap-4 mb-4">
         <div className="col-span-7 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Monthly Performance</h3>
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Rendimiento Mensual</h3>
           <ResponsiveContainer width="100%" height={200}>
             <ComposedChart data={mChart}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/>
               <XAxis dataKey="m" tick={{fontSize:9,fill:'#94a3b8'}} interval={mChart.length>18?2:0}/>
               <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={fm}/>
               <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
-              <Bar dataKey="rev" name="Gross Revenue" fill="#BFDBFE" radius={[3,3,0,0]}/>
-              <Bar dataKey="net" name="Net Income" fill="#6EE7B7" radius={[3,3,0,0]}/>
+              <Bar dataKey="rev" name="Ingreso Bruto" fill="#BFDBFE" radius={[3,3,0,0]}/>
+              <Bar dataKey="net" name="Neto Depositado" fill="#6EE7B7" radius={[3,3,0,0]}/>
               {mMort>0&&<Line dataKey="libre" name="Cash Flow" stroke="#1E293B" strokeWidth={2} dot={{r:2,fill:'#1E293B'}}/>}
             </ComposedChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="col-span-5 grid grid-rows-2 gap-4">
-          {/* Property */}
+        <div className="col-span-5 space-y-3">
+          {/* Property & Equity */}
           <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Property Propiedad & Patrimonio Equity</h3>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Valor mercado</span><span className="text-[11px] font-extrabold text-slate-800">{fm(marketValue)}</span></div>
+            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Propiedad & Patrimonio</h3>
+            <div className="space-y-1.5">
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Valor de Mercado</span><span className="text-[11px] font-extrabold text-slate-800">{fm(marketValue)}</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Precio de Compra</span><span className="text-[11px] font-bold text-slate-500">{fm(prop.purchasePrice)}</span></div>
+              {appreciation!==0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Valorización</span><span className={`text-[11px] font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{appreciation.toFixed(1)}% ({fm(marketValue-prop.purchasePrice)})</span></div>}
+              <div className="border-t border-slate-100 my-0.5"/>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Equity</span><span className="text-[11px] font-extrabold text-emerald-600">{fm(realEquity)}</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Compra</span><span className="text-[11px] font-bold text-slate-500">{fm(prop.purchasePrice)}</span></div>
-              {mort.balance>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Hipoteca</span><span className="text-[11px] font-bold text-slate-500">{fm(mort.balance)}</span></div>}
-              {appreciation!==0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Appreciation</span><span className={`text-[11px] font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{appreciation.toFixed(1)}%</span></div>}
+              {mort.balance>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Deuda Hipoteca</span><span className="text-[11px] font-bold text-slate-500">{fm(mort.balance)}</span></div>}
               {realLTV>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">LTV</span><span className={`text-[11px] font-bold ${realLTV>80?'text-rose-500':realLTV>60?'text-amber-500':'text-emerald-500'}`}>{realLTV.toFixed(0)}%</span></div>}
             </div>
           </div>
-          {/* Metrics */}
-          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Métricas de Inversión{partial?' (proy.)':''}</h3>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cap Rate</span><span className={`text-[11px] font-bold ${fCapR>6?'text-emerald-600':fCapR>4?'text-amber-500':'text-rose-500'}`}>{fCapR.toFixed(2)}%</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cash-on-Cash</span><span className={`text-[11px] font-bold ${fCoc>8?'text-emerald-600':fCoc>4?'text-amber-500':'text-rose-500'}`}>{fCoc.toFixed(1)}%</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Margen operativo</span><span className={`text-[11px] font-bold ${fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}`}>{fMargin.toFixed(0)}%</span></div>
-              {fDscr>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Cobertura deuda</span><span className={`text-[11px] font-bold ${fDscr>1.25?'text-emerald-600':fDscr>1?'text-amber-500':'text-rose-500'}`}>{fDscr.toFixed(2)}x</span></div>}
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Valor/noche</span><span className="text-[11px] font-bold text-slate-700">{fm(adr)}</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Capital total</span><span className="text-[11px] font-bold text-slate-700">{fm(totCont)}</span></div>
+          {/* Seasonality */}
+          {monthRank.length>=6&&<div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Estacionalidad (histórico)</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-emerald-50 rounded-xl p-2 text-center"><div className="text-[8px] text-emerald-600 font-bold">MEJOR MES</div><div className="text-sm font-extrabold text-emerald-700">{monthRank[0].month}</div><div className="text-[10px] text-emerald-500">{fm(monthRank[0].avg)} prom</div></div>
+              <div className="bg-rose-50 rounded-xl p-2 text-center"><div className="text-[8px] text-rose-600 font-bold">PEOR MES</div><div className="text-sm font-extrabold text-rose-700">{monthRank[monthRank.length-1].month}</div><div className="text-[10px] text-rose-500">{fm(monthRank[monthRank.length-1].avg)} prom</div></div>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
 
       {/* ── ROW 4: Year comparison + Partners ── */}
       {(annual.length>1||partners.length>1)&&<div className={`grid ${annual.length>1&&partners.length>1?'grid-cols-2':'grid-cols-1'} gap-4`}>
         {annual.length>1&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Annual Comparison</h3>
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Comparativo Anual</h3>
           <ResponsiveContainer width="100%" height={180}>
             <ComposedChart data={annual}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/>
               <XAxis dataKey="year" tick={{fontSize:11,fill:'#64748b'}}/>
               <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={fm}/>
               <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
-              <Bar dataKey="revenue" name="Gross Revenue" fill="#93C5FD" radius={[4,4,0,0]}/>
-              <Bar dataKey="net" name="Net Income" fill="#6EE7B7" radius={[4,4,0,0]}/>
+              <Bar dataKey="revenue" name="Ingreso Bruto" fill="#93C5FD" radius={[4,4,0,0]}/>
+              <Bar dataKey="net" name="Neto Depositado" fill="#6EE7B7" radius={[4,4,0,0]}/>
               <Line dataKey="hoa" name="HOA" stroke="#8B5CF6" strokeWidth={2} dot={{r:3}}/>
             </ComposedChart>
           </ResponsiveContainer>
         </div>}
         {partners.length>1&&<div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
-          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Partner Distribution</h3>
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Distribución entre Socios</h3>
           <div className="space-y-3">{partners.map(p=>{const t=pt[p.id]||{};return<div key={p.id} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:p.color}}>{p.name.charAt(0)}</div>
             <div className="flex-1 min-w-0"><div className="text-sm font-bold text-slate-700 truncate">{p.name} <span className="text-xs text-slate-400 font-normal">{p.ownership}%</span></div>
@@ -980,10 +969,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ VALUATION & EQUITY ═══ */}
     {view==='valuation'&&<>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">📈 Appreciation & Equity</h1><button onClick={()=>{setVf({date:new Date().toISOString().split('T')[0],value:'',source:'manual',notes:''});setEditId(null);setModal('valuation')}} className="px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Registrar Valor</button></div>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">📈 Valorización & Equity</h1><button onClick={()=>{setVf({date:new Date().toISOString().split('T')[0],value:'',source:'manual',notes:''});setEditId(null);setModal('valuation')}} className="px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Registrar Valor</button></div>
 
       <div className="grid grid-cols-4 gap-3 mb-5">
-        <KPI label="Precio de Compra" value={fm(prop.purchasePrice)} color="blue"/>
+        <KPI label="Precio de Precio de Compra" value={fm(prop.purchasePrice)} color="blue"/>
         <KPI label="Valor de Mercado" value={fm(marketValue)} sub={latestVal?'Actualizado '+fmDate(latestVal.date):'Purchase Price'} color={appreciation>=0?'green':'red'}/>
         <KPI label="Equity" value={fm(realEquity)} sub={mort.balance>0?'Valor - Hipoteca':'Sin hipoteca'} color="green" alert={realEquity>0?'green':'red'}/>
         <KPI label="Apreciación" value={appreciation.toFixed(1)+'%'} sub={appreciation>=0?fm(marketValue-prop.purchasePrice)+' ganancia':fm(prop.purchasePrice-marketValue)+' pérdida'} color={appreciation>=0?'green':'red'} trend={{dir:appreciation>=0?'up':'down',text:fm(Math.abs(marketValue-prop.purchasePrice))}}/>
@@ -1000,7 +989,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <h3 className="text-sm font-bold text-slate-700 mb-4">Composición del Equity</h3>
         <div className="space-y-3">
           <div className="flex justify-between py-3 px-4 bg-blue-50 rounded-xl border border-blue-100"><span className="font-bold text-blue-700">Valor de Mercado</span><span className="font-extrabold text-blue-700 text-lg">{fm(marketValue)}</span></div>
-          {mort.balance>0&&<div className="pl-6"><div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Balance Hipoteca</span><span className="font-semibold text-rose-500">{fm(mort.balance)}</span></div></div>}
+          {mort.balance>0&&<div className="pl-6"><div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Balance Deuda Hipoteca</span><span className="font-semibold text-rose-500">{fm(mort.balance)}</span></div></div>}
           <div className={`flex justify-between py-3 px-4 rounded-xl border ${realEquity>=0?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}><span className={`font-bold ${realEquity>=0?'text-emerald-700':'text-rose-700'}`}>= Equity Neto</span><span className={`font-extrabold text-lg ${realEquity>=0?'text-emerald-700':'text-rose-700'}`}>{fm(realEquity)}</span></div>
           {prop.purchasePrice>0&&<div className="pl-6 space-y-1">
             <div className="flex justify-between py-2 text-sm"><span className="text-slate-500">Capital aportado (down payment + extras)</span><span className="font-semibold">{fm(totCont)}</span></div>
@@ -1012,7 +1001,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {/* Valuation History */}
       {valuations.length>0&&<>
-        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4"><h3 className="text-sm font-bold text-slate-700 mb-4">Historial de Appreciation</h3>
+        <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm mb-4"><h3 className="text-sm font-bold text-slate-700 mb-4">Historial de Valorización</h3>
           <ResponsiveContainer width="100%" height={200}><AreaChart data={[{date:fmDate(prop.purchaseDate),value:prop.purchasePrice},...[...valuations].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(v=>({date:fmDate(v.date),value:parseFloat(v.value)||0}))]}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="date" tick={{fontSize:9,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Area dataKey="value" name="Valor" stroke="#059669" fill="rgba(5,150,105,.1)" strokeWidth={2.5}/></AreaChart></ResponsiveContainer>
         </div>
         <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500 font-medium">{fmDate(r.date)}</span>},{label:'Valor Estimado',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.value)}</span>},{label:'Fuente',render:r=><span className="text-xs text-slate-400">{r.source==='zillow'?'Zillow':r.source==='redfin'?'Redfin':r.source==='appraisal'?'Avalúo':r.source==='broker'?'Broker':'Manual'}</span>},{label:'Notas',key:'notes',cls:'text-xs text-slate-400'}]} rows={[...valuations].sort((a,b)=>(b.date||'').localeCompare(a.date||''))} onDel={del} dc="valuations" onEdit={r=>{setVf({date:r.date||'',value:String(r.value||''),source:r.source||'manual',notes:r.notes||''});setEditId(r.id);setModal('valuation')}}/>
@@ -1069,7 +1058,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3"><Inp label="Nombre" value={sf2.name} onChange={v=>uf('name',v)}/><Inp label="Dirección" value={sf2.address} onChange={v=>uf('address',v)}/></div>
           <div className="grid grid-cols-3 gap-3"><Inp label="Ciudad" value={sf2.city} onChange={v=>uf('city',v)}/><Sel label="Estado" value={sf2.state} onChange={v=>uf('state',v)} options={US.map(s=>({v:s,l:s}))}/><Sel label="Tipo" value={sf2.type} onChange={v=>uf('type',v)} options={PT}/></div>
-          <div className="grid grid-cols-4 gap-3"><Inp label="Precio Compra" value={sf2.purchasePrice} onChange={v=>uf('purchasePrice',v)} prefix="$" type="number"/><Inp label="Property Manager" value={sf2.manager} onChange={v=>uf('manager',v)}/><Inp label="Comisión (%)" value={sf2.managerCommission} onChange={v=>uf('managerCommission',v)} type="number"/><div/></div>
+          <div className="grid grid-cols-4 gap-3"><Inp label="Precio Precio de Compra" value={sf2.purchasePrice} onChange={v=>uf('purchasePrice',v)} prefix="$" type="number"/><Inp label="Property Manager" value={sf2.manager} onChange={v=>uf('manager',v)}/><Inp label="Comisión (%)" value={sf2.managerCommission} onChange={v=>uf('managerCommission',v)} type="number"/><div/></div>
           <div className="grid grid-cols-4 gap-3"><Inp label="Habitaciones" value={sf2.bedrooms} onChange={v=>uf('bedrooms',v)} type="number"/><Inp label="Baños" value={sf2.bathrooms} onChange={v=>uf('bathrooms',v)} type="number"/></div>
         </div>
         <button onClick={async()=>{try{await updateDoc(doc(db,'properties',propertyId),{name:sf2.name,address:sf2.address,city:sf2.city,state:sf2.state,type:sf2.type,purchasePrice:parseFloat(sf2.purchasePrice)||0,manager:sf2.manager,managerCommission:parseFloat(sf2.managerCommission)||15,bedrooms:parseInt(sf2.bedrooms)||0,bathrooms:parseInt(sf2.bathrooms)||0});alert('Guardado. Recarga para ver los cambios.')}catch(e){alert('Error: '+e.message)}}} className="mt-5 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20">💾 Guardar Cambios</button>
@@ -1115,7 +1104,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="grid grid-cols-6 gap-2 mb-6">
           <div className="bg-slate-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-slate-500 font-semibold uppercase">Margen</div><div className="text-sm font-extrabold text-slate-800">{margin.toFixed(1)}%</div></div>
           <div className="bg-slate-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-slate-500 font-semibold uppercase">Cap Rate</div><div className="text-sm font-extrabold text-slate-800">{capRate.toFixed(2)}%</div></div>
-          <div className="bg-slate-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-slate-500 font-semibold uppercase">Expense Ratio</div><div className="text-sm font-extrabold text-slate-800">{expRatio.toFixed(1)}%</div></div>
+          <div className="bg-slate-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-slate-500 font-semibold uppercase">Ratio de Gastos</div><div className="text-sm font-extrabold text-slate-800">{expRatio.toFixed(1)}%</div></div>
           <div className="bg-slate-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-slate-500 font-semibold uppercase">Equity</div><div className="text-sm font-extrabold text-slate-800">{fm(equity)}</div></div>
           <div className="bg-slate-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-slate-500 font-semibold uppercase">LTV</div><div className="text-sm font-extrabold text-slate-800">{ltv.toFixed(0)}%</div></div>
           <div className="bg-slate-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-slate-500 font-semibold uppercase">Capital</div><div className="text-sm font-extrabold text-slate-800">{fm(totCont)}</div></div>
@@ -1194,7 +1183,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Vendor/Otros</span><span className="font-semibold text-rose-500">{fm(stmtVendor)}</span></div>
             {totExp>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Gastos Adicionales</span><span className="font-semibold text-rose-500">{fm(totExp)}</span></div>}
           </div>
-          <div className="flex justify-between py-3 px-4 bg-emerald-50 rounded-xl border border-emerald-100"><span className="font-bold text-emerald-700">= NOI (Net Operating Income)</span><span className="font-extrabold text-emerald-700 text-lg">{fm(noi)}</span></div>
+          <div className="flex justify-between py-3 px-4 bg-emerald-50 rounded-xl border border-emerald-100"><span className="font-bold text-emerald-700">= NOI (Ingreso Operativo Neto)</span><span className="font-extrabold text-emerald-700 text-lg">{fm(noi)}</span></div>
           {mort.balance>0&&<><div className="pl-6"><div className="flex justify-between py-2 text-sm"><span className="text-amber-600">(-) Pago de Hipoteca (anual)</span><span className="font-semibold text-amber-600">{fm(annualMortgage)}</span></div></div>
           <div className={`flex justify-between py-3 px-4 rounded-xl border ${cashFlow>=0?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}><span className={`font-bold ${cashFlow>=0?'text-emerald-700':'text-rose-700'}`}>= Cash Flow</span><span className={`font-extrabold text-lg ${cashFlow>=0?'text-emerald-700':'text-rose-700'}`}>{fm(cashFlow)}</span></div></>}
           <div className="flex justify-between py-3 px-4 bg-purple-50 rounded-xl border border-purple-100 mt-2"><span className="font-bold text-purple-700">Cash-on-Cash Return</span><span className="font-extrabold text-purple-700 text-lg">{coc.toFixed(1)}%</span></div>
@@ -1232,7 +1221,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="bg-rose-50 rounded-xl p-3 text-center border border-rose-100"><div className="text-[10px] text-rose-600 font-bold uppercase">Total Gastos</div><div className="text-xl font-extrabold text-rose-700">{fm(totalOpEx)}</div></div>
           <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Fijos (Statements)</div><div className="text-xl font-extrabold text-amber-700">{fm(stmtRev-stmtNet)}</div></div>
           <div className="bg-slate-50 rounded-xl p-3 text-center border"><div className="text-[10px] text-slate-500 font-bold uppercase">Adicionales</div><div className="text-xl font-extrabold text-slate-800">{fm(totExp)}</div></div>
-          <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100"><div className="text-[10px] text-blue-600 font-bold uppercase">Expense Ratio</div><div className="text-xl font-extrabold text-blue-700">{expRatio.toFixed(1)}%</div></div>
+          <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100"><div className="text-[10px] text-blue-600 font-bold uppercase">Ratio de Gastos</div><div className="text-xl font-extrabold text-blue-700">{expRatio.toFixed(1)}%</div></div>
         </div>
         {/* Breakdown from statements */}
         {stmtRev>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Desglose — Costos Operativos (de Statements)</h3>
@@ -1268,7 +1257,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {modal==='addStmt'&&<Mdl title={editId?'✏️ Editar Statement':'Statement Manual'} grad="from-slate-700 to-slate-800" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const yr=parseInt(sf.year),mo=parseInt(sf.month);const data={year:yr,month:mo,revenue:parseFloat(sf.revenue)||0,net:parseFloat(sf.net)||0,commission:parseFloat(sf.commission)||0,duke:parseFloat(sf.duke)||0,water:parseFloat(sf.water)||0,hoa:parseFloat(sf.hoa)||0,maintenance:parseFloat(sf.maintenance)||0,vendor:parseFloat(sf.vendor)||0};if(editId){update('statements',editId,data)}else{if(stmts.find(s=>s.year===yr&&s.month===mo)){alert(`Ya existe un statement para ${M[mo-1]} ${yr}.`);return;}save('statements',data);setSf(x=>({...x,month:x.month<12?x.month+1:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''}))}}} disabled={!sf.revenue} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
       <div className="grid grid-cols-2 gap-3"><Inp label="Año" value={sf.year} onChange={v=>us('year',v)} type="number" disabled={!!editId}/><Sel label="Mes" value={sf.month} onChange={v=>us('month',v)} options={M.map((m,i)=>({v:i+1,l:m}))}/></div>
       <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100"><div className="text-[10px] font-black text-emerald-700 uppercase mb-3">Ingresos</div><Inp label="Revenue Total" value={sf.revenue} onChange={v=>us('revenue',v)} prefix="$" type="number"/></div>
-      <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100"><div className="text-[10px] font-black text-rose-700 uppercase mb-3">Gastos</div><div className="grid grid-cols-2 gap-3"><Inp label="Comisión PM" value={sf.commission} onChange={v=>us('commission',v)} prefix="$" type="number"/><Inp label="Electricidad" value={sf.duke} onChange={v=>us('duke',v)} prefix="$" type="number"/><Inp label="Agua" value={sf.water} onChange={v=>us('water',v)} prefix="$" type="number"/><Inp label="HOA" value={sf.hoa} onChange={v=>us('hoa',v)} prefix="$" type="number"/><Inp label="Maintenance" value={sf.maintenance} onChange={v=>us('maintenance',v)} prefix="$" type="number"/><Inp label="Vendor/Otros" value={sf.vendor} onChange={v=>us('vendor',v)} prefix="$" type="number"/></div></div>
+      <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100"><div className="text-[10px] font-black text-rose-700 uppercase mb-3">Gastos</div><div className="grid grid-cols-2 gap-3"><Inp label="Comisión PM" value={sf.commission} onChange={v=>us('commission',v)} prefix="$" type="number"/><Inp label="Electricidad" value={sf.duke} onChange={v=>us('duke',v)} prefix="$" type="number"/><Inp label="Agua" value={sf.water} onChange={v=>us('water',v)} prefix="$" type="number"/><Inp label="HOA" value={sf.hoa} onChange={v=>us('hoa',v)} prefix="$" type="number"/><Inp label="Mantenimiento" value={sf.maintenance} onChange={v=>us('maintenance',v)} prefix="$" type="number"/><Inp label="Vendor/Otros" value={sf.vendor} onChange={v=>us('vendor',v)} prefix="$" type="number"/></div></div>
       <Inp label="Net al Owner" value={sf.net} onChange={v=>us('net',v)} prefix="$" type="number"/>
     </Mdl>}
 
@@ -1302,13 +1291,13 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <Inp label="Notas (opcional)" value={tf.notes} onChange={v=>ut('notes',v)} placeholder="Detalles adicionales..."/>
     </Mdl>}
 
-    {modal==='valuation'&&<Mdl title={editId?'✏️ Editar Appreciation':'📈 Registrar Valor de Mercado'} grad="from-emerald-600 to-teal-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={date:vf.date,value:parseFloat(vf.value)||0,source:vf.source,notes:vf.notes};if(editId){update('valuations',editId,data)}else{save('valuations',data)}}} disabled={!vf.value} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+    {modal==='valuation'&&<Mdl title={editId?'✏️ Editar Valorización':'📈 Registrar Valor de Mercado'} grad="from-emerald-600 to-teal-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={date:vf.date,value:parseFloat(vf.value)||0,source:vf.source,notes:vf.notes};if(editId){update('valuations',editId,data)}else{save('valuations',data)}}} disabled={!vf.value} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
       <Inp label="Fecha de Estimación" value={vf.date} onChange={v=>uv('date',v)} type="date"/>
       <Inp label="Valor Estimado de Mercado" value={vf.value} onChange={v=>uv('value',v)} prefix="$" type="number" placeholder="490,000"/>
       <Sel label="Fuente" value={vf.source} onChange={v=>uv('source',v)} options={[{v:'manual',l:'Estimación propia'},{v:'zillow',l:'Zillow Zestimate'},{v:'redfin',l:'Redfin Estimate'},{v:'appraisal',l:'Avalúo profesional'},{v:'broker',l:'CMA de broker'},{v:'comps',l:'Comparables de mercado'}]}/>
       <Inp label="Notas (opcional)" value={vf.notes} onChange={v=>uv('notes',v)} placeholder="Ej: Basado en venta de vecino por $500K"/>
       {vf.value&&prop.purchasePrice>0&&<div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2 text-sm">
-        <div className="flex justify-between"><span className="text-slate-500">Precio Compra</span><span className="font-semibold">{fm(prop.purchasePrice)}</span></div>
+        <div className="flex justify-between"><span className="text-slate-500">Precio Precio de Compra</span><span className="font-semibold">{fm(prop.purchasePrice)}</span></div>
         <div className="flex justify-between"><span className="text-slate-500">Valor Estimado</span><span className="font-bold text-emerald-600">{fm(parseFloat(vf.value))}</span></div>
         <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-600 font-semibold">Apreciación</span><span className={`font-extrabold ${parseFloat(vf.value)>=prop.purchasePrice?'text-emerald-600':'text-rose-500'}`}>{((parseFloat(vf.value)-prop.purchasePrice)/prop.purchasePrice*100).toFixed(1)}% ({fm(parseFloat(vf.value)-prop.purchasePrice)})</span></div>
       </div>}
@@ -1322,7 +1311,6 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="text-xs text-slate-400 mt-1">Soporta múltiples archivos</div>
         <input type="file" accept=".pdf" multiple className="hidden" onChange={async e=>{
           const arr=[...e.target.files];
-          console.log('[INPUT] Copied', arr.length, 'files to array');
           e.target.value='';
           if(arr.length) await handlePDFs(arr);
         }}/>
