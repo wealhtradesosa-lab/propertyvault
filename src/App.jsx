@@ -664,7 +664,118 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
       </div>
 
-      {/* ── ROW 3: Monthly Chart + Property + Metrics ── */}
+      {/* ── ROW 3: INSIGHTS — What the data tells you ── */}
+      {n>=2&&<div className="grid grid-cols-12 gap-4 mb-4">
+        {/* Smart Insights */}
+        <div className="col-span-8 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Insights & Recomendaciones</h3>
+          <div className="space-y-2">
+            {(()=>{
+              const insights=[];
+              const avgRevMo=n>0?fRev/n:0;
+              const avgNetMo=n>0?fNet/n:0;
+              const breakEvenNights=adr>0?Math.ceil((fOpEx+ownerCosts)/(n||1)/adr*30):0;
+              const monthlyMort=mMort;
+              const monthlyOwnerCost=(ownerCosts)/Math.max(n,1);
+              const monthlyOpEx=fOpEx/Math.max(n,1);
+              const avgNightsMo=fNights>0?Math.round(fNights/n):0;
+              
+              // Break-even
+              if(adr>0&&breakEvenNights>0) insights.push({
+                type:breakEvenNights>25?'danger':breakEvenNights>20?'warn':'good',
+                icon:breakEvenNights>25?'🚨':breakEvenNights>20?'⚠️':'✅',
+                title:`Punto de equilibrio: ${breakEvenNights} noches/mes`,
+                desc:breakEvenNights>avgNightsMo?`Necesitas ${breakEvenNights} noches para cubrir costos pero promedias ${avgNightsMo}. Déficit de ${breakEvenNights-avgNightsMo} noches.`:`Cubres costos con ${breakEvenNights} noches y promedias ${avgNightsMo}. Margen de ${avgNightsMo-breakEvenNights} noches.`
+              });
+
+              // Cash Flow health
+              if(fCF<0) insights.push({type:'danger',icon:'🔴',title:`Cash flow negativo: ${fm(fCF)}`,desc:`La propiedad no cubre sus costos. La hipoteca (${fm(fMortP)}) consume ${fRev>0?(fMortP/fRev*100).toFixed(0):0}% del ingreso bruto. ${monthlyMort>avgNetMo?'El pago mensual de hipoteca es mayor que lo que deposita el PM.':'Considera refinanciar o aumentar tarifas.'}`});
+              else if(fCF>0&&fCFmo<500) insights.push({type:'warn',icon:'🟡',title:`Cash flow ajustado: ${fm(fCFmo)}/mes`,desc:'Cualquier reparación mayor o mes de baja ocupación puede dejarte en negativo. Considera construir una reserva de emergencia.'});
+              else if(fCFmo>1000) insights.push({type:'good',icon:'🟢',title:`Cash flow saludable: ${fm(fCFmo)}/mes`,desc:'La propiedad genera excedente consistente después de todos los costos.'});
+
+              // Occupancy
+              if(fNights>0){
+                if(occupancy>=80) insights.push({type:'good',icon:'📈',title:`Ocupación excelente: ${occupancy.toFixed(0)}%`,desc:`Con ${occupancy.toFixed(0)}% de ocupación, puedes considerar subir tarifas. Un aumento de $20/noche generaría ~${fm(fNights/n*20*12)} adicionales al año.`});
+                else if(occupancy>=60) insights.push({type:'warn',icon:'📊',title:`Ocupación aceptable: ${occupancy.toFixed(0)}%`,desc:`Hay espacio para ${Math.round(availNights-fNights)} noches más. Si llenas ${Math.round((availNights-fNights)*0.5)} noches adicionales al ADR actual (${fm(adr)}), generarías ${fm(Math.round((availNights-fNights)*0.5)*adr)} extra.`});
+                else insights.push({type:'danger',icon:'📉',title:`Ocupación baja: ${occupancy.toFixed(0)}%`,desc:`Solo ${fNights} de ${availNights} noches ocupadas. Revisa precios, fotos del listing, y la competencia en la zona.`});
+              }
+
+              // ADR vs market (Orlando STR avg ~$180-250)
+              if(adr>0){
+                if(adr>300) insights.push({type:'good',icon:'💎',title:`ADR premium: ${fm(adr)}/noche`,desc:'Tu tarifa está por encima del promedio del mercado de Orlando. Asegúrate de que las reseñas y amenities justifiquen el premium.'});
+                else if(adr<150) insights.push({type:'warn',icon:'💰',title:`ADR por debajo del mercado: ${fm(adr)}/noche`,desc:'Considera mejorar amenities (hot tub, game room, tematización) para subir tarifa. Cada $25 de aumento = ~'+fm(fNights/n*25*12)+'/año extra.'});
+              }
+
+              // Mortgage burden
+              if(mMort>0&&fRev>0){
+                const mortPct=fMortP/fRev*100;
+                if(mortPct>60) insights.push({type:'danger',icon:'🏦',title:`Hipoteca consume ${mortPct.toFixed(0)}% del ingreso`,desc:`El debt service es muy alto relativo al ingreso. DSCR de ${fDscr.toFixed(2)}x. ${fDscr<1.25?'Considera refinanciar a una tasa más baja o extender el plazo.':'Aunque el DSCR es aceptable, el margen es estrecho.'}`});
+              }
+
+              // Expense efficiency
+              if(fRev>0){
+                const opExPct=fOpEx/fRev*100;
+                if(opExPct>55) insights.push({type:'warn',icon:'📋',title:`Ratio de gastos alto: ${opExPct.toFixed(0)}%`,desc:`Los gastos operativos consumen más de la mitad del ingreso. Los principales: Comisión PM ${fm(fComm)} (${(fComm/fRev*100).toFixed(0)}%), Electricidad ${fm(fDuke)} (${(fDuke/fRev*100).toFixed(0)}%), HOA ${fm(fHoa)} (${(fHoa/fRev*100).toFixed(0)}%).`});
+              }
+
+              // Duke Energy trend
+              if(fDuke>0&&fRev>0){
+                const dukePct=fDuke/fRev*100;
+                if(dukePct>15) insights.push({type:'warn',icon:'⚡',title:`Electricidad alta: ${(dukePct).toFixed(0)}% del ingreso`,desc:`Duke Energy ${fm(fDuke)} (${fm(fDuke/n)}/mes). Para una propiedad STR en Orlando, lo típico es 8-12%. Verifica termostato inteligente, pool heater timer, y eficiencia del A/C.`});
+              }
+
+              // YoY comparison
+              if(prevYr&&prevYr.revenue>0&&dashYear!=='all'){
+                const revDiff=fRev-prevYr.revenue*(n/prevYr.n);
+                const netDiff=fNet-prevYr.net*(n/prevYr.n);
+                if(revDiff<0) insights.push({type:'warn',icon:'📉',title:`Ingreso ${((revDiff/(prevYr.revenue*(n/prevYr.n)))*100).toFixed(0)}% vs ${prevYr.year} (mismos meses)`,desc:`Ajustado por periodo, estás generando ${fm(Math.abs(revDiff))} menos que el año pasado. Revisa si la competencia aumentó o si tus tarifas necesitan ajuste.`});
+                else if(revDiff>0) insights.push({type:'good',icon:'📈',title:`Ingreso +${((revDiff/(prevYr.revenue*(n/prevYr.n)))*100).toFixed(0)}% vs ${prevYr.year}`,desc:`Crecimiento de ${fm(revDiff)} vs el mismo periodo del año anterior. Buen momentum.`});
+              }
+
+              // Appreciation
+              if(appreciation>20) insights.push({type:'good',icon:'🏠',title:`Valorización +${appreciation.toFixed(0)}% (${fm(marketValue-prop.purchasePrice)})`,desc:'Excelente apreciación. Tu equity es '+fm(realEquity)+'. Podrías hacer un HELOC para adquirir otra propiedad.'});
+
+              return insights.length>0?insights.map((ins,i)=><div key={i} className={`flex gap-3 p-3 rounded-xl border text-sm ${ins.type==='good'?'bg-emerald-50 border-emerald-100':ins.type==='warn'?'bg-amber-50 border-amber-100':'bg-rose-50 border-rose-100'}`}>
+                <span className="text-lg shrink-0">{ins.icon}</span>
+                <div><div className={`font-bold text-xs ${ins.type==='good'?'text-emerald-800':ins.type==='warn'?'text-amber-800':'text-rose-800'}`}>{ins.title}</div><div className="text-[11px] text-slate-600 mt-0.5">{ins.desc}</div></div>
+              </div>):<p className="text-sm text-slate-400 text-center py-4">Necesita más datos para generar insights</p>;
+            })()}
+          </div>
+        </div>
+
+        {/* Quick Numbers */}
+        <div className="col-span-4 space-y-3">
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Promedios Mensuales</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Ingreso Bruto</span><span className="text-[11px] font-bold text-blue-600">{fm(n>0?fRev/n:0)}/mes</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Gastos Operativos</span><span className="text-[11px] font-bold text-rose-500">{fm(n>0?fOpEx/n:0)}/mes</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Neto del PM</span><span className="text-[11px] font-bold text-emerald-600">{fm(n>0?fNet/n:0)}/mes</span></div>
+              {mMort>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Hipoteca</span><span className="text-[11px] font-bold text-red-500">{fm(mMort)}/mes</span></div>}
+              <div className="border-t border-slate-100 my-0.5"/>
+              <div className="flex justify-between"><span className="text-[11px] font-bold text-slate-600">Cash Flow</span><span className={`text-[11px] font-extrabold ${fCFmo>=0?'text-emerald-600':'text-rose-600'}`}>{fm(fCFmo)}/mes</span></div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Punto de Equilibrio</h3>
+            {(()=>{
+              const beMo=n>0?(fOpEx/n+mMort+insExp/Math.max(n,1)+taxExp/Math.max(n,1)):0;
+              const beNights=adr>0?Math.ceil(beMo/adr):0;
+              const avgNMo=fNights>0?Math.round(fNights/n):0;
+              const surplus=avgNMo-beNights;
+              return <div className="text-center">
+                <div className="text-3xl font-black text-slate-800">{beNights}</div>
+                <div className="text-[10px] text-slate-400">noches/mes para cubrir todos los costos</div>
+                <div className="text-xs text-slate-500 mt-1">Costos mensuales totales: {fm(beMo)}</div>
+                <div className="text-xs text-slate-500">ADR actual: {fm(adr)}/noche</div>
+                {avgNMo>0&&<div className={`text-xs font-bold mt-2 px-3 py-1 rounded-full inline-block ${surplus>=0?'bg-emerald-100 text-emerald-700':'bg-rose-100 text-rose-700'}`}>{surplus>=0?`+${surplus} noches de margen`:`${Math.abs(surplus)} noches de déficit`}</div>}
+              </div>;
+            })()}
+          </div>
+        </div>
+      </div>}
+
+      {/* ── ROW 4: Monthly Chart + Property + Seasonality ── */}
       <div className="grid grid-cols-12 gap-4 mb-4">
         <div className="col-span-7 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
           <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Rendimiento Mensual</h3>
