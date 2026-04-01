@@ -195,7 +195,7 @@ function LandingPage({onLogin}) {
           <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent"> decisiones inteligentes.</span>
         </h1>
         <p className="text-lg text-white/40 max-w-2xl mx-auto leading-relaxed mb-10">
-          Sube el PDF que te manda tu property manager y al instante ve el panorama real: dónde ganas, dónde pierdes, cuánto te come la hipoteca, y qué ajustar para que tu inversión sea más rentable.
+          Sube el PDF que te manda tu property manager y al instante ve el panorama real: dónde ganas, dónde pierdes, cuánto se lleva la hipoteca, y qué ajustar para que tu inversión sea más rentable.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button onClick={()=>onLogin('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl hover:from-blue-700 hover:to-blue-600 transition-all shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5">Analiza tu propiedad gratis</button>
