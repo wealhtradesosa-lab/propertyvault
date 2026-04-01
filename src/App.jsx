@@ -340,18 +340,18 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   // PDF Upload handler — with robust duplicate detection
   const handlePDFs=async(files)=>{
-    console.log('[UPLOAD] START — files:', files.length);
+    // CRITICAL: Convert FileList to Array IMMEDIATELY before any await
+    // FileList is a live reference — if the input is cleared, it becomes empty
+    const fileArr=Array.from(files);
+    console.log('[UPLOAD] START —', fileArr.length, 'files:', fileArr.map(f=>f.name));
     const log=[];
     const uploaded=new Set();
     let existingPeriods=new Set();
     try{
-      console.log('[UPLOAD] Checking existing statements...');
       const freshSnap=await getDocs(collection(db,'properties',propertyId,'statements'));
       existingPeriods=new Set(freshSnap.docs.map(d=>{const s=d.data();return s.year+'-'+s.month}));
-      console.log('[UPLOAD] Existing periods:', [...existingPeriods]);
     }catch(e){console.error('[UPLOAD] getDocs error:', e);}
 
-    const fileArr=Array.from(files);
     for(let fi=0; fi<fileArr.length; fi++){
       const f=fileArr[fi];
       console.log(`[UPLOAD] File ${fi+1}/${fileArr.length}: ${f.name}`);
@@ -1320,9 +1320,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <Upload size={32} className="text-blue-400 mx-auto mb-2"/>
         <div className="text-sm font-semibold text-blue-600">Haz clic aquí para seleccionar PDFs</div>
         <div className="text-xs text-slate-400 mt-1">Soporta múltiples archivos</div>
-        <input type="file" accept=".pdf" multiple className="hidden" onChange={e=>{
-          console.log('[UPLOAD] Files selected:', e.target.files.length);
-          if(e.target.files.length) handlePDFs(e.target.files);
+        <input type="file" accept=".pdf" multiple className="hidden" onChange={async e=>{
+          const f=e.target.files;
+          if(f&&f.length) await handlePDFs(f);
           e.target.value='';
         }}/>
       </label>
