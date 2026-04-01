@@ -382,7 +382,7 @@ function LandingPage({onLogin}) {
             <div className="flex items-baseline gap-1 mb-1"><span className="text-5xl font-black">${annual?'9':'12'}</span><span className="text-white/30 text-sm">/mes</span></div>
             {annual&&<div className="text-xs text-white/25 line-through">$12/mes</div>}
             <p className="text-sm text-white/30 mb-6 mt-3">Para optimizar tu inversión con inteligencia.</p>
-            <button onClick={()=>onLogin('register')} className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl text-sm font-bold text-white shadow-xl shadow-blue-600/25 hover:from-blue-700 hover:to-blue-600 transition-all">Comenzar con Starter</button>
+            <a href={annual?'https://buy.stripe.com/fZu4gA6PAgvs74Of8s2ZO03':'https://buy.stripe.com/7sY8wQddYa7488S9O82ZO01'} target="_blank" rel="noopener" className="block w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl text-sm font-bold text-white shadow-xl shadow-blue-600/25 hover:from-blue-700 hover:to-blue-600 transition-all text-center">Comenzar con Starter</a>
             <div className="mt-6 pt-5 border-t border-white/5 space-y-3 text-[13px] text-white/50">
               <div className="flex gap-2"><span className="text-blue-400">③</span>Hasta 3 propiedades</div>
               <div className="flex gap-2"><span className="text-emerald-400">✓</span>Dashboard completo</div>
@@ -400,7 +400,7 @@ function LandingPage({onLogin}) {
             <div className="flex items-baseline gap-1 mb-1"><span className="text-5xl font-black">${annual?'16':'21'}</span><span className="text-white/30 text-sm">/mes</span></div>
             {annual&&<div className="text-xs text-white/25 line-through">$21/mes</div>}
             <p className="text-sm text-white/30 mb-6 mt-3">Para portafolios serios con múltiples activos.</p>
-            <button onClick={()=>onLogin('register')} className="w-full py-3.5 bg-gradient-to-r from-slate-700 to-slate-600 border border-white/10 rounded-xl text-sm font-bold text-white hover:from-slate-600 hover:to-slate-500 transition-all">Ir a Pro</button>
+            <a href={annual?'https://buy.stripe.com/aFaeVe6PAfro60K8K42ZO04':'https://buy.stripe.com/9B6cN66PA6US1KuaSc2ZO00'} target="_blank" rel="noopener" className="block w-full py-3.5 bg-gradient-to-r from-slate-700 to-slate-600 border border-white/10 rounded-xl text-sm font-bold text-white hover:from-slate-600 hover:to-slate-500 transition-all text-center">Ir a Pro</a>
             <div className="mt-6 pt-5 border-t border-white/5 space-y-3 text-[13px] text-white/40">
               <div className="flex gap-2"><span className="text-purple-400">∞</span>Propiedades ilimitadas</div>
               <div className="flex gap-2"><span className="text-emerald-400">✓</span>Todo de Starter</div>
