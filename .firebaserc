@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "district-42394"
+  },
+  "targets": {
+    "district-42394": {
+      "hosting": {
+        "ownerdesk": [
+          "ownerdesk"
+        ]
+      }
+    }
   }
 }

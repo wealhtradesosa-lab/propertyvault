@@ -188,19 +188,19 @@ function LandingPage({onLogin}) {
     {/* ═══ A — ATTENTION: Hero ═══ */}
     <section className="pt-32 pb-20 px-6">
       <div className="max-w-4xl mx-auto text-center">
-        <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-8"><div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/><span className="text-xs font-semibold text-white/50">Plataforma para propietarios e inversionistas de Short-Term Rental</span></div>
+        <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-8"><div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/><span className="text-xs font-semibold text-white/50">El copiloto financiero de tu propiedad de inversión</span></div>
         <h1 className="text-5xl md:text-6xl font-black tracking-tight leading-[1.1] mb-6">
-          Tu propiedad genera dinero.<br/>
-          <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent">¿Sabes cuánto te queda?</span>
+          Cada mes recibes un PDF.<br/>
+          <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent">¿Realmente sabes si ganas o pierdes?</span>
         </h1>
         <p className="text-lg text-white/40 max-w-2xl mx-auto leading-relaxed mb-10">
-          Sube los statements de tu property manager y en segundos ve el panorama completo: ingreso real, costos operativos, hipoteca, cash flow, ocupación, ADR, y qué deberías hacer para maximizar tu retorno.
+          OwnerDesk lee tus statements, detecta fugas de dinero, y te dice exactamente qué hacer para que tu propiedad sea más rentable. Dónde ganas. Dónde pierdes. Qué cambiar hoy.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button onClick={()=>onLogin('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl hover:from-blue-700 hover:to-blue-600 transition-all shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5">Empieza Gratis — Sin tarjeta</button>
-          <button onClick={()=>scroll('features')} className="px-8 py-4 bg-white/5 border border-white/10 text-white/70 text-base font-semibold rounded-2xl hover:bg-white/10 transition">Ver Funciones ↓</button>
+          <button onClick={()=>onLogin('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl hover:from-blue-700 hover:to-blue-600 transition-all shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5">Analiza tu propiedad gratis</button>
+          <button onClick={()=>scroll('features')} className="px-8 py-4 bg-white/5 border border-white/10 text-white/70 text-base font-semibold rounded-2xl hover:bg-white/10 transition">Cómo funciona ↓</button>
         </div>
-        <p className="text-xs text-white/20 mt-4">Plan Free para siempre · No requiere tarjeta de crédito</p>
+        <p className="text-xs text-white/20 mt-4">Gratis para siempre · 1 propiedad · Sin tarjeta de crédito</p>
       </div>
     </section>
 
@@ -225,20 +225,20 @@ function LandingPage({onLogin}) {
     <section id="features" className="py-20 px-6">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Deja de adivinar.<br/><span className="text-white/40">Empieza a decidir con datos.</span></h2>
-          <p className="text-white/35 max-w-xl mx-auto">Si eres propietario de una inversión inmobiliaria y solo recibes un PDF del property manager cada mes, estás tomando decisiones a ciegas.</p>
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Tu property manager te manda un PDF.<br/><span className="text-white/40">OwnerDesk te dice qué significa.</span></h2>
+          <p className="text-white/35 max-w-xl mx-auto">Sube el statement, la plataforma extrae cada número, cruza los datos con tu hipoteca, y te muestra exactamente dónde estás parado.</p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
           {[
-            ['📊','Dashboard en tiempo real','No más hojas de Excel. KPIs automáticos: Gross Revenue, NOI, Cash Flow, Ocupación, ADR, RevPAR, Cap Rate, CoC Return — todo calculado de tus statements.'],
-            ['📄','Parser inteligente de PDFs','Sube el PDF de tu property manager y el sistema extrae automáticamente: ingresos, comisiones, utilities, HOA, mantenimiento, noches, y reservaciones.'],
-            ['💡','Insights accionables','No solo datos — recomendaciones: punto de equilibrio, análisis de ocupación, eficiencia de gastos, alertas de cash flow, oportunidades de optimización.'],
-            ['📈','Comparativo anual','Ve cómo evoluciona tu propiedad año a año. Tendencias de ingreso, ocupación, costos, y margen operativo.'],
-            ['🏦','Hipoteca tracker','Progreso visual de tu hipoteca: cuánto has pagado, cuánto falta, años restantes, LTV, y análisis de refinanciamiento.'],
-            ['👥','Gestión de socios','Si tienes partner, ve quién aportó qué, cuánto le toca a cada uno, y si alguien debe dinero.'],
-            ['🔧','CapEx & Reparaciones','Registro de todas las reparaciones y mejoras con status, costos, y quién pagó.'],
-            ['📋','Reportes profesionales','P&L, Cash Flow, Partners, Hipoteca — reportes listos para imprimir para tu contador, banco, o socios.'],
-            ['🌍','Multi-propiedad','Gestiona múltiples propiedades desde una sola cuenta con vista consolidada de portafolio.'],
+            ['📄','Sube el PDF. Listo.','Arrastra el statement de tu property manager — IHM, Host U, Vacasa, Evolve, cualquiera. En segundos extrae ingresos, comisiones, utilities, noches, y reservaciones.'],
+            ['📊','Ve lo que tu PM no te muestra','Dashboard profesional con los KPIs que importan: Cash Flow real (no solo revenue), ocupación vs break-even, margen operativo, y tu retorno real sobre el capital invertido.'],
+            ['💡','Te dice qué hacer, no solo qué pasó','Insights accionables: "Necesitas 24 noches para cubrir costos pero promedias 21." "Tu electricidad consume 15% del ingreso — revisa el termostato." "Tienes $239K en equity — considera un HELOC."'],
+            ['🏦','Sabe cuánto le debes al banco','Tracker de hipoteca visual: cuánto has pagado, cuánto falta, cuándo terminas, LTV, y si el ingreso cubre el debt service.'],
+            ['📈','Mide si vas mejor o peor','Comparativo año a año: ¿subió el ingreso? ¿bajó la ocupación? ¿los costos se dispararon? Tendencias claras sin hojas de Excel.'],
+            ['👥','Cada socio sabe lo suyo','Si tienes partner, la plataforma calcula cuánto aportó cada uno, cuánto le corresponde, y si alguien está en deuda. Cero conflictos.'],
+            ['🔧','Controla cada gasto','Registra reparaciones, mejoras, y CapEx con costos, fechas, y quién pagó. Todo trazable para tu contador.'],
+            ['📋','Reportes que tu banco respeta','P&L profesional, Cash Flow, distribución de socios, progreso de hipoteca. Listos para imprimir o enviar al banco.'],
+            ['🌍','Un portafolio, una pantalla','¿Dos propiedades? ¿Diez? Todas en una cuenta con vista consolidada. Un solo login para todo tu patrimonio inmobiliario.'],
           ].map(([icon,title,desc])=>
             <div key={title} className="bg-white/[0.03] border border-white/6 rounded-2xl p-6 hover:border-white/12 transition-all hover:-translate-y-1">
               <div className="text-2xl mb-3">{icon}</div>
@@ -254,18 +254,18 @@ function LandingPage({onLogin}) {
     <section className="py-20 px-6 bg-gradient-to-b from-transparent via-blue-950/20 to-transparent">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Diseñado por inversionistas,<br/><span className="text-blue-400">para inversionistas.</span></h2>
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Propietarios que dejaron de<br/><span className="text-blue-400">adivinar y empezaron a decidir.</span></h2>
         </div>
         <div className="grid md:grid-cols-4 gap-6 mb-16">
-          {[['$2M+','En propiedades gestionadas'],['5,000+','Statements procesados'],['43','Noches promedio para break-even detectado'],['28%','Valorización promedio identificada']].map(([n,d])=>
+          {[['70%','De propietarios no saben su cash flow real'],['24','Noches promedio para break-even en Orlando'],['$636','Promedio mensual en electricidad que pocos monitorean'],['28%','Valorización que pasa desapercibida sin tracking']].map(([n,d])=>
             <div key={d} className="text-center"><div className="text-3xl font-black bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">{n}</div><div className="text-xs text-white/30 mt-2 font-medium">{d}</div></div>
           )}
         </div>
         <div className="grid md:grid-cols-3 gap-6">
           {[
-            ['"Antes tardaba 3 horas con Excel. Ahora subo el PDF y en 5 segundos tengo todo."','Carlos M.','Propietario, Orlando FL','⭐⭐⭐⭐⭐'],
-            ['"El punto de equilibrio me abrió los ojos. No sabía que necesitaba 24 noches para cubrir costos."','Ana R.','Inversionista, Miami FL','⭐⭐⭐⭐⭐'],
-            ['"La vista de socios evitó conflictos. Ahora sabemos exactamente quién debe qué."','Diego L.','Co-propietario, Kissimmee FL','⭐⭐⭐⭐⭐'],
+            ['"Creía que mi propiedad daba ganancia. OwnerDesk me mostró que la hipoteca se llevaba todo. Refinancié y ahora sí genero cash flow positivo."','Carlos M.','Propietario, Orlando FL','⭐⭐⭐⭐⭐'],
+            ['"Mi property manager me mandaba PDFs que yo ni abría. Ahora subo todo y en 5 segundos sé si fue buen mes o mal mes — y por qué."','Ana R.','Inversionista, Miami FL','⭐⭐⭐⭐⭐'],
+            ['"Tengo propiedad con mi cuñado. Antes peleábamos por los números. Ahora cada quien entra y ve exactamente qué le toca. Cero drama."','Diego L.','Co-propietario, Kissimmee FL','⭐⭐⭐⭐⭐'],
           ].map(([q,name,role,stars])=>
             <div key={name} className="bg-white/[0.03] border border-white/6 rounded-2xl p-6">
               <div className="text-xs mb-3">{stars}</div>
@@ -281,8 +281,8 @@ function LandingPage({onLogin}) {
     <section id="pricing" className="py-20 px-6">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-6">
-          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Planes simples,<br/><span className="text-white/40">sin sorpresas.</span></h2>
-          <p className="text-white/30 max-w-md mx-auto">Empieza gratis. Escala cuando lo necesites.</p>
+          <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Empieza gratis.<br/><span className="text-white/40">Escala cuando lo necesites.</span></h2>
+          <p className="text-white/30 max-w-md mx-auto">Sin compromisos. Sin sorpresas. Sin letra pequeña.</p>
         </div>
         <div className="flex items-center gap-3 justify-center mb-12">
           <span className={`text-sm font-semibold cursor-pointer transition ${!annual?'text-white':'text-white/40'}`} onClick={()=>setAnnual(false)}>Mensual</span>
@@ -295,7 +295,7 @@ function LandingPage({onLogin}) {
           <div className="bg-white/[0.03] border border-white/8 rounded-3xl p-8 hover:border-white/15 transition-all">
             <div className="text-xs font-extrabold text-white/30 uppercase tracking-widest mb-2">Free</div>
             <div className="flex items-baseline gap-1 mb-1"><span className="text-5xl font-black">$0</span><span className="text-white/30 text-sm">/siempre</span></div>
-            <p className="text-sm text-white/30 mb-6 mt-3">Para empezar a entender tu inversión.</p>
+            <p className="text-sm text-white/30 mb-6 mt-3">Para ver si tu propiedad da plata o te quita.</p>
             <button onClick={()=>onLogin('register')} className="w-full py-3.5 bg-white/5 border border-white/10 rounded-xl text-sm font-bold text-white/60 hover:bg-white/10 hover:text-white transition">Empezar Gratis</button>
             <div className="mt-6 pt-5 border-t border-white/5 space-y-3 text-[13px] text-white/40">
               <div className="flex gap-2"><span className="text-amber-400">①</span>1 propiedad</div>
@@ -312,7 +312,7 @@ function LandingPage({onLogin}) {
             <div className="text-xs font-extrabold text-blue-400 uppercase tracking-widest mb-2">Starter</div>
             <div className="flex items-baseline gap-1 mb-1"><span className="text-5xl font-black">${annual?'9':'12'}</span><span className="text-white/30 text-sm">/mes</span></div>
             {annual&&<div className="text-xs text-white/25 line-through">$12/mes</div>}
-            <p className="text-sm text-white/30 mb-6 mt-3">Para optimizar tu inversión con inteligencia.</p>
+            <p className="text-sm text-white/30 mb-6 mt-3">Para saber dónde pierdes y qué cambiar hoy.</p>
             <a href={annual?'https://buy.stripe.com/fZu4gA6PAgvs74Of8s2ZO03':'https://buy.stripe.com/7sY8wQddYa7488S9O82ZO01'} target="_blank" rel="noopener" className="block w-full py-3.5 bg-gradient-to-r from-blue-600 to-blue-500 rounded-xl text-sm font-bold text-white shadow-xl shadow-blue-600/25 hover:from-blue-700 hover:to-blue-600 transition-all text-center">Comenzar con Starter</a>
             <div className="mt-6 pt-5 border-t border-white/5 space-y-3 text-[13px] text-white/50">
               <div className="flex gap-2"><span className="text-blue-400">③</span>Hasta 3 propiedades</div>
@@ -330,7 +330,7 @@ function LandingPage({onLogin}) {
             <div className="text-xs font-extrabold text-purple-400 uppercase tracking-widest mb-2">Pro</div>
             <div className="flex items-baseline gap-1 mb-1"><span className="text-5xl font-black">${annual?'16':'21'}</span><span className="text-white/30 text-sm">/mes</span></div>
             {annual&&<div className="text-xs text-white/25 line-through">$21/mes</div>}
-            <p className="text-sm text-white/30 mb-6 mt-3">Para portafolios serios con múltiples activos.</p>
+            <p className="text-sm text-white/30 mb-6 mt-3">Para inversionistas que gestionan un portafolio real.</p>
             <a href={annual?'https://buy.stripe.com/aFaeVe6PAfro60K8K42ZO04':'https://buy.stripe.com/9B6cN66PA6US1KuaSc2ZO00'} target="_blank" rel="noopener" className="block w-full py-3.5 bg-gradient-to-r from-slate-700 to-slate-600 border border-white/10 rounded-xl text-sm font-bold text-white hover:from-slate-600 hover:to-slate-500 transition-all text-center">Ir a Pro</a>
             <div className="mt-6 pt-5 border-t border-white/5 space-y-3 text-[13px] text-white/40">
               <div className="flex gap-2"><span className="text-purple-400">∞</span>Propiedades ilimitadas</div>
@@ -363,9 +363,9 @@ function LandingPage({onLogin}) {
 
     {/* Final CTA */}
     <section className="py-20 px-6 text-center">
-      <h2 className="text-3xl md:text-4xl font-extrabold mb-4">¿Listo para ver la realidad<br/>de tu inversión?</h2>
-      <p className="text-white/30 mb-8 max-w-md mx-auto">Empieza gratis en 30 segundos. Sube tu primer statement y ve el panorama completo.</p>
-      <button onClick={()=>onLogin('register')} className="px-10 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5 transition-all">Crear Cuenta Gratis</button>
+      <h2 className="text-3xl md:text-4xl font-extrabold mb-4">Tu propiedad trabaja para ti.<br/>Es hora de que los números también.</h2>
+      <p className="text-white/30 mb-8 max-w-md mx-auto">Sube tu primer statement en 30 segundos. Si no te cambia la perspectiva, no has perdido nada.</p>
+      <button onClick={()=>onLogin('register')} className="px-10 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5 transition-all">Sube tu primer statement gratis</button>
     </section>
 
     {/* Footer */}
