@@ -105,9 +105,9 @@ async function parsePDF(file) {
     text: items.sort((a,b)=>a.x-b.x).map(i=>i.text).join(' ')
   })).sort((a,b)=>a.page===b.page?b.y-a.y:a.page-b.page);
 
-  // ═══ DETECT FORMAT ═══
+  // ═══ DETECT FORMAT (v2 — Host U first) ═══
+  const isHostU = /Host\s*U|PMC commission|Rental Income.*Management Fee/is.test(fullText);
   const isIHM = /Year:\s*\d{4}\s*Period:\s*\d+/.test(fullText);
-  const isHostU = /Host\s*U|PMC commission/i.test(fullText);
   const monthMap = {January:1,February:2,March:3,April:4,May:5,June:6,July:7,August:8,September:9,October:10,November:11,December:12};
 
   // ═══ COMMON: Nights & Reservations ═══
@@ -116,6 +116,34 @@ async function parsePDF(file) {
   if(nightMatches) nightMatches.forEach(m=>{const n=parseInt(m);if(n>0&&n<60)nights+=n});
   const resMatch=fullText.match(/(\d+)\s*reservations?/i);
   const reservations=resMatch?parseInt(resMatch[1]):(fullText.match(/Reservation\s*#/gi)||[]).length;
+
+  // ═══ HOST U FORMAT (check first — simpler format) ═══
+  if(isHostU&&!isIHM){
+    const dateMatch=fullText.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i);
+    if(!dateMatch) return {error:'No se encontró fecha en el statement de Host U'};
+    const year=parseInt(dateMatch[2]),month=monthMap[dateMatch[1]];
+
+    const findVal=(label,exclude)=>{
+      const lbl=label.toLowerCase();
+      const exc=exclude?exclude.toLowerCase():null;
+      for(const row of rows){
+        const rt=row.text.toLowerCase();
+        if(!rt.includes(lbl)) continue;
+        if(exc&&rt.includes(exc)) continue;
+        const amounts=row.text.match(/-?\$([\d,]+\.\d{2})/g);
+        if(amounts&&amounts.length>0) return parseFloat(amounts[0].replace(/[$,-]/g,''));
+      }
+      return 0;
+    };
+
+    const revenue=findVal('Rental Income');
+    const commissionFee=findVal('Management Fee');
+    const management=findVal('Management','Management Fee');
+    const supplies=findVal('Supplies');
+    const net=findVal('Payment due to owner')||findVal('Ending balance')||findVal('Statement balance');
+
+    return {year,month,revenue,commission:commissionFee,duke:0,water:0,hoa:0,maintenance:0,vendor:management+supplies,net,nights,reservations,pool:0,roomCharge:revenue,format:'HostU'};
+  }
 
   // ═══ IHM FORMAT (Insight Hospitality Management) ═══
   if(isIHM){
@@ -148,34 +176,6 @@ async function parsePDF(file) {
     if(!net&&revenue>0){net=revenue-commission-duke-water-hoa-maintenance-vendorOther;if(net<0)net=0;}
 
     return {year,month,revenue,commission,duke,water,hoa,maintenance,vendor:vendorOther,net,nights,reservations,pool,roomCharge,format:'IHM'};
-  }
-
-  // ═══ HOST U FORMAT ═══
-  if(isHostU){
-    const dateMatch=fullText.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i);
-    if(!dateMatch) return {error:'No se encontró fecha en el statement de Host U'};
-    const year=parseInt(dateMatch[2]),month=monthMap[dateMatch[1]];
-
-    const findVal=(label,exclude)=>{
-      const lbl=label.toLowerCase();
-      const exc=exclude?exclude.toLowerCase():null;
-      for(const row of rows){
-        const rt=row.text.toLowerCase();
-        if(!rt.includes(lbl)) continue;
-        if(exc&&rt.includes(exc)) continue;
-        const amounts=row.text.match(/-?\$([\d,]+\.\d{2})/g);
-        if(amounts&&amounts.length>0) return parseFloat(amounts[0].replace(/[$,-]/g,''));
-      }
-      return 0;
-    };
-
-    const revenue=findVal('Rental Income');
-    const commissionFee=findVal('Management Fee');
-    const management=findVal('Management','Management Fee');
-    const supplies=findVal('Supplies');
-    const net=findVal('Payment due to owner')||findVal('Ending balance')||findVal('Statement balance');
-
-    return {year,month,revenue,commission:commissionFee,duke:0,water:0,hoa:0,maintenance:0,vendor:management+supplies,net,nights,reservations,pool:0,roomCharge:revenue,format:'HostU'};
   }
 
   // ═══ GENERIC FALLBACK ═══
