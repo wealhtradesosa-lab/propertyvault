@@ -88,8 +88,7 @@ async function parsePDF(file) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({data: new Uint8Array(buf)}).promise;
 
-  let allItems = [];
-  let fullText = '';
+  let allItems = [], fullText = '';
   for (let i=1; i<=pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
@@ -99,139 +98,95 @@ async function parsePDF(file) {
     fullText += content.items.map(it=>it.str).join(' ') + '\n';
   }
 
-  // Year & Period
-  const ym = fullText.match(/Year:\s*(\d{4})\s*Period:\s*(\d+)/);
-  if (!ym || parseInt(ym[2])===0) return {error:'No es statement mensual (Period 0 o no encontrado)'};
-  const year=parseInt(ym[1]), month=parseInt(ym[2]);
-
-  // Build rows by page + Y coordinate
   const rowMap = {};
-  allItems.forEach(it => {
-    const key = it.page + '_' + Math.round(it.y / 3) * 3;
-    if (!rowMap[key]) rowMap[key] = [];
-    rowMap[key].push(it);
-  });
-  const rows = Object.entries(rowMap).map(([key, items]) => ({
-    key,
-    page: parseInt(key.split('_')[0]),
-    y: parseInt(key.split('_')[1]),
-    items: items.sort((a,b) => a.x - b.x),
-    text: items.sort((a,b) => a.x - b.x).map(i=>i.text).join(' ')
-  })).sort((a,b) => a.page===b.page ? b.y-a.y : a.page-b.page);
+  allItems.forEach(it => { const key=it.page+'_'+Math.round(it.y/3)*3; if(!rowMap[key])rowMap[key]=[]; rowMap[key].push(it); });
+  const rows = Object.entries(rowMap).map(([key,items])=>({
+    key, page:parseInt(key.split('_')[0]), y:parseInt(key.split('_')[1]),
+    text: items.sort((a,b)=>a.x-b.x).map(i=>i.text).join(' ')
+  })).sort((a,b)=>a.page===b.page?b.y-a.y:a.page-b.page);
 
-  // ═══ STRATEGY: Parse from Transaction Summary (consolidated totals) ═══
-  // Transaction Summary rows have NO date prefix and usually TWO amounts (Period + YTD)
-  const findSummary = (label) => {
-    const lbl = label.toLowerCase();
-    for (const row of rows) {
-      if (!row.text.toLowerCase().includes(lbl)) continue;
-      // Skip detail rows (they start with a date like 02/04/2026)
-      if (/^\d{2}\/\d{2}\/\d{4}/.test(row.text.trim())) continue;
-      const amounts = row.text.match(/\$?-?([\d,]+\.\d{2})/g);
-      if (amounts && amounts.length >= 1) {
-        // First amount = Period column, second = YTD
-        const val = parseFloat(amounts[0].replace(/[$,-]/g, ''));
-        if (val > 0) return val;
-      }
-    }
-    return 0;
-  };
+  // ═══ DETECT FORMAT ═══
+  const isIHM = /Year:\s*\d{4}\s*Period:\s*\d+/.test(fullText);
+  const isHostU = /Host\s*U|PMC commission/i.test(fullText);
+  const monthMap = {January:1,February:2,March:3,April:4,May:5,June:6,July:7,August:8,September:9,October:10,November:11,December:12};
 
-  // For items in the detail section (have date prefix)
-  const findDetail = (label) => {
-    const lbl = label.toLowerCase();
-    for (const row of rows) {
-      if (!row.text.toLowerCase().includes(lbl)) continue;
-      if (!/^\d{2}\/\d{2}\/\d{4}/.test(row.text.trim())) continue;
-      const amounts = row.text.match(/\$?([\d,]+\.\d{2})/g);
-      if (amounts && amounts.length > 0) {
-        return parseFloat(amounts[0].replace(/[$,]/g, ''));
-      }
-    }
-    return 0;
-  };
+  // ═══ COMMON: Nights & Reservations ═══
+  let nights=0;
+  const nightMatches=fullText.match(/(\d+)\s*nights?/gi);
+  if(nightMatches) nightMatches.forEach(m=>{const n=parseInt(m);if(n>0&&n<60)nights+=n});
+  const resMatch=fullText.match(/(\d+)\s*reservations?/i);
+  const reservations=resMatch?parseInt(resMatch[1]):(fullText.match(/Reservation\s*#/gi)||[]).length;
 
-  // ═══ GROSS REVENUE from Transaction Summary ═══
-  const roomCharge = findSummary('Room Charge');
-  const pool = findSummary('Pool Heat');
-  let revenue = roomCharge + pool;
-  // Fallback: sum individual Room Charges if no summary
-  if (!revenue) {
-    rows.forEach(r => {
-      if (r.text.toLowerCase().includes('room charge') && /^\d{2}\//.test(r.text.trim())) {
-        const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
-        if (amounts) revenue += parseFloat(amounts[0].replace(/[$,]/g, ''));
-      }
-    });
+  // ═══ IHM FORMAT (Insight Hospitality Management) ═══
+  if(isIHM){
+    const ym=fullText.match(/Year:\s*(\d{4})\s*Period:\s*(\d+)/);
+    if(!ym||parseInt(ym[2])===0) return {error:'No es statement mensual (Period 0)'};
+    const year=parseInt(ym[1]),month=parseInt(ym[2]);
+
+    const findSummary=(label)=>{const lbl=label.toLowerCase();for(const row of rows){if(!row.text.toLowerCase().includes(lbl))continue;if(/^\d{2}\/\d{2}\/\d{4}/.test(row.text.trim()))continue;const amounts=row.text.match(/\$?-?([\d,]+\.\d{2})/g);if(amounts&&amounts.length>=1){const val=parseFloat(amounts[0].replace(/[$,-]/g,''));if(val>0)return val;}}return 0;};
+
+    const roomCharge=findSummary('Room Charge'), pool=findSummary('Pool Heat');
+    const revenue=roomCharge+pool;
+    const commission=findSummary('Commission');
+    const hoa=findSummary('HOA')||findSummary('Association');
+    const maintenance=findSummary('Maintenance');
+    const vendorTotal=findSummary('Vendor Bills')||findSummary('Vendor');
+
+    let duke=0;
+    rows.forEach(r=>{const rt=r.text.toLowerCase();if((rt.includes('duke')||rt.includes('energy'))&&!rt.includes('commission')&&/^\d{2}\//.test(r.text.trim())){const a=r.text.match(/\$?([\d,]+\.\d{2})/g);if(a){const v=parseFloat(a[0].replace(/[$,]/g,''));if(v>0&&v<2000)duke+=v;}}});
+    if(!duke){rows.forEach(r=>{const rt=r.text.toLowerCase();if((rt.includes('duke')||rt.includes('electric'))&&!rt.includes('commission')&&!/^\d{2}\//.test(r.text.trim())){const a=r.text.match(/\$?-?([\d,]+\.\d{2})/g);if(a){const v=parseFloat(a[0].replace(/[$,-]/g,''));if(v>0&&v<2000)duke=v;}}});}
+
+    let water=0;
+    rows.forEach(r=>{const rt=r.text.toLowerCase();if((rt.includes('toho')||(rt.includes('water')&&!rt.includes('pool')))&&/^\d{2}\//.test(r.text.trim())){const a=r.text.match(/\$?([\d,]+\.\d{2})/g);if(a){const v=parseFloat(a[0].replace(/[$,]/g,''));if(v>0&&v<500)water+=v;}}});
+    if(!water){const w=findSummary('Toho');if(w)water=w;else{const w2=findSummary('Water');if(w2)water=w2;}}
+
+    const vendorOther=Math.max(0,vendorTotal-duke-water);
+
+    let net=0;
+    rows.forEach(r=>{if(r.text.toLowerCase().includes('ach')&&r.text.toLowerCase().includes('payment')&&/^\d{2}\//.test(r.text.trim())){const a=r.text.match(/\$?([\d,]+\.\d{2})/g);if(a)net=parseFloat(a[0].replace(/[$,]/g,''));}});
+    if(!net) net=findSummary('Payments To Owner')||findSummary('Payment to Owner');
+    if(!net&&revenue>0){net=revenue-commission-duke-water-hoa-maintenance-vendorOther;if(net<0)net=0;}
+
+    return {year,month,revenue,commission,duke,water,hoa,maintenance,vendor:vendorOther,net,nights,reservations,pool,roomCharge,format:'IHM'};
   }
 
-  // ═══ OPERATING EXPENSES from Transaction Summary ═══
-  const commission = findSummary('Commission');
-  const hoa = findSummary('HOA') || findSummary('Association');
-  const maintenance = findSummary('Mantenimiento');
-  const vendorTotal = findSummary('Vendor Bills') || findSummary('Vendor');
+  // ═══ HOST U FORMAT ═══
+  if(isHostU){
+    const dateMatch=fullText.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i);
+    if(!dateMatch) return {error:'No se encontró fecha en el statement de Host U'};
+    const year=parseInt(dateMatch[2]),month=monthMap[dateMatch[1]];
 
-  // ═══ DUKE & WATER from detail lines (Vendor Bills breakdown) ═══
-  let duke = 0;
-  rows.forEach(r => {
-    const rt = r.text.toLowerCase();
-    if ((rt.includes('duke') || rt.includes('electric') || rt.includes('energy')) 
-        && !rt.includes('commission') && !rt.includes('transaction') && !rt.includes('summary')
-        && /^\d{2}\//.test(r.text.trim())) {
-      const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
-      if (amounts) { const v=parseFloat(amounts[0].replace(/[$,]/g,'')); if(v>0&&v<2000) duke+=v; }
-    }
-  });
-  // Fallback: search non-detail rows but exclude Transaction Summary row
-  if (!duke) {
-    rows.forEach(r => {
-      const rt = r.text.toLowerCase();
-      if ((rt.includes('duke') || rt.includes('electric')) && !rt.includes('commission') && !/^\d{2}\//.test(r.text.trim())) {
-        const amounts = r.text.match(/\$?-?([\d,]+\.\d{2})/g);
-        if (amounts) { const v=parseFloat(amounts[0].replace(/[$,-]/g,'')); if(v>0&&v<2000) duke=v; }
+    const findVal=(label)=>{
+      const lbl=label.toLowerCase();
+      for(const row of rows){
+        if(!row.text.toLowerCase().includes(lbl)) continue;
+        const amounts=row.text.match(/-?\$([\d,]+\.\d{2})/g);
+        if(amounts&&amounts.length>0) return parseFloat(amounts[0].replace(/[$,-]/g,''));
       }
-    });
+      return 0;
+    };
+
+    const revenue=findVal('Rental Income');
+    const commissionFee=findVal('Management Fee');
+    const mgmt=findVal('Management');
+    const management=(mgmt>0&&mgmt!==commissionFee)?mgmt:0;
+    const supplies=findVal('Supplies');
+    const net=findVal('Payment due to owner')||findVal('Ending balance')||findVal('Statement balance');
+
+    return {year,month,revenue,commission:commissionFee,duke:0,water:0,hoa:0,maintenance:0,vendor:management+supplies,net,nights,reservations,pool:0,roomCharge:revenue,format:'HostU'};
   }
 
-  let water = 0;
-  rows.forEach(r => {
-    const rt = r.text.toLowerCase();
-    if ((rt.includes('toho') || (rt.includes('water') && !rt.includes('pool') && !rt.includes('heater')))
-        && /^\d{2}\//.test(r.text.trim())) {
-      const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
-      if (amounts) { const v=parseFloat(amounts[0].replace(/[$,]/g,'')); if(v>0&&v<500) water+=v; }
-    }
-  });
-  if (!water) water = findSummary('Toho') || findSummary('Water');
+  // ═══ GENERIC FALLBACK ═══
+  const genericDate=fullText.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i);
+  if(!genericDate) return {error:'Formato no reconocido. Soportamos: IHM (Insight Hospitality) y Host U. Ingresa los datos manualmente.'};
+  const year=parseInt(genericDate[2]),month=monthMap[genericDate[1]];
 
-  // Vendor "other" = vendorTotal - duke - water (linen, supplies, etc.)
-  const vendorOther = Math.max(0, vendorTotal - duke - water);
+  const findAny=(labels)=>{for(const lbl of labels){for(const row of rows){if(row.text.toLowerCase().includes(lbl.toLowerCase())){const a=row.text.match(/-?\$([\d,]+\.\d{2})/g);if(a)return parseFloat(a[0].replace(/[$,-]/g,''));}}}return 0;};
+  const revenue=findAny(['Rental Income','Room Charge','Gross Revenue','Total Income','Revenue']);
+  const commission=findAny(['Commission','Management Fee','PM Fee','PMC commission']);
+  const net=findAny(['Payment due to owner','Payments To Owner','Net to Owner','ACH Payment','Ending balance']);
 
-  // ═══ ACH PAYMENT (what was deposited to owner) ═══
-  let net = 0;
-  // Look for ACH Payment detail line
-  rows.forEach(r => {
-    if (r.text.toLowerCase().includes('ach') && r.text.toLowerCase().includes('payment') && /^\d{2}\//.test(r.text.trim())) {
-      const amounts = r.text.match(/\$?([\d,]+\.\d{2})/g);
-      if (amounts) net = parseFloat(amounts[0].replace(/[$,]/g, ''));
-    }
-  });
-  // Fallback: Payments To Owner from Transaction Summary
-  if (!net) net = findSummary('Payments To Owner') || findSummary('Payment to Owner');
-  // Last resort: calculate
-  if (!net && revenue > 0) {
-    net = revenue - commission - duke - water - hoa - maintenance - vendorOther;
-    if (net < 0) net = 0;
-  }
-
-  // ═══ NIGHTS & RESERVATIONS ═══
-  let nights = 0;
-  const nightMatches = fullText.match(/(\d+)\s*Nights?/gi);
-  if (nightMatches) nightMatches.forEach(m => { const n=parseInt(m); if(n>0&&n<60) nights+=n; });
-  const reservations = (fullText.match(/Reservation\s*#/gi)||[]).length;
-
-
-  return {year, month, revenue, commission, duke, water, hoa, maintenance, vendor: vendorOther, net, nights, reservations, pool, roomCharge};
+  return {year,month,revenue,commission,duke:0,water:0,hoa:0,maintenance:0,vendor:0,net:net||Math.max(0,revenue-commission),nights,reservations,pool:0,roomCharge:revenue,format:'Generic'};
 }
 
 // ═══ LANDING PAGE (AIDA Methodology) ═══
