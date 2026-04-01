@@ -337,8 +337,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   // PDF Upload handler — with robust duplicate detection
   const handlePDFs=async(files)=>{
-    console.log('[UPLOAD] handlePDFs called with', files.length, 'files');
-    alert('Procesando ' + files.length + ' archivo(s)...');
+    console.log('[UPLOAD] Processing', files.length, 'files');
     const log=[];
     const uploaded=new Set();
     let existingPeriods=new Set();
