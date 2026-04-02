@@ -59,9 +59,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   // PDF Upload handler — with robust duplicate detection
   const handlePDFs=async(files)=>{
-    // CRITICAL: Convert FileList to Array IMMEDIATELY before any await
-    // FileList is a live reference — if the input is cleared, it becomes empty
     const fileArr=Array.from(files);
+    if(fileArr.length>15){alert(`Máximo 15 PDFs a la vez. Seleccionaste ${fileArr.length}.`);return;}
     const log=[];
     const uploaded=new Set();
     let existingPeriods=new Set();
@@ -1032,6 +1031,33 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <p className="text-[10px] text-slate-400 mt-2">El email del socio le permite acceder a esta propiedad con su propia cuenta de OwnerDesk.</p>
       </div>
 
+      {/* Data Export */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl mt-4">
+        <h3 className="text-base font-bold text-slate-700 mb-2">Exportar Datos</h3>
+        <p className="text-xs text-slate-400 mb-4">Descarga un respaldo completo de tu propiedad.</p>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={()=>{
+            const data={property:{name:prop.name,address:prop.address,city:prop.city,state:prop.state,purchasePrice:prop.purchasePrice,type:prop.type},
+              statements:stmts.map(s=>({periodo:`${M[s.month-1]} ${s.year}`,revenue:s.revenue,commission:s.commission,duke:s.duke,water:s.water,hoa:s.hoa,maintenance:s.maintenance,vendor:s.vendor,net:s.net,nights:s.nights,reservations:s.reservations})),
+              expenses:expenses.map(e=>({fecha:e.date,concepto:e.concept,monto:e.amount,categoria:e.category,tipo:e.type})),
+              contributions:contribs.map(c=>({fecha:c.date,concepto:c.concept,monto:c.amount})),
+              valuations:valuations.map(v=>({fecha:v.date,valor:v.value,fuente:v.source})),
+              repairs:repairs.map(r=>({fecha:r.date,titulo:r.title,monto:r.amount,vendor:r.vendor,estado:r.status})),
+              partners:partners.map(p=>({nombre:p.name,participacion:p.ownership,capital:p.initialCapital})),
+              exportDate:new Date().toISOString()};
+            const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+            const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`ownerdesk-${prop.name?.replace(/\s+/g,'-')||'export'}-${new Date().toISOString().split('T')[0]}.json`;a.click();URL.revokeObjectURL(url);
+          }} className="px-5 py-3 bg-slate-700 text-white rounded-xl font-bold text-sm hover:bg-slate-800 active:bg-slate-900 transition flex items-center gap-2">📦 Exportar JSON</button>
+          <button onClick={()=>{
+            if(!stmts.length){alert('No hay statements para exportar');return}
+            const header='Periodo,Revenue,Comision,Electricidad,Agua,HOA,Mantenimiento,Otros,Net,Noches,Reservaciones\n';
+            const rows=stmts.sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>`${M[s.month-1]} ${s.year},${s.revenue||0},${s.commission||0},${s.duke||0},${s.water||0},${s.hoa||0},${s.maintenance||0},${s.vendor||0},${s.net||0},${s.nights||0},${s.reservations||0}`).join('\n');
+            const blob=new Blob([header+rows],{type:'text/csv'});
+            const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`statements-${prop.name?.replace(/\s+/g,'-')||'export'}-${new Date().toISOString().split('T')[0]}.csv`;a.click();URL.revokeObjectURL(url);
+          }} className="px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 active:bg-emerald-800 transition flex items-center gap-2">📊 Statements CSV</button>
+        </div>
+      </div>
+
       {/* Danger zone */}
       <div className="bg-rose-50 rounded-2xl border border-rose-200 p-6 max-w-2xl mt-4">
         <h3 className="text-base font-bold text-rose-700 mb-2">Zona de Peligro</h3>
@@ -1209,14 +1235,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     </Mdl>}
 
     {modal==='contribution'&&<Mdl title={editId?'✏️ Editar Aporte':'Aporte de Capital'} grad="from-purple-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...cf,amount:parseFloat(cf.amount),type:'contribution'};if(editId){update('contributions',editId,data)}else{save('contributions',data)}}} disabled={!cf.amount} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={cf.date} onChange={v=>uc('date',v)} type="date"/><Inp label="Monto" value={cf.amount} onChange={v=>uc('amount',v)} prefix="$" type="number"/></div>
-      <Inp label="Concepto" value={cf.concept} onChange={v=>uc('concept',v)} placeholder="Ej: Down payment"/>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={cf.date} onChange={v=>uc('date',v)} type="date" required/><Inp label="Monto" value={cf.amount} onChange={v=>uc('amount',v)} prefix="$" type="number" required error={cf.amount&&parseFloat(cf.amount)<=0?'Monto debe ser mayor a 0':''}/></div>
+      <Inp label="Concepto" value={cf.concept} onChange={v=>uc('concept',v)} placeholder="Ej: Down payment, reparación techo" required/>
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Socio</label><PPick partners={partners} selected={cf.paidBy} onChange={v=>uc('paidBy',v)}/></div>
     </Mdl>}
 
     {modal==='addStmt'&&<Mdl title={editId?'✏️ Editar Statement':'Statement Manual'} grad="from-slate-700 to-slate-800" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const yr=parseInt(sf.year),mo=parseInt(sf.month);const data={year:yr,month:mo,revenue:parseFloat(sf.revenue)||0,net:parseFloat(sf.net)||0,commission:parseFloat(sf.commission)||0,duke:parseFloat(sf.duke)||0,water:parseFloat(sf.water)||0,hoa:parseFloat(sf.hoa)||0,maintenance:parseFloat(sf.maintenance)||0,vendor:parseFloat(sf.vendor)||0};if(editId){update('statements',editId,data)}else{if(stmts.find(s=>s.year===yr&&s.month===mo)){alert(`Ya existe un statement para ${M[mo-1]} ${yr}.`);return;}save('statements',data);setSf(x=>({...x,month:x.month<12?x.month+1:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''}))}}} disabled={!sf.revenue} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Año" value={sf.year} onChange={v=>us('year',v)} type="number" disabled={!!editId}/><Sel label="Mes" value={sf.month} onChange={v=>us('month',v)} options={M.map((m,i)=>({v:i+1,l:m}))}/></div>
-      <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100"><div className="text-[10px] font-black text-emerald-700 uppercase mb-3">Ingresos</div><Inp label="Revenue Total" value={sf.revenue} onChange={v=>us('revenue',v)} prefix="$" type="number"/></div>
+      <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100"><div className="text-[10px] font-black text-emerald-700 uppercase mb-3">Ingresos</div><Inp label="Revenue Total" value={sf.revenue} onChange={v=>us('revenue',v)} prefix="$" type="number" required error={sf.revenue&&parseFloat(sf.revenue)<=0?'Ingresa el revenue del periodo':''}/></div>
       <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100"><div className="text-[10px] font-black text-rose-700 uppercase mb-3">Gastos</div><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Comisión PM" value={sf.commission} onChange={v=>us('commission',v)} prefix="$" type="number"/><Inp label="Electricidad" value={sf.duke} onChange={v=>us('duke',v)} prefix="$" type="number"/><Inp label="Agua" value={sf.water} onChange={v=>us('water',v)} prefix="$" type="number"/><Inp label="HOA" value={sf.hoa} onChange={v=>us('hoa',v)} prefix="$" type="number"/><Inp label="Mantenimiento" value={sf.maintenance} onChange={v=>us('maintenance',v)} prefix="$" type="number"/><Inp label="Vendor/Otros" value={sf.vendor} onChange={v=>us('vendor',v)} prefix="$" type="number"/></div></div>
       <Inp label="Net al Owner" value={sf.net} onChange={v=>us('net',v)} prefix="$" type="number"/>
     </Mdl>}
@@ -1227,10 +1253,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     </Mdl>}
 
     {modal==='repair'&&<Mdl title={editId?'✏️ Editar Ticket':'🔧 Nuevo Ticket de Reparación'} grad="from-amber-500 to-amber-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...rf,amount:parseFloat(rf.amount)||0};if(editId){update('repairs',editId,data)}else{save('repairs',data)}}} disabled={!rf.title} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <Inp label="Título" value={rf.title} onChange={v=>ur('title',v)} placeholder="Ej: Reparación de AC, Pintura exterior"/>
+      <Inp label="Título" value={rf.title} onChange={v=>ur('title',v)} placeholder="Ej: Reparación de AC, Pintura exterior" required/>
       <div className="grid grid-cols-2 gap-3">
-        <Inp label="Fecha" value={rf.date} onChange={v=>ur('date',v)} type="date"/>
-        <Inp label="Monto (USD)" value={rf.amount} onChange={v=>ur('amount',v)} prefix="$" type="number"/>
+        <Inp label="Fecha" value={rf.date} onChange={v=>ur('date',v)} type="date" required/>
+        <Inp label="Monto (USD)" value={rf.amount} onChange={v=>ur('amount',v)} prefix="$" type="number" min="0"/>
       </div>
       <div className="grid grid-cols-2 gap-3">
         <Sel label="Tipo" value={rf.category} onChange={v=>ur('category',v)} options={[{v:'repair',l:'🔧 Reparación urgente'},{v:'preventive',l:'🛡️ Mantenimiento preventivo'},{v:'capex',l:'📈 Mejora / CapEx'}]}/>
