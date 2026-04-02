@@ -1,16 +1,41 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Properties - only owner can read/write
+
+    // ═══ PROPERTIES ═══
     match /properties/{propertyId} {
+      // Owner can do everything
       allow read, write: if request.auth != null && request.auth.uid == resource.data.ownerId;
       allow create: if request.auth != null;
-      
-      // Subcollections - only property owner can access
+      // Partners (memberEmails) can READ the property
+      allow read: if request.auth != null && request.auth.token.email in resource.data.memberEmails;
+
+      // Subcollections (statements, expenses, income, contributions, valuations, repairs, tasks)
       match /{subcollection}/{docId} {
-        allow read, write: if request.auth != null && 
+        // Owner has full access
+        allow read, write: if request.auth != null &&
           get(/databases/$(database)/documents/properties/$(propertyId)).data.ownerId == request.auth.uid;
+        // Partners can READ subcollections + CREATE contributions/expenses
+        allow read: if request.auth != null &&
+          request.auth.token.email in get(/databases/$(database)/documents/properties/$(propertyId)).data.memberEmails;
+        allow create: if request.auth != null &&
+          request.auth.token.email in get(/databases/$(database)/documents/properties/$(propertyId)).data.memberEmails &&
+          (subcollection == 'contributions' || subcollection == 'expenses');
       }
+    }
+
+    // ═══ USERS (Stripe plans) ═══
+    match /users/{userEmail} {
+      // Users can only read their own plan
+      allow read: if request.auth != null && request.auth.token.email == userEmail;
+      // Only Cloud Functions (admin SDK) can write — no client writes
+      allow write: if false;
+    }
+
+    // ═══ SUPPORT TICKETS ═══
+    match /support_tickets/{ticketId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null;
     }
   }
 }
