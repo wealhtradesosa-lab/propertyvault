@@ -403,8 +403,41 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
       </div>
 
-      {/* ── ROW 3: INSIGHTS — What the data tells you ── */}
-      {n>=2&&(canUse('insights')?<div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
+      {/* ── Obligaciones Anuales — auto-detected from expenses ── */}
+      {(()=>{
+        const yr=dashYear==='all'?new Date().getFullYear():dashYear;
+        const obligations=[
+          {key:'insurance',label:'Seguro',icon:'🛡️',freq:'Anual'},
+          {key:'taxes',label:'Impuestos',icon:'🏛️',freq:'Anual'},
+          {key:'hoa',label:'HOA',icon:'🏢',freq:'Mensual'},
+        ];
+        const yearExps=expenses.filter(e=>{const d=e.date||'';return d.startsWith(String(yr))});
+        const items=obligations.map(o=>{
+          const paid=yearExps.filter(e=>e.category===o.key);
+          const total=paid.reduce((s,e)=>s+(e.amount||0),0);
+          const lastDate=paid.length>0?paid.sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date:null;
+          return {...o,paid:paid.length>0,total,count:paid.length,lastDate};
+        });
+        const hasSome=expenses.some(e=>['insurance','taxes','hoa'].includes(e.category));
+        if(!hasSome&&expenses.length<3)return null;
+        return <div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm mb-4">
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Obligaciones {yr}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {items.map(o=><div key={o.key} className={`flex items-center gap-3 p-3 rounded-xl border ${o.paid?'bg-emerald-50/50 border-emerald-200':'bg-amber-50/50 border-amber-200'}`}>
+              <span className="text-lg">{o.icon}</span>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-bold text-slate-700">{o.label}</div>
+                {o.paid?<div className="text-[10px] text-emerald-600 font-semibold">{fm(o.total)} · {o.count} pago{o.count>1?'s':''}{o.lastDate?' · '+fmDate(o.lastDate):''}</div>
+                :<div className="text-[10px] text-amber-600 font-semibold">Sin registrar en {yr}</div>}
+              </div>
+              {o.paid?<CheckCircle size={16} className="text-emerald-500 shrink-0"/>:<AlertTriangle size={16} className="text-amber-400 shrink-0"/>}
+            </div>)}
+          </div>
+          {items.some(o=>!o.paid)&&<button onClick={()=>{setExpenseForm({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||'',category:items.find(o=>!o.paid)?.key||'insurance',type:'fixed'});setModal('expense')}} className="mt-3 w-full py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 active:bg-slate-300 transition flex items-center justify-center gap-1.5"><Plus size={13}/> Registrar Pago</button>}
+        </div>;
+      })()}
+
+      {/* ── ROW 3: INSIGHTS — What the data tells you ── */}      {n>=2&&(canUse('insights')?<div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
         {/* Smart Insights */}
         <div className="col-span-1 md:col-span-8 bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden">
           <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Insights & Recomendaciones</h3>
