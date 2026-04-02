@@ -232,7 +232,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   const fixedExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return c?.fixed||e.type==='fixed'}),[expenses,propCats]);
   const additionalExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return !c?.fixed&&e.type!=='fixed'}),[expenses,propCats]);
-  const expByCat=useMemo(()=>{const r={};expenses.forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!r[e.category])r[e.category]={name:c.l,value:0,monthly:0};const amt=toPropCur(e.amount||0,e.expCurrency);const f=eFreq(e);const mo=f==='annual'?amt/12:f==='monthly'?amt:amt;r[e.category].value+=amt;r[e.category].monthly+=(f==='annual'?amt/12:f==='monthly'?amt:0)});return Object.values(r).sort((a,b)=>b.monthly-a.monthly||b.value-a.value)},[expenses,propCats]);
+  const expByCat=useMemo(()=>{const r={};expenses.filter(e=>e.category!=='mortgage_pay').forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!r[e.category])r[e.category]={name:c.l,value:0,monthly:0};const amt=toPropCur(e.amount||0,e.expCurrency);const f=eFreq(e);const mo=f==='annual'?amt/12:f==='monthly'?amt:amt;r[e.category].value+=amt;r[e.category].monthly+=(f==='annual'?amt/12:f==='monthly'?amt:0)});return Object.values(r).sort((a,b)=>b.monthly-a.monthly||b.value-a.value)},[expenses,propCats]);
 
   const annual=useMemo(()=>{const y={};stmts.forEach(s=>{if(!y[s.year])y[s.year]={year:s.year,revenue:0,net:0,commission:0,duke:0,water:0,hoa:0,maintenance:0,vendor:0,nights:0,reservations:0,n:0};const a=y[s.year];a.revenue+=s.revenue||0;a.net+=s.net||0;a.commission+=s.commission||0;a.duke+=s.duke||0;a.water+=s.water||0;a.hoa+=s.hoa||0;a.maintenance+=s.maintenance||0;a.vendor+=s.vendor||0;a.nights+=s.nights||0;a.reservations+=s.reservations||0;a.n++});return Object.values(y).sort((a,b)=>a.year-b.year)},[stmts]);
 
@@ -368,7 +368,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const recurringExp=expenses.filter(e=>isRecurring(e));
       const oneTimeExp=dashYear==='all'?expenses.filter(e=>!isRecurring(e)):expenses.filter(e=>!isRecurring(e)&&(e.date||'').startsWith(String(dashYear)));
       const yearExpenses=[...recurringExp,...oneTimeExp];
-      const ownerExpTotal=yearExpenses.reduce((s,e)=>{
+      const ownerExpTotal=yearExpenses.filter(e=>e.category!=='mortgage_pay').reduce((s,e)=>{
         const amt=toPC(e.amount||0,e.expCurrency);
         const f=eFreq(e);
         if(f==='annual')return s+amt/12*(n||1);
@@ -383,8 +383,16 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const fNoi=fRev-totalOpEx;
 
       // 4. Debt Service
+      // Debt Service: use configured mortgage, OR fall back to mortgage_pay expenses
       const mMort=mort.monthlyPayment||0;
-      const fMortP=mMort*n;
+      const mortFromExpenses=yearExpenses.filter(e=>e.category==='mortgage_pay').reduce((s,e)=>{
+        const amt=toPC(e.amount||0,e.expCurrency);
+        const f=eFreq(e);
+        if(f==='annual')return s+amt/12*(n||1);
+        if(f==='monthly')return s+amt*(n||1);
+        return s+amt;
+      },0);
+      const fMortP=mMort>0?(mMort*n):mortFromExpenses;
 
       // 5. Cash Flow = NOI - Mortgage
       const fCF=fNoi-fMortP;
@@ -406,7 +414,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const revChg=prevYr&&prevYr.revenue?((fRev-prevYr.revenue)/prevYr.revenue*100):null;
       const chartColors=['#E11D48','#F59E0B','#06B6D4','#8B5CF6','#10B981','#64748B','#DB2777','#EA580C'];
       const expData=isOwnerManaged?
-        (()=>{const cp={};yearExpenses.forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!cp[e.category])cp[e.category]={name:c.l,value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[e.category].value+=amt/12*(n||1);else if(ef==='monthly')cp[e.category].value+=amt*(n||1);else cp[e.category].value+=amt});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
+        (()=>{const cp={};yearExpenses.filter(e=>e.category!=='mortgage_pay').forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!cp[e.category])cp[e.category]={name:c.l,value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[e.category].value+=amt/12*(n||1);else if(ef==='monthly')cp[e.category].value+=amt*(n||1);else cp[e.category].value+=amt});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
         [['Comisión',fComm,'#E11D48'],['Electricity',fDuke,'#F59E0B'],['Agua',fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],['Maintenance',fMaint,'#10B981'],['Otros',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
       const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>({m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:stmtToPC(s.revenue||0),net:stmtToPC(s.net||0),libre:stmtToPC(s.net||0)-mMort}));
 
@@ -478,7 +486,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               {fComm>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-rose-400 opacity-75" style={{width:Math.max(2,fComm/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Platform Fees</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(fComm)} <span className="text-slate-400">({(fComm/fRev*100).toFixed(0)}%)</span></span></div></div>}
               {(()=>{
                 const catPeriod={};
-                yearExpenses.forEach(e=>{
+                yearExpenses.filter(e=>e.category!=='mortgage_pay').forEach(e=>{
                   const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};
                   if(!catPeriod[e.category])catPeriod[e.category]={name:c.l,value:0};
                   const amt=toPC(e.amount||0,e.expCurrency);
@@ -507,7 +515,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             {/* Debt Service */}
             {fMortP>0&&<>
               <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Debt Service</div>
-              <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Mortgage ({dFm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{dFm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>
+              <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,Math.abs(fMortP)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Mortgage{mMort>0?` (${dFm(mMort)}/mo × ${n}m)`:''}</span><span className="text-[10px] font-bold text-slate-700">{dFm(fMortP)} <span className="text-slate-400">({(Math.abs(fMortP)/fRev*100).toFixed(0)}%)</span></span></div></div>
             </>}
 
             {/* Cash Flow */}
