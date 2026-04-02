@@ -53,7 +53,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const notify=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),4000)};
   const [valForm,setValForm]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setValForm(x=>({...x,[k]:v})),[]);
   const [repairForm,setRepairForm]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRepairForm(x=>({...x,[k]:v})),[]);
-  const [taskForm,setTaskForm]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner'});const ut=useCallback((k,v)=>setTaskForm(x=>({...x,[k]:v})),[]);
+  const [taskForm,setTaskForm]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30'});const ut=useCallback((k,v)=>setTaskForm(x=>({...x,[k]:v})),[]);
   const [settingsForm,setSettingsForm]=useState(null);
   const [editPartners,setEditPartners]=useState(null);
   const [mortConfig,setMortConfig]=useState({bal:'',rate:'',term:'30',pay:'',start:''});const [savingMort,setSavingMort]=useState(false);
@@ -460,7 +460,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         const alerts=tasks.filter(t=>t.payer!=='pm'&&t.status!=='done'&&t.dueDate).map(t=>{
           const due=new Date(t.dueDate+'T00:00:00');
           const days=Math.ceil((due-today)/(1000*60*60*24));
-          const threshold=t.frequency==='monthly'?5:30;
+          const threshold=parseInt(t.reminderDays)||( t.frequency==='monthly'?5:30);
           if(days<0)return {...t,days,level:'overdue'};
           if(days<=threshold)return {...t,days,level:'soon'};
           return null;
@@ -993,7 +993,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {view==='pipeline'&&<>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <div><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">📋 Obligaciones del Propietario</h1><p className="text-xs text-slate-400 mt-1">Registra aquí tus pagos recurrentes. Al marcar "Pagado" el gasto se registra automáticamente.</p></div>
-        <button onClick={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual'});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 active:bg-indigo-800 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Agregar</button>
+        <button onClick={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30'});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 active:bg-indigo-800 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Agregar</button>
       </div>
 
       {/* Quick-add templates */}
@@ -1001,7 +1001,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <p className="text-sm text-slate-500 mb-4">Agrega las obligaciones de tu propiedad:</p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           {[['🏦','Hipoteca','monthly'],['🏛️','Impuestos','annual'],['🛡️','Seguro','annual'],['📊','Contabilidad','monthly']].map(([ic,t,fr])=>
-            <button key={t} onClick={()=>{setTaskForm({title:t,dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:fr});setEditId(null);setModal('task')}} className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:bg-blue-50 hover:border-blue-200 active:bg-blue-100 transition text-left">
+            <button key={t} onClick={()=>{setTaskForm({title:t,dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:fr,payer:'owner',reminderDays:fr==='monthly'?'7':'30'});setEditId(null);setModal('task')}} className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:bg-blue-50 hover:border-blue-200 active:bg-blue-100 transition text-left">
               <span className="text-lg">{ic}</span><span className="text-xs font-semibold text-slate-700">{t}</span>
             </button>)}
         </div>
@@ -1031,7 +1031,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           const isPM=t.payer==='pm';
           const today=new Date();today.setHours(0,0,0,0);
           const days=t.dueDate?Math.ceil((new Date(t.dueDate+'T00:00:00')-today)/(1000*60*60*24)):null;
-          const threshold=t.frequency==='monthly'?5:30;
+          const threshold=parseInt(t.reminderDays)||( t.frequency==='monthly'?5:30);
           const isOverdue=!isPM&&days!==null&&days<0;
           const isSoon=!isPM&&days!==null&&days>=0&&days<=threshold;
           return <div key={t.id} className={`bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-3 md:gap-4 ${isPM?'border-slate-200 opacity-70':isOverdue?'border-rose-300 bg-rose-50/30':isSoon?'border-amber-300 bg-amber-50/30':'border-slate-200'}`}>
@@ -1047,6 +1047,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400 flex-wrap">
                 {t.amount&&<span className="font-semibold text-slate-600">{fm(parseFloat(t.amount)||0)}{t.frequency==='monthly'?'/mes':'/año'}</span>}
                 {!isPM&&t.dueDate&&<span className="flex items-center gap-1"><Calendar size={10}/>Próximo: {fmDate(t.dueDate)}</span>}
+                {!isPM&&t.reminderDays&&<span className="text-blue-400">⏰ Alerta {t.reminderDays}d antes</span>}
                 {t.lastPaid&&<span className="text-emerald-500 font-semibold">✓ Pagado: {fmDate(t.lastPaid)}</span>}
                 {isPM&&<span className="text-slate-400">Incluido en statements</span>}
                 {t.notes&&<span className="truncate">{t.notes}</span>}
@@ -1054,7 +1055,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </div>
             <div className="flex items-center gap-1 shrink-0">
               {!isPM&&<button onClick={()=>markPaid(t)} className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${isOverdue?'bg-rose-500 text-white hover:bg-rose-600':isSoon?'bg-amber-500 text-white hover:bg-amber-600':'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'}`}>Pagar ✓</button>}
-              <button onClick={()=>{setTaskForm({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||'',amount:String(t.amount||''),frequency:t.frequency||'annual',payer:t.payer||'owner'});setEditId(t.id);setModal('task')}} className="p-2 text-slate-300 hover:text-blue-500 rounded-xl hover:bg-blue-50 transition"><Pencil size={14}/></button>
+              <button onClick={()=>{setTaskForm({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||'',amount:String(t.amount||''),frequency:t.frequency||'annual',payer:t.payer||'owner',reminderDays:String(t.reminderDays||'30')});setEditId(t.id);setModal('task')}} className="p-2 text-slate-300 hover:text-blue-500 rounded-xl hover:bg-blue-50 transition"><Pencil size={14}/></button>
               <button onClick={()=>del('tasks',t.id)} className="p-2 text-slate-300 hover:text-red-500 rounded-xl hover:bg-red-50 transition"><Trash2 size={14}/></button>
             </div>
           </div>})}
@@ -1278,7 +1279,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <Inp label="Monto (USD)" value={taskForm.amount} onChange={v=>ut('amount',v)} prefix="$" type="number" placeholder="1,850"/>
         <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Frecuencia</label><div className="grid grid-cols-2 gap-2">{[['monthly','Mensual'],['annual','Anual']].map(([v,l])=><button key={v} type="button" onClick={()=>ut('frequency',v)} className={`py-2.5 rounded-xl border-2 text-xs font-medium transition ${taskForm.frequency===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
       </div>
-      {taskForm.payer==='owner'&&<Inp label="Próximo pago" value={taskForm.dueDate} onChange={v=>ut('dueDate',v)} type="date"/>}
+      {taskForm.payer==='owner'&&<div className="grid grid-cols-2 gap-3">
+        <Inp label="Próximo pago" value={taskForm.dueDate} onChange={v=>ut('dueDate',v)} type="date"/>
+        <Sel label="Recordar antes de" value={taskForm.reminderDays} onChange={v=>ut('reminderDays',v)} options={[{v:'3',l:'3 días antes'},{v:'7',l:'1 semana antes'},{v:'15',l:'15 días antes'},{v:'30',l:'1 mes antes'},{v:'60',l:'2 meses antes'}]}/>
+      </div>}
       <Inp label="Notas (opcional)" value={taskForm.notes} onChange={v=>ut('notes',v)} placeholder="Ej: Póliza #12345, County Tax"/>
     </Mdl>}
 
