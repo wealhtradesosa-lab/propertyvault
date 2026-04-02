@@ -173,8 +173,8 @@ const translations = {
   },
   es: {
     grossRevenue: 'Ingreso Bruto',
-    noi: 'NOI',
-    cashFlow: 'Cash Flow',
+    noi: 'Ing. Operativo Neto',
+    cashFlow: 'Flujo de Caja',
     occupancy: 'Ocupación',
     cashOnCash: 'Cash-on-Cash',
     margin: 'Margen',
