@@ -380,7 +380,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const fDscr=mMort>0?(noiAnual/(mMort*12)):0;
       const fNights=fy?(fy.nights||0):fStmts.reduce((s,x)=>s+(x.nights||0),0);
       const fRes=fy?(fy.reservations||0):fStmts.reduce((s,x)=>s+(x.reservations||0),0);
-      const availNights=dashYear==='all'?(stmts.length>0?Math.round((stmts.length/12)*365):0):(n>=12?365:n*30.44);
+      const availNights=dashYear==='all'?(stmts.length>0?Math.round((stmts.length/12)*365):0):Math.round(n>=12?365:n*30.44);
       const occupancy=availNights>0&&fNights>0?Math.min(100,fNights/availNights*100):0;
       const adr=fNights>0?fRev/fNights:(n>0?fRev/(n*30):0);
       const revpar=availNights>0?fRev/availNights:0;
