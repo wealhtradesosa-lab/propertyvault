@@ -288,25 +288,36 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ DASHBOARD VIEW ═══ */}
     {view==='dashboard'&&(()=>{try{
+      const isOwnerManaged=prop.managedBy==='owner';
       const fy=dashYear==='all'?null:annual.find(y=>y.year===dashYear);
       const fStmts=dashYear==='all'?stmts:stmts.filter(s=>s.year===dashYear);
       const n=fy?fy.n:(stmts.length||0);
       const fRev=fy?fy.revenue:(revenue||0);
       const fNet=fy?fy.net:((stmtNet||totNet)||0);
-      const fComm=fy?(fy.commission||0):(stmtComm||0);
+      const fComm=isOwnerManaged?0:(fy?(fy.commission||0):(stmtComm||0));
       const fDuke=fy?(fy.duke||0):(stmtDuke||0);
       const fHoa=fy?(fy.hoa||0):(stmtHoa||0);
       const fMaint=fy?(fy.maintenance||0):(stmtMaint||0);
       const fWater=fy?(fy.water||0):(stmtWater||0);
       const fVendor=fy?(fy.vendor||0):(stmtVendor||0);
       const fOpEx=fComm+fDuke+fHoa+fMaint+fWater+fVendor;
-      const fNoi=fRev-fOpEx;
+
+      // Owner expenses — filter by year if needed
+      const yearExpenses=dashYear==='all'?expenses:expenses.filter(e=>(e.date||'').startsWith(String(dashYear)));
+      const ownerExpTotal=yearExpenses.reduce((s,e)=>{
+        const amt=e.amount||0;
+        if(e.frequency==='annual')return s+amt/12*(n||1);
+        if(e.frequency==='monthly')return s+amt*(n||1);
+        return s+amt;
+      },0);
+
+      const fNoi=isOwnerManaged?(fRev-ownerExpTotal):(fRev-fOpEx);
       const mMort=mort.monthlyPayment||0;
       const fMortP=mMort*n;
-      const insExp=expenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+((e.amount||0)),0);
-      const taxExp=expenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+((e.amount||0)),0);
-      const ownerCosts=fMortP+insExp+taxExp;
-      const fCF=fNoi-ownerCosts;
+      const insExp=isOwnerManaged?0:yearExpenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+((e.amount||0)),0);
+      const taxExp=isOwnerManaged?0:yearExpenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+((e.amount||0)),0);
+      const ownerCosts=fMortP+(isOwnerManaged?0:insExp+taxExp+ownerExpTotal);
+      const fCF=isOwnerManaged?(fNoi-fMortP):(fNoi-ownerCosts);
       const fCFmo=n>0?fCF/n:0;
       const partial=n>0&&n<12;
       const proyAnual=partial&&n>0?(fCF/n)*12:fCF;
@@ -323,7 +334,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const revpar=availNights>0?fRev/availNights:0;
       const prevYr=dashYear!=='all'?annual.find(y=>y.year===dashYear-1):null;
       const revChg=prevYr&&prevYr.revenue?((fRev-prevYr.revenue)/prevYr.revenue*100):null;
-      const expData=[['Comisión',fComm,'#E11D48'],['Electricidad',fDuke,'#F59E0B'],['Agua',fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],['Mantenimiento',fMaint,'#10B981'],['Otros',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
+      const expData=isOwnerManaged?
+        [['Gastos Propietario',ownerExpTotal,'#E11D48']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill})):
+        [['Comisión',fComm,'#E11D48'],['Electricidad',fDuke,'#F59E0B'],['Agua',fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],['Mantenimiento',fMaint,'#10B981'],['Otros',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
       const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>({m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:s.revenue||0,net:s.net||0,libre:(s.net||0)-mMort}));
 
       return <>
@@ -382,18 +395,27 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="space-y-1.5">
             <div className="rounded-lg relative overflow-hidden" style={{height:"34px"}}><div className="absolute inset-0 bg-blue-500"/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] md:text-[11px] font-bold text-white truncate">Ingreso Bruto</span><span className="text-[12px] font-extrabold text-white">{fm(fRev)}</span></div></div>
 
-            <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5">Gastos Operativos (descuenta el administrador)</div>
+            {isOwnerManaged?<>
+              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5">Gastos del Propietario</div>
+              {expByCat.map(c=><div key={c.name} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-rose-400 opacity-75" style={{width:Math.max(2,(c.value||0)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{c.name}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{fm(c.value)} <span className="text-slate-400">({(c.value/fRev*100).toFixed(0)}%)</span></span></div></div>)}
+            </>:<>
+              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5">Gastos Operativos (descuenta el administrador)</div>
+              {[[`Comisión PM (${prop.managerCommission||15}%)`,fComm,'bg-rose-400'],['Electricidad',fDuke,'bg-amber-400'],['Agua',fWater,'bg-cyan-400'],[propTerms.hoa,fHoa,'bg-purple-400'],['Mantenimiento',fMaint,'bg-teal-400'],['Vendor / Otros',fVendor,'bg-slate-400']].filter(([_,v])=>v>0).map(([l,v,bg])=>
+                <div key={l} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className={`absolute inset-y-0 left-0 ${bg} opacity-75`} style={{width:Math.max(2,v/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{l}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{fm(v)} <span className="text-slate-400">({(v/fRev*100).toFixed(0)}%)</span></span></div></div>
+              )}
+            </>}
 
-            {[[`Comisión PM (${prop.managerCommission||15}%)`,fComm,'bg-rose-400'],['Electricidad (Duke Energy)',fDuke,'bg-amber-400'],['Agua (Toho)',fWater,'bg-cyan-400'],['HOA',fHoa,'bg-purple-400'],['Mantenimiento',fMaint,'bg-teal-400'],['Vendor / Suministros',fVendor,'bg-slate-400']].filter(([_,v])=>v>0).map(([l,v,bg])=>
-              <div key={l} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className={`absolute inset-y-0 left-0 ${bg} opacity-75`} style={{width:Math.max(2,v/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{l}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{fm(v)} <span className="text-slate-400">({(v/fRev*100).toFixed(0)}%)</span></span></div></div>
-            )}
+            <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi>0?fNoi/fRev*100:0)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden bg-emerald-50"><span className="text-[9px] md:text-[11px] font-bold text-emerald-800 truncate">= NOI <span className="text-[9px] font-normal">(Ingreso Operativo Neto)</span></span><span className="text-[12px] font-extrabold text-emerald-800">{fm(fNoi)} <span className="text-emerald-600 text-[10px]">{(fRev>0?(fNoi/fRev*100):0).toFixed(0)}%</span></span></div></div>
 
-            <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden bg-emerald-50"><span className="text-[9px] md:text-[11px] font-bold text-emerald-800 truncate">= NOI <span className="text-[9px] font-normal">(Ingreso Operativo Neto)</span></span><span className="text-[12px] font-extrabold text-emerald-800">{fm(fNoi)} <span className="text-emerald-600 text-[10px]">{(fRev>0?(fNoi/fRev*100):0).toFixed(0)}%</span></span></div></div>
+            {/* Mortgage */}
+            {fMortP>0&&<>
+              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Hipoteca</div>
+              <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Hipoteca ({fm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{fm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>
+            </>}
 
-            {/* Owner costs */}
-            {ownerCosts>0&&<>
-              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Hipoteca y Gastos del Propietario</div>
-              {fMortP>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Hipoteca ({fm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{fm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>}
+            {/* Owner costs for PM-managed only */}
+            {!isOwnerManaged&&(insExp>0||taxExp>0)&&<>
+              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Gastos del Propietario</div>
               {insExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,insExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Seguro</span><span className="text-[10px] font-bold text-slate-700">{fm(insExp)}</span></div></div>}
               {taxExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-violet-400 opacity-75" style={{width:Math.max(2,taxExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Impuestos</span><span className="text-[10px] font-bold text-slate-700">{fm(taxExp)}</span></div></div>}
             </>}
