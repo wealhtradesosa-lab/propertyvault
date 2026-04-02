@@ -59,7 +59,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [mortConfig,setMortConfig]=useState({bal:'',rate:'',term:'30',pay:'',start:''});const [savingMort,setSavingMort]=useState(false);
   const umc=useCallback((k,v)=>setMortConfig(x=>({...x,[k]:v})),[]);
   const partners=prop.partners||[];const mort=prop.mortgage||{};
-  const [expenseForm,setExpenseForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});const [editId,setEditId]=useState(null);
+  const [expenseForm,setExpenseForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once'});const [editId,setEditId]=useState(null);
   const [nf,setNf]=useState({date:'',month:'',grossAmount:''});
   const [contribForm,setContribForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||''});
   const [stmtForm,setStmtForm]=useState({year:new Date().getFullYear(),month:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''});
@@ -333,7 +333,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="hidden md:block"><h1 className="text-lg md:text-xl font-extrabold text-slate-800">{prop.name}</h1><p className="text-xs text-slate-400 mt-0.5">{prop.address}, {prop.city} {prop.state}</p></div>
         <div className="flex gap-2">
           <button onClick={()=>window.print()} aria-label="Imprimir" className="hidden md:flex px-3 py-2 bg-slate-100 text-slate-500 text-xs rounded-xl font-bold hover:bg-slate-200 items-center gap-1.5"><Printer size={13}/></button>
-          <button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 active:bg-slate-900 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button>
+          <button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once'});setModal('expense')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 active:bg-slate-900 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button>
           <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-1.5 shadow-sm"><Upload size={14}/> Statements</button>
         </div>
       </div>
@@ -691,7 +691,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           {[
             {done:stmts.length>0, step:'1', title:'Sube tus statements', desc:'Arrastra los PDFs de tu property manager (IHM, Host U, etc.)', action:'Subir PDFs', onClick:()=>{setUploadLog([]);setModal('upload')}, color:'blue'},
             {done:!!(mort.balance||mort.monthlyPayment), step:'2', title:'Configura tu hipoteca', desc:'Registra el balance, tasa y pago mensual para calcular cash flow real.', action:'Configurar', onClick:()=>setView('mortgage'), color:'indigo'},
-            {done:expenses.filter(e=>e.category==='insurance'||e.category==='taxes').length>0, step:'3', title:'Agrega seguro e impuestos', desc:'Estos gastos fijos completan tu P&L y radiografía de costos.', action:'Agregar Gastos', onClick:()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'insurance',type:'fixed'});setModal('expense')}, color:'emerald'},
+            {done:expenses.filter(e=>e.category==='insurance'||e.category==='taxes').length>0, step:'3', title:'Agrega seguro e impuestos', desc:'Estos gastos fijos completan tu P&L y radiografía de costos.', action:'Agregar Gastos', onClick:()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'insurance',type:'fixed',frequency:'monthly'});setModal('expense')}, color:'emerald'},
             {done:valuations.length>0, step:'4', title:'Registra el valor de mercado', desc:'Con esto calculas equity real, apreciación y Cap Rate correcto.', action:'Registrar Valor', onClick:()=>setView('valuation'), color:'purple'},
           ].map(s=><button key={s.step} onClick={s.onClick} className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${s.done?'bg-slate-50 border-slate-100':'bg-white border-slate-200 hover:border-blue-300 hover:shadow-sm'}`}>
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${s.done?'bg-emerald-100':'bg-'+s.color+'-50'}`}>{s.done?<CheckCircle size={18} className="text-emerald-500"/>:<span className={`text-sm font-extrabold text-${s.color}-500`}>{s.step}</span>}</div>
@@ -833,8 +833,19 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ EXPENSES ═══ */}
     {view==='expenses'&&<>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🧾 Gastos</h1><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 active:bg-rose-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button></div>
-      {expenses.length>0&&<div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 mb-5"><KPI label="Gastos Fijos" value={fm(fixedExp.reduce((s,e)=>s+(e.amount||0),0))} sub={fixedExp.length+' registros'} color="amber"/><KPI label="Gastos Adicionales" value={fm(additionalExp.reduce((s,e)=>s+(e.amount||0),0))} sub={additionalExp.length+' registros'} color="red"/><KPI label="Total" value={fm(totExp)} color="purple"/></div>}
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🧾 Gastos</h1><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once'});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 active:bg-rose-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button></div>
+      {expenses.length>0&&(()=>{
+        const monthlyRecurring=expenses.filter(e=>e.frequency==='monthly').reduce((s,e)=>s+(e.amount||0),0);
+        const annualRecurring=expenses.filter(e=>e.frequency==='annual').reduce((s,e)=>s+(e.amount||0),0);
+        const oneTime=expenses.filter(e=>!e.frequency||e.frequency==='once').reduce((s,e)=>s+(e.amount||0),0);
+        const monthlyEquiv=monthlyRecurring+(annualRecurring/12);
+        return <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-5">
+          <KPI label="Costo Mensual" value={fm(monthlyEquiv)} sub="Fijos + anuales/12" color="blue"/>
+          <KPI label="Mensuales" value={fm(monthlyRecurring)} sub={expenses.filter(e=>e.frequency==='monthly').length+' gastos'} color="amber"/>
+          <KPI label="Anuales" value={fm(annualRecurring)} sub={fm(annualRecurring/12)+'/mes equiv.'} color="purple"/>
+          <KPI label="Únicos" value={fm(oneTime)} sub={expenses.filter(e=>!e.frequency||e.frequency==='once').length+' gastos'} color="red"/>
+        </div>
+      })()}
       {expByCat.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4"><h3 className="text-sm font-bold text-slate-700 mb-3">Por Categoría</h3><ResponsiveContainer width="100%" height={Math.max(150,expByCat.length*35)}><BarChart data={expByCat} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis type="number" tickFormatter={fm} tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#64748b'}} width={120}/><Tooltip content={<Tip/>}/><Bar dataKey="value" name="Monto" fill="#DC2626" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer></div>}
 
       {/* Grouped by month */}
@@ -847,13 +858,13 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             {label:'Fecha',render:r=><span className="text-slate-500 text-xs">{r.date?r.date.slice(8):''}</span>},
             {label:'Concepto',key:'concept',cls:'text-slate-700 font-medium'},
             {label:'Categoría',render:r=>{const c=propCats.find(x=>x.v===r.category);return<span className="text-xs">{c?c.i+' '+c.l:r.category}</span>}},
-            {label:'Tipo',render:r=><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.type==='fixed'?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}`}>{r.type==='fixed'?'Fijo':'Adicional'}</span>},
+            {label:'Tipo',render:r=><div className="flex gap-1 flex-wrap"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.type==='fixed'?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}`}>{r.type==='fixed'?'Fijo':'Único'}</span>{r.frequency&&r.frequency!=='once'&&<span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.frequency==='annual'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}`}>{r.frequency==='annual'?'Anual':'Mensual'}</span>}</div>},
             {label:'Pagó',render:r=><span style={{color:pCl(r.paidBy)}} className="text-xs font-semibold">{pN(r.paidBy)}</span>},
-            {label:'Monto',r:true,render:r=><span className="font-bold text-rose-500">{fm(r.amount)}</span>}
-          ]} rows={g.items} onDel={del} dc="expenses" onEdit={r=>{setExpenseForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'additional'});setEditId(r.id);setModal('expense')}}/>
+            {label:'Monto',r:true,render:r=><div className="text-right"><span className="font-bold text-rose-500">{fm(r.amount)}</span>{r.frequency==='annual'&&<div className="text-[9px] text-slate-400">{fm(r.amount/12)}/mes</div>}</div>}
+          ]} rows={g.items} onDel={del} dc="expenses" onEdit={r=>{setExpenseForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'additional',frequency:r.frequency||'once'});setEditId(r.id);setModal('expense')}}/>
         </div>)
       })()}
-      {!expenses.length&&<Empty icon={Receipt} title="Sin gastos" desc="Registra gastos fijos y adicionales." action="Registrar" onAction={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}}/>}
+      {!expenses.length&&<Empty icon={Receipt} title="Sin gastos" desc="Registra gastos fijos y adicionales." action="Registrar" onAction={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once'});setModal('expense')}}/>}
     </>}
 
     {/* ═══ INCOME (powered by statements) ═══ */}
@@ -1274,7 +1285,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={expenseForm.date} onChange={v=>ue('date',v)} type="date" required/><Sel label="Categoría" value={expenseForm.category} onChange={v=>ue('category',v)} options={propCats.map(c=>({v:c.v,l:c.i+' '+c.l}))}/></div>
       <Inp label="Concepto" value={expenseForm.concept} onChange={v=>ue('concept',v)} placeholder="Descripción del gasto" required error={expenseForm.concept===''&&expenseForm.amount?'Ingresa una descripción':''}/>
       <Inp label="Monto (USD)" value={expenseForm.amount} onChange={v=>ue('amount',v)} prefix="$" type="number" min="0" required error={expenseForm.amount&&parseFloat(expenseForm.amount)<=0?'El monto debe ser mayor a 0':''}/>
-      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de gasto</label><div className="grid grid-cols-2 gap-2">{[['fixed','🔄 Fijo'],['additional','➕ Adicional']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('type',v)} className={`py-2.5 rounded-xl border-2 text-sm font-medium transition ${expenseForm.type===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tipo</label><div className="grid grid-cols-2 gap-2">{[['fixed','🔄 Fijo'],['additional','➕ Único']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('type',v)} className={`py-2.5 rounded-xl border-2 text-xs font-medium transition ${expenseForm.type===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
+        <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Frecuencia</label><div className="grid grid-cols-3 gap-1">{[['once','1 vez'],['monthly','Mensual'],['annual','Anual']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('frequency',v)} className={`py-2.5 rounded-xl border-2 text-[11px] font-medium transition ${expenseForm.frequency===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
+      </div>
+      {expenseForm.frequency==='annual'&&expenseForm.amount&&<div className="text-[11px] text-blue-500 font-semibold bg-blue-50 px-3 py-2 rounded-xl">= {fm(parseFloat(expenseForm.amount)/12)}/mes equivalente</div>}
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={expenseForm.paidBy} onChange={v=>ue('paidBy',v)}/></div>
     </Mdl>}
 
