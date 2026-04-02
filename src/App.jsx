@@ -509,21 +509,21 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               </>}
             </>}
 
-            {/* NOI — only show as intermediate step when there's mortgage */}
-            {fMortP>0&&<div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi>0?fNoi/fRev*100:0)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden bg-emerald-50"><span className="text-[9px] md:text-[11px] font-bold text-emerald-800 truncate">= NOI</span><span className="text-[12px] font-extrabold text-emerald-800">{dFm(fNoi)} <span className="text-emerald-600 text-[10px]">{fMargin.toFixed(0)}%</span></span></div></div>}
+            {/* NOI = Revenue - Operating Expenses */}
+            {fMortP>0&&<div className={`rounded-lg relative overflow-hidden mt-1 ${fNoi>=0?'bg-emerald-50':'bg-rose-50'}`} style={{height:'38px'}}><div className={`absolute inset-y-0 left-0 ${fNoi>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fNoi)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><div><span className={`text-[11px] font-bold ${fNoi>=0?'text-emerald-800':'text-rose-800'}`}>= NOI</span><span className="text-[9px] text-slate-400 ml-2">Revenue − Operating Expenses</span></div><span className={`text-[12px] font-extrabold ${fNoi>=0?'text-emerald-800':'text-rose-800'}`}>{dFm(fNoi)} <span className="text-[10px]">{fMargin.toFixed(0)}%</span></span></div></div>}
 
-            {/* Debt Service */}
+            {/* Debt Service = Mortgage */}
             {fMortP>0&&<>
               <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Debt Service</div>
               <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,Math.abs(fMortP)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Mortgage{mMort>0?` (${dFm(mMort)}/mo × ${n}m)`:''}</span><span className="text-[10px] font-bold text-slate-700">{dFm(fMortP)} <span className="text-slate-400">({(Math.abs(fMortP)/fRev*100).toFixed(0)}%)</span></span></div></div>
             </>}
 
-            {/* Cash Flow */}
-            <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
+            {/* Cash Flow = NOI - Debt Service */}
+            <div className={`rounded-lg relative overflow-hidden border-2 mt-2 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'44px'}}>
               <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
               <div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden">
-                <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Cash Flow</span>
-                <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)} <span className="text-[10px]">{(fRev>0?(fCF/fRev*100):0).toFixed(0)}% · {dFm(fCFmo)}/mes</span></span>
+                <div><span className={`text-[12px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Cash Flow</span>{fMortP>0&&<span className="text-[9px] text-slate-400 ml-2">NOI − Debt Service</span>}</div>
+                <div className="text-right"><span className={`text-[14px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)}</span><div className={`text-[10px] ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mes</div></div>
               </div>
             </div>
             {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded py-1.5 mt-1">Periodo parcial ({n} meses) · Proyección anualizada: <b>{dFm(proyAnual)}</b></div>}
