@@ -491,12 +491,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                 );
               })()}
             </>:<>
-              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5">Operating Expenses (PM)</div>
+              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5">Operating Expenses</div>
               {[[`PM Commission (${prop.managerCommission||15}%)`,fComm,'bg-rose-400'],['Electricity',fDuke,'bg-amber-400'],['Water',fWater,'bg-cyan-400'],[propTerms.hoa,fHoa,'bg-purple-400'],['Maintenance',fMaint,'bg-teal-400'],['Vendor / Other',fVendor,'bg-slate-400']].filter(([_,v])=>v>0).map(([l,v,bg])=>
                 <div key={l} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className={`absolute inset-y-0 left-0 ${bg} opacity-75`} style={{width:Math.max(2,v/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{l}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(v)} <span className="text-slate-400">({(v/fRev*100).toFixed(0)}%)</span></span></div></div>
               )}
               {ownerExpTotal>0&&<>
-                <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Owner Expenses</div>
                 {expByCat.filter(c=>c.monthly>0||c.value>0).map(c=><div key={c.name} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,(c.monthly||c.value)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{c.name}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(c.monthly||c.value)} <span className="text-slate-400">({((c.monthly||c.value)/fRev*100).toFixed(0)}%)</span></span></div></div>)}
               </>}
             </>}
