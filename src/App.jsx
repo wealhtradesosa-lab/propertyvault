@@ -996,16 +996,41 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <button onClick={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30'});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 active:bg-indigo-800 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Agregar</button>
       </div>
 
-      {/* Quick-add templates */}
-      {!tasks.length&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
-        <p className="text-sm text-slate-500 mb-4">Agrega las obligaciones de tu propiedad:</p>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          {[['🏦','Hipoteca','monthly'],['🏛️','Impuestos','annual'],['🛡️','Seguro','annual'],['📊','Contabilidad','monthly']].map(([ic,t,fr])=>
-            <button key={t} onClick={()=>{setTaskForm({title:t,dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:fr,payer:'owner',reminderDays:fr==='monthly'?'7':'30'});setEditId(null);setModal('task')}} className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:bg-blue-50 hover:border-blue-200 active:bg-blue-100 transition text-left">
-              <span className="text-lg">{ic}</span><span className="text-xs font-semibold text-slate-700">{t}</span>
+      {/* Smart suggestions based on statements */}
+      {(()=>{
+        const pmCovers={commission:stmts.some(s=>(s.commission||0)>0),electricity:stmts.some(s=>(s.duke||0)>0),water:stmts.some(s=>(s.water||0)>0),hoa:stmts.some(s=>(s.hoa||0)>0),maintenance:stmts.some(s=>(s.maintenance||0)>0)};
+        const allObligations=[
+          {title:'Hipoteca',icon:'🏦',freq:'monthly',likely:'owner'},
+          {title:'Impuestos',icon:'🏛️',freq:'annual',likely:'owner'},
+          {title:'Seguro',icon:'🛡️',freq:'annual',likely:'owner'},
+          {title:'Contabilidad',icon:'📊',freq:'monthly',likely:'owner'},
+          {title:'HOA',icon:'🏢',freq:'monthly',likely:pmCovers.hoa?'pm':'owner'},
+        ];
+        const existing=tasks.map(t=>t.title.toLowerCase());
+        const suggestions=allObligations.filter(o=>!existing.includes(o.title.toLowerCase()));
+        if(!suggestions.length)return null;
+
+        return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
+          <h3 className="text-sm font-bold text-slate-700 mb-1">{stmts.length>0?'Sugerencias basadas en tus statements':'Obligaciones comunes'}</h3>
+          <p className="text-xs text-slate-400 mb-4">{stmts.length>0?'Estos pagos no aparecen en lo que cubre tu PM:':'Agrega las que apliquen a tu propiedad:'}</p>
+
+          {stmts.length>0&&Object.entries(pmCovers).some(([,v])=>v)&&<div className="mb-4 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+            <div className="text-[10px] font-bold text-emerald-700 uppercase mb-1.5">Tu PM ya cubre:</div>
+            <div className="flex flex-wrap gap-1.5">{pmCovers.commission&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">💼 Comisión</span>}{pmCovers.electricity&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">⚡ Electricidad</span>}{pmCovers.water&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">💧 Agua</span>}{pmCovers.hoa&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">🏢 HOA</span>}{pmCovers.maintenance&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">🔧 Mantenimiento</span>}</div>
+          </div>}
+
+          <div className="text-[10px] font-bold text-amber-700 uppercase mb-2">Probablemente debes pagar tú:</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {suggestions.map(o=><button key={o.title} onClick={()=>{setTaskForm({title:o.title,dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:o.freq,payer:o.likely,reminderDays:o.freq==='monthly'?'7':'30'});setEditId(null);setModal('task')}} className={`flex items-center gap-3 p-3 rounded-xl border transition text-left ${o.likely==='pm'?'bg-slate-50 border-slate-200 hover:bg-slate-100':'bg-amber-50 border-amber-200 hover:bg-amber-100 active:bg-amber-200'}`}>
+              <span className="text-lg">{o.icon}</span>
+              <div>
+                <span className="text-xs font-bold text-slate-700">{o.title}</span>
+                <div className="text-[10px] text-slate-400">{o.freq==='monthly'?'Mensual':'Anual'} · {o.likely==='pm'?'PM podría cubrirlo':'Tú pagas'}</div>
+              </div>
             </button>)}
-        </div>
-      </div>}
+          </div>
+        </div>;
+      })()}
 
       {/* Summary KPIs */}
       {tasks.length>0&&(()=>{
@@ -1060,7 +1085,6 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </div>
           </div>})}
       </div>}
-      {!tasks.length&&<div/>}
     </>}
 
     {/* ═══ SUPPORT / TICKETS ═══ */}
