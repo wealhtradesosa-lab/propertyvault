@@ -354,29 +354,40 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         return amt;
       };
 
-      // Owner expenses — recurring apply to ALL periods, one-time filtered by year
+      // ═══ P&L — SIMPLE AND CORRECT ═══
+      // 
+      // Gross Revenue                    (from statements/platform)
+      // (-) PM Operating Expenses        (from statements: commission, utilities, HOA, etc.)
+      // (-) Owner Operating Expenses     (from Gastos: personal, energía, predial, etc.)
+      // = NOI (Net Operating Income)
+      // (-) Debt Service                 (mortgage payments)
+      // = Cash Flow
+      //
+
+      // 1. Owner expenses from Gastos section (recurring apply to ALL periods)
       const recurringExp=expenses.filter(e=>isRecurring(e));
       const oneTimeExp=dashYear==='all'?expenses.filter(e=>!isRecurring(e)):expenses.filter(e=>!isRecurring(e)&&(e.date||'').startsWith(String(dashYear)));
       const yearExpenses=[...recurringExp,...oneTimeExp];
       const ownerExpTotal=yearExpenses.reduce((s,e)=>{
-        const raw=e.amount||0;
-        const amt=toPC(raw,e.expCurrency);
-        const f=eFreq(e);if(f==='annual')return s+amt/12*(n||1);
+        const amt=toPC(e.amount||0,e.expCurrency);
+        const f=eFreq(e);
+        if(f==='annual')return s+amt/12*(n||1);
         if(f==='monthly')return s+amt*(n||1);
         return s+amt;
       },0);
 
-      const fNoi=isOwnerManaged?(fRev-ownerExpTotal):(fRev-fOpEx);
+      // 2. Total OpEx = PM expenses (from statements) + Owner expenses (from Gastos)
+      const totalOpEx=fOpEx+ownerExpTotal;
+
+      // 3. NOI = Revenue - ALL operating expenses
+      const fNoi=fRev-totalOpEx;
+
+      // 4. Debt Service
       const mMort=mort.monthlyPayment||0;
       const fMortP=mMort*n;
 
-      // Cash Flow = what you ACTUALLY keep
-      // PM-managed: Net deposited by PM - Mortgage - Extra owner costs
-      // Owner-managed: Revenue - All expenses - Mortgage
-      const insExp=isOwnerManaged?0:yearExpenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+(toPropCur(e.amount||0,e.expCurrency)),0);
-      const taxExp=isOwnerManaged?0:yearExpenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+(toPropCur(e.amount||0,e.expCurrency)),0);
-      const fCF=isOwnerManaged?(fNoi-fMortP):(fNoi-fMortP-insExp-taxExp);
-      const ownerCosts=fMortP+insExp+taxExp;
+      // 5. Cash Flow = NOI - Mortgage
+      const fCF=fNoi-fMortP;
       const fCFmo=n>0?fCF/n:0;
       const partial=n>0&&n<12;
       const proyAnual=partial&&n>0?(fCF/n)*12:fCF;
@@ -483,35 +494,23 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               )}
             </>}
 
-            {/* If there's mortgage or extra costs, show NOI as intermediate step */}
-            {(fMortP>0||insExp>0||taxExp>0)?<>
-              <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi>0?fNoi/fRev*100:0)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden bg-emerald-50"><span className="text-[9px] md:text-[11px] font-bold text-emerald-800 truncate">= NOI <span className="text-[9px] font-normal">(Net Operating Income)</span></span><span className="text-[12px] font-extrabold text-emerald-800">{dFm(fNoi)} <span className="text-emerald-600 text-[10px]">{(fRev>0?(fNoi/fRev*100):0).toFixed(0)}%</span></span></div></div>
+            {/* NOI */}
+            <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi>0?fNoi/fRev*100:0)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden bg-emerald-50"><span className="text-[9px] md:text-[11px] font-bold text-emerald-800 truncate">= NOI <span className="text-[9px] font-normal">(Net Operating Income)</span></span><span className="text-[12px] font-extrabold text-emerald-800">{dFm(fNoi)} <span className="text-emerald-600 text-[10px]">{(fRev>0?(fNoi/fRev*100):0).toFixed(0)}%</span></span></div></div>
 
-              {fMortP>0&&<>
-                <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Hipoteca</div>
-                <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Hipoteca ({dFm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{dFm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>
-              </>}
+            {/* Debt Service */}
+            {fMortP>0&&<>
+              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Debt Service</div>
+              <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Mortgage ({dFm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{dFm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>
+            </>}
 
-              {!isOwnerManaged&&insExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,insExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Seguro</span><span className="text-[10px] font-bold text-slate-700">{dFm(insExp)}</span></div></div>}
-              {!isOwnerManaged&&taxExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-violet-400 opacity-75" style={{width:Math.max(2,taxExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Impuestos</span><span className="text-[10px] font-bold text-slate-700">{dFm(taxExp)}</span></div></div>}
-
-              <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
-                <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
-                <div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden">
-                  <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Cash Flow</span>
-                  <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)} <span className="text-[10px]">{dFm(fCFmo)}/mes</span></span>
-                </div>
+            {/* Cash Flow = NOI - Debt Service */}
+            <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
+              <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
+              <div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden">
+                <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Cash Flow {!fMortP&&<span className="text-[9px] font-normal">(= NOI, sin hipoteca)</span>}</span>
+                <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)} <span className="text-[10px]">{dFm(fCFmo)}/mes</span></span>
               </div>
-            </>:
-              /* No mortgage — just show final result */
-              <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
-                <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
-                <div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden">
-                  <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Te queda <span className="text-[9px] font-normal">(después de gastos)</span></span>
-                  <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)} <span className="text-[10px]">{(fRev>0?(fCF/fRev*100):0).toFixed(0)}%</span></span>
-                </div>
-              </div>
-            }
+            </div>
             {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded py-1.5 mt-1">Periodo parcial ({n} meses) · Proyección anualizada: <b>{dFm(proyAnual)}</b></div>}
           </div>
         </div>
@@ -592,9 +591,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               const insights=[];
               const avgRevMo=n>0?fRev/n:0;
               const avgNetMo=n>0?fNet/n:0;
-              const breakEvenNights=adr>0?Math.ceil((fOpEx+ownerCosts)/Math.max(n,1)/adr):0;
+              const breakEvenNights=adr>0?Math.ceil(totalOpEx/Math.max(n,1)/adr):0;
               const monthlyMort=mMort;
-              const monthlyOwnerCost=(ownerCosts)/Math.max(n,1);
+              const monthlyMortCost=fMortP/Math.max(n,1);
               const monthlyOpEx=fOpEx/Math.max(n,1);
               const avgNightsMo=fNights>0?Math.round(fNights/n):0;
               
@@ -677,7 +676,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="bg-white rounded-2xl p-3 md:p-4 border border-slate-200 shadow-sm overflow-hidden">
             <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Break-Even</h3>
             {(()=>{
-              const beMo=n>0?(fOpEx/n+mMort+insExp/Math.max(n,1)+taxExp/Math.max(n,1)):0;
+              const beMo=n>0?(totalOpEx/n+mMort):0;
               const beNights=adr>0?Math.ceil(beMo/adr):0;
               const avgNMo=fNights>0?Math.round(fNights/n):0;
               const surplus=avgNMo-beNights;
