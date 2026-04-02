@@ -16,6 +16,22 @@ import { DashboardContext } from './context/DashboardContext';
 import { SupportView } from './views/SupportView';
 import { SettingsView } from './views/SettingsView';
 
+// Safe view wrapper — catches errors per view instead of crashing the app
+class ViewGuard extends React.Component {
+  constructor(props){super(props);this.state={error:null}}
+  static getDerivedStateFromError(error){return {error}}
+  componentDidCatch(e){console.error('View error:',e)}
+  render(){
+    if(this.state.error) return <div className="bg-white rounded-2xl border border-rose-200 p-8 text-center m-4">
+      <div className="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-3"><span className="text-rose-500 text-lg font-bold">!</span></div>
+      <h3 className="text-base font-bold text-slate-700 mb-2">Error en esta sección</h3>
+      <p className="text-sm text-slate-400 mb-4">{this.state.error.message}</p>
+      <button onClick={()=>this.setState({error:null})} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition">Intentar de nuevo</button>
+    </div>;
+    return this.props.children;
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════
@@ -233,7 +249,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>
     </div>
 
-    <div className="flex-1 overflow-auto overflow-x-hidden" role="main"><div className="p-3 md:p-6 pt-[72px] md:pt-6 max-w-[1200px] lg:mx-auto">
+    <div className="flex-1 overflow-auto overflow-x-hidden" role="main"><div className="p-3 md:p-6 pt-[72px] md:pt-6 max-w-[1200px] lg:mx-auto"><ViewGuard>
 
     {/* ═══ DASHBOARD VIEW ═══ */}
     {view==='dashboard'&&(()=>{try{
@@ -879,8 +895,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <button onClick={()=>{setMortConfig({bal:String(mort.balance||''),rate:String(mort.rate||''),term:String(mort.termYears||30),pay:String(mort.monthlyPayment||''),start:mort.startDate||''});setModal('editMort')}} className="text-sm text-blue-600 font-semibold hover:text-blue-800 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-50 transition"><Settings size={15}/> Editar datos de hipoteca</button>
       </>:<div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm max-w-lg">
         <div className="flex items-center gap-3 mb-5"><div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center"><Landmark size={24} className="text-blue-600"/></div><div><h3 className="text-base font-extrabold text-slate-800">Configurar Hipoteca</h3><p className="text-xs text-slate-400">Ingresa los datos de tu mortgage.</p></div></div>
-        <div className="space-y-3"><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mortConfig.bal} onChange={v=>updateMort('bal',v)} prefix="$" type="number" placeholder="285,000"/><Inp label="Tasa (%)" value={mortConfig.rate} onChange={v=>updateMort('rate',v)} type="number" placeholder="7.25"/></div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mortConfig.term} onChange={v=>updateMort('term',v)} type="number" placeholder="30"/><Inp label="Pago Mensual" value={mortConfig.pay} onChange={v=>updateMort('pay',v)} prefix="$" type="number" placeholder="1,945"/><Inp label="Inicio" value={mortConfig.start} onChange={v=>updateMort('start',v)} type="date"/></div></div>
+        <div className="space-y-3"><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mortConfig.bal} onChange={v=>umc('bal',v)} prefix="$" type="number" placeholder="285,000"/><Inp label="Tasa (%)" value={mortConfig.rate} onChange={v=>umc('rate',v)} type="number" placeholder="7.25"/></div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mortConfig.term} onChange={v=>umc('term',v)} type="number" placeholder="30"/><Inp label="Pago Mensual" value={mortConfig.pay} onChange={v=>umc('pay',v)} prefix="$" type="number" placeholder="1,945"/><Inp label="Inicio" value={mortConfig.start} onChange={v=>umc('start',v)} type="date"/></div></div>
         <button onClick={saveMortgage} disabled={!mortConfig.bal||!mortConfig.rate||!mortConfig.pay||savingMort} className="w-full mt-5 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-30 transition shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={16} className="animate-spin"/>}💾 Guardar Hipoteca</button>
       </div>}
     </>}
@@ -1164,56 +1180,56 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={expenseForm.paidBy} onChange={v=>ue('paidBy',v)}/></div>
     </Mdl>}
 
-    {modal==='contribution'&&<Mdl title={editId?'✏️ Editar Aporte':'Aporte de Capital'} grad="from-purple-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...cf,amount:parseFloat(contribForm.amount),type:'contribution'};if(editId){update('contributions',editId,data)}else{save('contributions',data)}}} disabled={!contribForm.amount} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={contribForm.date} onChange={v=>updateContrib('date',v)} type="date" required/><Inp label="Monto" value={contribForm.amount} onChange={v=>updateContrib('amount',v)} prefix="$" type="number" required error={contribForm.amount&&parseFloat(contribForm.amount)<=0?'Monto debe ser mayor a 0':''}/></div>
-      <Inp label="Concepto" value={contribForm.concept} onChange={v=>updateContrib('concept',v)} placeholder="Ej: Down payment, reparación techo" required/>
-      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Socio</label><PPick partners={partners} selected={contribForm.paidBy} onChange={v=>updateContrib('paidBy',v)}/></div>
+    {modal==='contribution'&&<Mdl title={editId?'✏️ Editar Aporte':'Aporte de Capital'} grad="from-purple-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...contribForm,amount:parseFloat(contribForm.amount),type:'contribution'};if(editId){update('contributions',editId,data)}else{save('contributions',data)}}} disabled={!contribForm.amount} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={contribForm.date} onChange={v=>uc('date',v)} type="date" required/><Inp label="Monto" value={contribForm.amount} onChange={v=>uc('amount',v)} prefix="$" type="number" required error={contribForm.amount&&parseFloat(contribForm.amount)<=0?'Monto debe ser mayor a 0':''}/></div>
+      <Inp label="Concepto" value={contribForm.concept} onChange={v=>uc('concept',v)} placeholder="Ej: Down payment, reparación techo" required/>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Socio</label><PPick partners={partners} selected={contribForm.paidBy} onChange={v=>uc('paidBy',v)}/></div>
     </Mdl>}
 
     {modal==='addStmt'&&<Mdl title={editId?'✏️ Editar Statement':'Statement Manual'} grad="from-slate-700 to-slate-800" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const yr=parseInt(stmtForm.year),mo=parseInt(stmtForm.month);const data={year:yr,month:mo,revenue:parseFloat(stmtForm.revenue)||0,net:parseFloat(stmtForm.net)||0,commission:parseFloat(stmtForm.commission)||0,duke:parseFloat(stmtForm.duke)||0,water:parseFloat(stmtForm.water)||0,hoa:parseFloat(stmtForm.hoa)||0,maintenance:parseFloat(stmtForm.maintenance)||0,vendor:parseFloat(stmtForm.vendor)||0};if(editId){update('statements',editId,data)}else{if(stmts.find(s=>s.year===yr&&s.month===mo)){notify(`Ya existe statement para ${M[mo-1]} ${yr}`,"error");return;}save('statements',data);setStmtForm(x=>({...x,month:x.month<12?x.month+1:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''}))}}} disabled={!stmtForm.revenue} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Año" value={stmtForm.year} onChange={v=>updateStmt('year',v)} type="number" disabled={!!editId}/><Sel label="Mes" value={stmtForm.month} onChange={v=>updateStmt('month',v)} options={M.map((m,i)=>({v:i+1,l:m}))}/></div>
-      <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100"><div className="text-[10px] font-black text-emerald-700 uppercase mb-3">Ingresos</div><Inp label="Revenue Total" value={stmtForm.revenue} onChange={v=>updateStmt('revenue',v)} prefix="$" type="number" required error={stmtForm.revenue&&parseFloat(stmtForm.revenue)<=0?'Ingresa el revenue del periodo':''}/></div>
-      <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100"><div className="text-[10px] font-black text-rose-700 uppercase mb-3">Gastos</div><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Comisión PM" value={stmtForm.commission} onChange={v=>updateStmt('commission',v)} prefix="$" type="number"/><Inp label="Electricidad" value={stmtForm.duke} onChange={v=>updateStmt('duke',v)} prefix="$" type="number"/><Inp label="Agua" value={stmtForm.water} onChange={v=>updateStmt('water',v)} prefix="$" type="number"/><Inp label="HOA" value={stmtForm.hoa} onChange={v=>updateStmt('hoa',v)} prefix="$" type="number"/><Inp label="Mantenimiento" value={stmtForm.maintenance} onChange={v=>updateStmt('maintenance',v)} prefix="$" type="number"/><Inp label="Vendor/Otros" value={stmtForm.vendor} onChange={v=>updateStmt('vendor',v)} prefix="$" type="number"/></div></div>
-      <Inp label="Net al Owner" value={stmtForm.net} onChange={v=>updateStmt('net',v)} prefix="$" type="number"/>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Año" value={stmtForm.year} onChange={v=>us('year',v)} type="number" disabled={!!editId}/><Sel label="Mes" value={stmtForm.month} onChange={v=>us('month',v)} options={M.map((m,i)=>({v:i+1,l:m}))}/></div>
+      <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100"><div className="text-[10px] font-black text-emerald-700 uppercase mb-3">Ingresos</div><Inp label="Revenue Total" value={stmtForm.revenue} onChange={v=>us('revenue',v)} prefix="$" type="number" required error={stmtForm.revenue&&parseFloat(stmtForm.revenue)<=0?'Ingresa el revenue del periodo':''}/></div>
+      <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100"><div className="text-[10px] font-black text-rose-700 uppercase mb-3">Gastos</div><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Comisión PM" value={stmtForm.commission} onChange={v=>us('commission',v)} prefix="$" type="number"/><Inp label="Electricidad" value={stmtForm.duke} onChange={v=>us('duke',v)} prefix="$" type="number"/><Inp label="Agua" value={stmtForm.water} onChange={v=>us('water',v)} prefix="$" type="number"/><Inp label="HOA" value={stmtForm.hoa} onChange={v=>us('hoa',v)} prefix="$" type="number"/><Inp label="Mantenimiento" value={stmtForm.maintenance} onChange={v=>us('maintenance',v)} prefix="$" type="number"/><Inp label="Vendor/Otros" value={stmtForm.vendor} onChange={v=>us('vendor',v)} prefix="$" type="number"/></div></div>
+      <Inp label="Net al Owner" value={stmtForm.net} onChange={v=>us('net',v)} prefix="$" type="number"/>
     </Mdl>}
 
     {modal==='editMort'&&<Mdl title="Editar Hipoteca" grad="from-blue-600 to-blue-700" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={async()=>{await saveMortgage();setModal(null)}} disabled={!(parseFloat(mortConfig.bal)>0)||!(parseFloat(mortConfig.rate)>0)||!(parseFloat(mortConfig.pay)>0)||savingMort} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={14} className="animate-spin"/>}Guardar</button></>}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mortConfig.bal} onChange={v=>updateMort('bal',v)} prefix="$" type="number"/><Inp label="Tasa (%)" value={mortConfig.rate} onChange={v=>updateMort('rate',v)} type="number"/></div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mortConfig.term} onChange={v=>updateMort('term',v)} type="number"/><Inp label="Pago Mensual" value={mortConfig.pay} onChange={v=>updateMort('pay',v)} prefix="$" type="number"/><Inp label="Inicio" value={mortConfig.start} onChange={v=>updateMort('start',v)} type="date"/></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mortConfig.bal} onChange={v=>umc('bal',v)} prefix="$" type="number"/><Inp label="Tasa (%)" value={mortConfig.rate} onChange={v=>umc('rate',v)} type="number"/></div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mortConfig.term} onChange={v=>umc('term',v)} type="number"/><Inp label="Pago Mensual" value={mortConfig.pay} onChange={v=>umc('pay',v)} prefix="$" type="number"/><Inp label="Inicio" value={mortConfig.start} onChange={v=>umc('start',v)} type="date"/></div>
     </Mdl>}
 
-    {modal==='repair'&&<Mdl title={editId?'✏️ Editar Ticket':'🔧 Nuevo Ticket de Reparación'} grad="from-amber-500 to-amber-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...rf,amount:parseFloat(repairForm.amount)||0};if(editId){update('repairs',editId,data)}else{save('repairs',data)}}} disabled={!repairForm.title} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <Inp label="Título" value={repairForm.title} onChange={v=>updateRepair('title',v)} placeholder="Ej: Reparación de AC, Pintura exterior" required/>
+    {modal==='repair'&&<Mdl title={editId?'✏️ Editar Ticket':'🔧 Nuevo Ticket de Reparación'} grad="from-amber-500 to-amber-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...repairForm,amount:parseFloat(repairForm.amount)||0};if(editId){update('repairs',editId,data)}else{save('repairs',data)}}} disabled={!repairForm.title} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <Inp label="Título" value={repairForm.title} onChange={v=>ur('title',v)} placeholder="Ej: Reparación de AC, Pintura exterior" required/>
       <div className="grid grid-cols-2 gap-3">
-        <Inp label="Fecha" value={repairForm.date} onChange={v=>updateRepair('date',v)} type="date" required/>
-        <Inp label="Monto (USD)" value={repairForm.amount} onChange={v=>updateRepair('amount',v)} prefix="$" type="number" min="0"/>
+        <Inp label="Fecha" value={repairForm.date} onChange={v=>ur('date',v)} type="date" required/>
+        <Inp label="Monto (USD)" value={repairForm.amount} onChange={v=>ur('amount',v)} prefix="$" type="number" min="0"/>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Sel label="Tipo" value={repairForm.category} onChange={v=>updateRepair('category',v)} options={[{v:'repair',l:'🔧 Reparación urgente'},{v:'preventive',l:'🛡️ Mantenimiento preventivo'},{v:'capex',l:'📈 Mejora / CapEx'}]}/>
-        <Sel label="Estado" value={repairForm.status} onChange={v=>updateRepair('status',v)} options={[{v:'pending',l:'⚠ Pendiente'},{v:'progress',l:'⏳ En Progreso'},{v:'done',l:'✓ Completado'}]}/>
+        <Sel label="Tipo" value={repairForm.category} onChange={v=>ur('category',v)} options={[{v:'repair',l:'🔧 Reparación urgente'},{v:'preventive',l:'🛡️ Mantenimiento preventivo'},{v:'capex',l:'📈 Mejora / CapEx'}]}/>
+        <Sel label="Estado" value={repairForm.status} onChange={v=>ur('status',v)} options={[{v:'pending',l:'⚠ Pendiente'},{v:'progress',l:'⏳ En Progreso'},{v:'done',l:'✓ Completado'}]}/>
       </div>
-      <Inp label="Vendor / Proveedor" value={repairForm.vendor} onChange={v=>updateRepair('vendor',v)} placeholder="Ej: ABC Plumbing, Home Depot"/>
-      <Inp label="Descripción (opcional)" value={repairForm.description} onChange={v=>updateRepair('description',v)} placeholder="Detalles adicionales..."/>
-      {partners.length>0&&<div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={repairForm.paidBy} onChange={v=>updateRepair('paidBy',v)}/></div>}
+      <Inp label="Vendor / Proveedor" value={repairForm.vendor} onChange={v=>ur('vendor',v)} placeholder="Ej: ABC Plumbing, Home Depot"/>
+      <Inp label="Descripción (opcional)" value={repairForm.description} onChange={v=>ur('description',v)} placeholder="Detalles adicionales..."/>
+      {partners.length>0&&<div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={repairForm.paidBy} onChange={v=>ur('paidBy',v)}/></div>}
     </Mdl>}
 
-    {modal==='task'&&<Mdl title={editId?'✏️ Editar Tarea':'📋 Nueva Tarea'} grad="from-indigo-500 to-indigo-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...tf};if(editId){update('tasks',editId,data)}else{save('tasks',data)}}} disabled={!taskForm.title} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <Inp label="Título" value={taskForm.title} onChange={v=>updateTask('title',v)} placeholder="Ej: Renovar seguro, Pagar property tax"/>
+    {modal==='task'&&<Mdl title={editId?'✏️ Editar Tarea':'📋 Nueva Tarea'} grad="from-indigo-500 to-indigo-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...taskForm};if(editId){update('tasks',editId,data)}else{save('tasks',data)}}} disabled={!taskForm.title} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <Inp label="Título" value={taskForm.title} onChange={v=>ut('title',v)} placeholder="Ej: Renovar seguro, Pagar property tax"/>
       <div className="grid grid-cols-2 gap-3">
-        <Inp label="Fecha límite" value={taskForm.dueDate} onChange={v=>updateTask('dueDate',v)} type="date"/>
-        <Sel label="Prioridad" value={taskForm.priority} onChange={v=>updateTask('priority',v)} options={[{v:'high',l:'🔴 Alta'},{v:'medium',l:'🟡 Media'},{v:'low',l:'🟢 Baja'}]}/>
+        <Inp label="Fecha límite" value={taskForm.dueDate} onChange={v=>ut('dueDate',v)} type="date"/>
+        <Sel label="Prioridad" value={taskForm.priority} onChange={v=>ut('priority',v)} options={[{v:'high',l:'🔴 Alta'},{v:'medium',l:'🟡 Media'},{v:'low',l:'🟢 Baja'}]}/>
       </div>
-      <Sel label="Estado" value={taskForm.status} onChange={v=>updateTask('status',v)} options={[{v:'pending',l:'⚠ Pendiente'},{v:'progress',l:'⏳ En Progreso'},{v:'done',l:'✓ Completada'}]}/>
-      <Inp label="Notas (opcional)" value={taskForm.notes} onChange={v=>updateTask('notes',v)} placeholder="Detalles adicionales..."/>
+      <Sel label="Estado" value={taskForm.status} onChange={v=>ut('status',v)} options={[{v:'pending',l:'⚠ Pendiente'},{v:'progress',l:'⏳ En Progreso'},{v:'done',l:'✓ Completada'}]}/>
+      <Inp label="Notas (opcional)" value={taskForm.notes} onChange={v=>ut('notes',v)} placeholder="Detalles adicionales..."/>
     </Mdl>}
 
     {modal==='valuation'&&<Mdl title={editId?'✏️ Editar Valorización':'📈 Registrar Valor de Mercado'} grad="from-emerald-600 to-teal-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={date:valForm.date,value:parseFloat(valForm.value)||0,source:valForm.source,notes:valForm.notes};if(editId){update('valuations',editId,data)}else{save('valuations',data)}}} disabled={!valForm.value} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <Inp label="Fecha de Estimación" value={valForm.date} onChange={v=>updateVal('date',v)} type="date"/>
-      <Inp label="Valor Estimado de Mercado" value={valForm.value} onChange={v=>updateVal('value',v)} prefix="$" type="number" placeholder="490,000"/>
-      <Sel label="Fuente" value={valForm.source} onChange={v=>updateVal('source',v)} options={[{v:'manual',l:'Estimación propia'},{v:'zillow',l:'Zillow Zestimate'},{v:'redfin',l:'Redfin Estimate'},{v:'appraisal',l:'Avalúo profesional'},{v:'broker',l:'CMA de broker'},{v:'comps',l:'Comparables de mercado'}]}/>
-      <Inp label="Notas (opcional)" value={valForm.notes} onChange={v=>updateVal('notes',v)} placeholder="Ej: Basado en venta de vecino por $500K"/>
+      <Inp label="Fecha de Estimación" value={valForm.date} onChange={v=>uv('date',v)} type="date"/>
+      <Inp label="Valor Estimado de Mercado" value={valForm.value} onChange={v=>uv('value',v)} prefix="$" type="number" placeholder="490,000"/>
+      <Sel label="Fuente" value={valForm.source} onChange={v=>uv('source',v)} options={[{v:'manual',l:'Estimación propia'},{v:'zillow',l:'Zillow Zestimate'},{v:'redfin',l:'Redfin Estimate'},{v:'appraisal',l:'Avalúo profesional'},{v:'broker',l:'CMA de broker'},{v:'comps',l:'Comparables de mercado'}]}/>
+      <Inp label="Notas (opcional)" value={valForm.notes} onChange={v=>uv('notes',v)} placeholder="Ej: Basado en venta de vecino por $500K"/>
       {valForm.value&&prop.purchasePrice>0&&<div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2 text-sm">
-        <div className="flex justify-between"><span className="text-slate-500">Precio Precio de Compra</span><span className="font-semibold">{fm(prop.purchasePrice)}</span></div>
+        <div className="flex justify-between"><span className="text-slate-500">Precio de Compra</span><span className="font-semibold">{fm(prop.purchasePrice)}</span></div>
         <div className="flex justify-between"><span className="text-slate-500">Valor Estimado</span><span className="font-bold text-emerald-600">{fm(parseFloat(valForm.value))}</span></div>
         <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-600 font-semibold">Apreciación</span><span className={`font-extrabold ${parseFloat(valForm.value)>=prop.purchasePrice?'text-emerald-600':'text-rose-500'}`}>{((parseFloat(valForm.value)-prop.purchasePrice)/prop.purchasePrice*100).toFixed(1)}% ({fm(parseFloat(valForm.value)-prop.purchasePrice)})</span></div>
       </div>}
