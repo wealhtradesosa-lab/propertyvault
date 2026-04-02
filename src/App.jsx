@@ -213,9 +213,15 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   // LTV
   const ltv = prop.purchasePrice > 0 && mort.balance > 0 ? (mort.balance / prop.purchasePrice) * 100 : 0;
 
-  const fixedExp=useMemo(()=>expenses.filter(e=>{const c=CATS.find(x=>x.v===e.category);return c?.fixed||e.type==='fixed'}),[expenses]);
-  const additionalExp=useMemo(()=>expenses.filter(e=>{const c=CATS.find(x=>x.v===e.category);return !c?.fixed&&e.type!=='fixed'}),[expenses]);
-  const expByCat=useMemo(()=>{const r={};expenses.forEach(e=>{const c=CATS.find(x=>x.v===e.category)||{l:'Otros'};if(!r[e.category])r[e.category]={name:c.l,value:0};r[e.category].value+=e.amount||0});return Object.values(r).sort((a,b)=>b.value-a.value)},[expenses]);
+  const propCountry=prop.country||'US';
+  const propCurrency=prop.currency||'USD';
+  const fmP=v=>fmCurrency(v,propCurrency);
+  const propCats=getCats(propCountry);
+  const propTerms=getTerms(propCountry);
+
+  const fixedExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return c?.fixed||e.type==='fixed'}),[expenses,propCats]);
+  const additionalExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return !c?.fixed&&e.type!=='fixed'}),[expenses,propCats]);
+  const expByCat=useMemo(()=>{const r={};expenses.forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!r[e.category])r[e.category]={name:c.l,value:0};r[e.category].value+=e.amount||0});return Object.values(r).sort((a,b)=>b.value-a.value)},[expenses,propCats]);
 
   const annual=useMemo(()=>{const y={};stmts.forEach(s=>{if(!y[s.year])y[s.year]={year:s.year,revenue:0,net:0,commission:0,duke:0,water:0,hoa:0,maintenance:0,vendor:0,nights:0,reservations:0,n:0};const a=y[s.year];a.revenue+=s.revenue||0;a.net+=s.net||0;a.commission+=s.commission||0;a.duke+=s.duke||0;a.water+=s.water||0;a.hoa+=s.hoa||0;a.maintenance+=s.maintenance||0;a.vendor+=s.vendor||0;a.nights+=s.nights||0;a.reservations+=s.reservations||0;a.n++});return Object.values(y).sort((a,b)=>a.year-b.year)},[stmts]);
 
@@ -256,11 +262,6 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     <div className="flex-1 p-3 md:p-6 pt-[72px] md:pt-6"><div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">{Array(5).fill(0).map((_,i)=><div key={i} className="bg-white rounded-2xl p-4 border border-slate-200 animate-pulse" style={{animationDelay:i*100+'ms'}}><div className="h-2.5 bg-slate-200 rounded w-16 mb-3"/><div className="h-6 bg-slate-200 rounded w-24 mb-2"/><div className="h-2 bg-slate-100 rounded w-20"/></div>)}</div>
     <div className="grid grid-cols-1 md:grid-cols-12 gap-4"><div className="md:col-span-7 bg-white rounded-2xl p-5 border border-slate-200 h-64 animate-pulse"/><div className="md:col-span-5 bg-white rounded-2xl p-5 border border-slate-200 h-64 animate-pulse" style={{animationDelay:'200ms'}}/></div></div></div>
   </div>;
-  const propCountry=prop.country||'US';
-  const propCurrency=prop.currency||'USD';
-  const fmP=v=>fmCurrency(v,propCurrency);
-  const propCats=getCats(propCountry);
-  const propTerms=getTerms(propCountry);
   const ctx={propertyId,prop,allProperties,onSwitchProperty,onLogout,onAddProperty,userEmail,isAdmin,plan,canUse,view,setView,modal,setModal,editId,setEditId,mobileNav,setMobileNav,dark,setDark,stmts,expenses,income,contribs,valuations,repairs,tasks,tickets,partners,mort,annual,revenue,stmtNet:stmts.reduce((s,x)=>s+(x.net||0),0),stmtComm:stmts.reduce((s,x)=>s+(x.commission||0),0),totNet:income.reduce((s,i)=>s+(i.netAmount||0),0),totCont:contribs.reduce((s,c)=>s+(c.amount||0),0)+(partners||[]).reduce((s,p)=>s+(p.initialCapital||0),0),marketValue,realEquity,realLTV,appreciation,latestVal,pt,fixedExp,additionalExp,expByCat,dashYear,setDashYear,stmtPage,setStmtPage,stmtYearFilter,setStmtYearFilter,rptTab,setRptTab,uploadLog,setUploadLog,toast,setToast,loading,expenseForm,ue,contribForm,uc,stmtForm,us,valForm,uv,repairForm,ur,taskForm,ut,mortConfig,umc,savingMort,ticketForm,setTicketForm,settingsForm,setSettingsForm,editPartners,setEditPartners,save,update,del,handlePDFs,saveMortgage,markPaid,notify,propCountry,propCurrency,propCats,propTerms,fmP,COUNTRIES,CURRENCY_LIST,M,fm,fmCurrency,fmDate,pct,CATS,US,PT,C,PER_PAGE};
   return <DashboardContext.Provider value={ctx}><div className="min-h-screen bg-[#F8FAFC] flex">
     {/* MOBILE HEADER */}
@@ -850,7 +851,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <Tbl cols={[
             {label:'Fecha',render:r=><span className="text-slate-500 text-xs">{r.date?r.date.slice(8):''}</span>},
             {label:'Concepto',key:'concept',cls:'text-slate-700 font-medium'},
-            {label:'Categoría',render:r=>{const c=CATS.find(x=>x.v===r.category);return<span className="text-xs">{c?c.i+' '+c.l:r.category}</span>}},
+            {label:'Categoría',render:r=>{const c=propCats.find(x=>x.v===r.category);return<span className="text-xs">{c?c.i+' '+c.l:r.category}</span>}},
             {label:'Tipo',render:r=><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.type==='fixed'?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}`}>{r.type==='fixed'?'Fijo':'Adicional'}</span>},
             {label:'Pagó',render:r=><span style={{color:pCl(r.paidBy)}} className="text-xs font-semibold">{pN(r.paidBy)}</span>},
             {label:'Monto',r:true,render:r=><span className="font-bold text-rose-500">{fm(r.amount)}</span>}
@@ -1005,13 +1006,24 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {(()=>{
         const pmCovers={commission:stmts.some(s=>(s.commission||0)>0),electricity:stmts.some(s=>(s.duke||0)>0),water:stmts.some(s=>(s.water||0)>0),hoa:stmts.some(s=>(s.hoa||0)>0),maintenance:stmts.some(s=>(s.maintenance||0)>0)};
         const pmTasks=tasks.filter(t=>t.payer==='pm');
-        const allObligations=[
+        const usObligations=[
           {title:'Hipoteca',icon:'🏦',freq:'monthly'},
           {title:'Impuestos',icon:'🏛️',freq:'annual'},
           {title:'Seguro',icon:'🛡️',freq:'annual'},
           {title:'Contabilidad',icon:'📊',freq:'monthly'},
           ...(!pmCovers.hoa?[{title:'HOA',icon:'🏢',freq:'monthly'}]:[]),
         ];
+        const coObligations=[
+          {title:'Personal de Servicio',icon:'👷',freq:'monthly'},
+          {title:'Prestaciones Sociales',icon:'📋',freq:'monthly'},
+          {title:'Impuesto Predial',icon:'🏛️',freq:'annual'},
+          {title:'Seguros',icon:'🛡️',freq:'annual'},
+          {title:'Contabilidad',icon:'📊',freq:'monthly'},
+          {title:'Hipoteca',icon:'🏦',freq:'monthly'},
+          ...(!pmCovers.hoa?[{title:'Administración',icon:'🏢',freq:'monthly'}]:[]),
+        ];
+        const country=prop.country||'US';
+        const allObligations=country==='CO'?coObligations:usObligations;
         const existing=tasks.map(t=>t.title.toLowerCase());
         const suggestions=allObligations.filter(o=>!existing.includes(o.title.toLowerCase()));
         if(!suggestions.length)return null;
@@ -1263,7 +1275,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ MODALS ═══ */}
     {modal==='expense'&&<Mdl title={editId?'✏️ Editar Gasto':'Registrar Gasto'} grad="from-rose-500 to-rose-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...expenseForm,amount:parseFloat(expenseForm.amount)};if(editId){update('expenses',editId,data)}else{save('expenses',data)}}} disabled={!expenseForm.amount||!expenseForm.concept} className="flex-1 py-2.5 bg-rose-500 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={expenseForm.date} onChange={v=>ue('date',v)} type="date" required/><Sel label="Categoría" value={expenseForm.category} onChange={v=>ue('category',v)} options={CATS.map(c=>({v:c.v,l:c.i+' '+c.l}))}/></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={expenseForm.date} onChange={v=>ue('date',v)} type="date" required/><Sel label="Categoría" value={expenseForm.category} onChange={v=>ue('category',v)} options={propCats.map(c=>({v:c.v,l:c.i+' '+c.l}))}/></div>
       <Inp label="Concepto" value={expenseForm.concept} onChange={v=>ue('concept',v)} placeholder="Descripción del gasto" required error={expenseForm.concept===''&&expenseForm.amount?'Ingresa una descripción':''}/>
       <Inp label="Monto (USD)" value={expenseForm.amount} onChange={v=>ue('amount',v)} prefix="$" type="number" min="0" required error={expenseForm.amount&&parseFloat(expenseForm.amount)<=0?'El monto debe ser mayor a 0':''}/>
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de gasto</label><div className="grid grid-cols-2 gap-2">{[['fixed','🔄 Fijo'],['additional','➕ Adicional']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('type',v)} className={`py-2.5 rounded-xl border-2 text-sm font-medium transition ${expenseForm.type===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
