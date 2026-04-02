@@ -443,19 +443,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-1">{dFm(fRev)}</div>
           <div className="text-[10px] text-slate-400">{n} meses{revChg!==null?` · ${revChg>=0?'+':''}${revChg.toFixed(0)}% YoY`:''}</div>
         </div>
-        {fMortP>0?
-          <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-amber-500 border border-slate-200 shadow-sm">
-            <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">NOI</div>
-            <div className="text-base md:text-[22px] font-extrabold text-amber-700 mt-1">{dFm(fNoi)}</div>
-            <div className="text-[10px] text-slate-400">Margen {fMargin.toFixed(0)}%</div>
-          </div>
-        :
-          <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-rose-400 border border-slate-200 shadow-sm">
-            <div className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Operating Expenses</div>
-            <div className="text-base md:text-[22px] font-extrabold text-rose-600 mt-1">-{dFm(totalOpEx)}</div>
-            <div className="text-[10px] text-slate-400">{(fRev>0?(totalOpEx/fRev*100):0).toFixed(0)}% del revenue</div>
-          </div>
-        }
+        <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fNoi>=0?'border-l-amber-500':'border-l-rose-500'}`}>
+          <div className={`text-[10px] font-bold uppercase tracking-widest ${fNoi>=0?'text-amber-600':'text-rose-500'}`}>NOI</div>
+          <div className={`text-base md:text-[22px] font-extrabold mt-1 ${fNoi>=0?'text-amber-700':'text-rose-600'}`}>{dFm(fNoi)}</div>
+          <div className="text-[10px] text-slate-400">Margin {fMargin.toFixed(0)}%</div>
+        </div>
         <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
           <div className={`text-[10px] font-bold uppercase tracking-widest ${fCF>=0?'text-emerald-600':'text-rose-500'}`}>Cash Flow</div>
           <div className={`text-base md:text-[22px] font-extrabold mt-1 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{dFm(fCF)}</div>
@@ -510,7 +502,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </>}
 
             {/* NOI = Revenue - Operating Expenses */}
-            {fMortP>0&&<div className={`rounded-lg relative overflow-hidden mt-1 ${fNoi>=0?'bg-emerald-50':'bg-rose-50'}`} style={{height:'38px'}}><div className={`absolute inset-y-0 left-0 ${fNoi>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fNoi)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><div><span className={`text-[11px] font-bold ${fNoi>=0?'text-emerald-800':'text-rose-800'}`}>= NOI</span><span className="text-[9px] text-slate-400 ml-2">Revenue − Operating Expenses</span></div><span className={`text-[12px] font-extrabold ${fNoi>=0?'text-emerald-800':'text-rose-800'}`}>{dFm(fNoi)} <span className="text-[10px]">{fMargin.toFixed(0)}%</span></span></div></div>}
+            <div className={`rounded-lg relative overflow-hidden mt-1 ${fNoi>=0?'bg-emerald-50':'bg-rose-50'}`} style={{height:'38px'}}><div className={`absolute inset-y-0 left-0 ${fNoi>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fNoi)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><div><span className={`text-[11px] font-bold ${fNoi>=0?'text-emerald-800':'text-rose-800'}`}>= NOI</span><span className="text-[9px] text-slate-400 ml-2">Revenue − Operating Expenses</span></div><span className={`text-[12px] font-extrabold ${fNoi>=0?'text-emerald-800':'text-rose-800'}`}>{dFm(fNoi)} <span className="text-[10px]">{fMargin.toFixed(0)}%</span></span></div></div>
 
             {/* Debt Service = Mortgage */}
             {fMortP>0&&<>
