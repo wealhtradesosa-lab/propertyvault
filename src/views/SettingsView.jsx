@@ -1,12 +1,19 @@
 import { collection, addDoc, updateDoc, deleteDoc, doc, getDocs, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useDashboard } from '../context/DashboardContext';
+import { getTerms } from '../lib/constants';
 import { Inp, Sel } from '../components/ui';
 
 export function SettingsView() {
-  const { prop, propertyId, partners, latestVal, settingsForm, setSettingsForm, editPartners, setEditPartners, stmts, expenses, income, contribs, valuations, repairs, notify, US, PT, M, fm } = useDashboard();
-      const sf2=settingsForm||{name:prop.name||'',address:prop.address||'',city:prop.city||'',state:prop.state||'FL',type:prop.type||'vacation',purchasePrice:String(prop.purchasePrice||''),purchaseDate:prop.purchaseDate||'',marketValue:String(latestVal?latestVal.value:prop.purchasePrice||''),manager:prop.manager||'',managerCommission:String(prop.managerCommission||15),bedrooms:String(prop.bedrooms||''),bathrooms:String(prop.bathrooms||'')};
-      const uf=(k,v)=>setSettingsForm({...sf2,[k]:v});
+  const { prop, propertyId, partners, latestVal, settingsForm, setSettingsForm, editPartners, setEditPartners, stmts, expenses, income, contribs, valuations, repairs, notify, propTerms, COUNTRIES, CURRENCY_LIST, US, PT, M, fm } = useDashboard();
+      const sf2=settingsForm||{name:prop.name||'',address:prop.address||'',city:prop.city||'',state:prop.state||'',type:prop.type||'vacation',purchasePrice:String(prop.purchasePrice||''),purchaseDate:prop.purchaseDate||'',marketValue:String(latestVal?latestVal.value:prop.purchasePrice||''),manager:prop.manager||'',managerCommission:String(prop.managerCommission||15),bedrooms:String(prop.bedrooms||''),bathrooms:String(prop.bathrooms||''),country:prop.country||'US',currency:prop.currency||'USD'};
+      const uf=(k,v)=>{
+        const next={...sf2,[k]:v};
+        if(k==='country'){const c=COUNTRIES.find(x=>x.v===v);if(c)next.currency=c.cur;next.state=''}
+        setSettingsForm(next);
+      };
+      const terms=getTerms(sf2.country);
+      const stateList=terms.stateList||[];
       const ep=editPartners||partners.map(p=>({...p,email:p.email||''}));
       const upEp=(i,k,v)=>{const n=[...ep];n[i]={...n[i],[k]:v};setEditPartners(n)};
       return <>
@@ -17,12 +24,17 @@ export function SettingsView() {
         <h3 className="text-base font-bold text-slate-700 mb-4">Datos Generales</h3>
         <div className="space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Nombre" value={sf2.name} onChange={v=>uf('name',v)}/><Inp label="Dirección" value={sf2.address} onChange={v=>uf('address',v)}/></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Ciudad" value={sf2.city} onChange={v=>uf('city',v)}/><Sel label="Estado" value={sf2.state} onChange={v=>uf('state',v)} options={US.map(s=>({v:s,l:s}))}/><Sel label="Tipo" value={sf2.type} onChange={v=>uf('type',v)} options={PT}/></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Precio de Compra" value={sf2.purchasePrice} onChange={v=>uf('purchasePrice',v)} prefix="$" type="number"/><Inp label="Fecha de Compra" value={sf2.purchaseDate} onChange={v=>uf('purchaseDate',v)} type="date"/><Inp label="Valor Comercial Actual" value={sf2.marketValue} onChange={v=>uf('marketValue',v)} prefix="$" type="number"/></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <Sel label="País" value={sf2.country} onChange={v=>uf('country',v)} options={COUNTRIES.map(c=>({v:c.v,l:c.l}))}/>
+            <Sel label="Moneda" value={sf2.currency} onChange={v=>uf('currency',v)} options={CURRENCY_LIST}/>
+            <Sel label="Tipo" value={sf2.type} onChange={v=>uf('type',v)} options={PT}/>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Ciudad" value={sf2.city} onChange={v=>uf('city',v)}/>{stateList.length>0?<Sel label={terms.state} value={sf2.state} onChange={v=>uf('state',v)} options={stateList.map(s=>({v:s,l:s}))}/>:<Inp label={terms.state} value={sf2.state} onChange={v=>uf('state',v)}/>}<Inp label="Fecha de Compra" value={sf2.purchaseDate} onChange={v=>uf('purchaseDate',v)} type="date"/></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Precio de Compra" value={sf2.purchasePrice} onChange={v=>uf('purchasePrice',v)} prefix={sf2.currency==='EUR'?'€':sf2.currency==='GBP'?'£':'$'} type="number"/><Inp label="Valor Comercial Actual" value={sf2.marketValue} onChange={v=>uf('marketValue',v)} prefix={sf2.currency==='EUR'?'€':sf2.currency==='GBP'?'£':'$'} type="number"/></div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3"><Inp label="Property Manager" value={sf2.manager} onChange={v=>uf('manager',v)}/><Inp label="Comisión (%)" value={sf2.managerCommission} onChange={v=>uf('managerCommission',v)} type="number"/><Inp label="Habitaciones" value={sf2.bedrooms} onChange={v=>uf('bedrooms',v)} type="number"/><Inp label="Baños" value={sf2.bathrooms} onChange={v=>uf('bathrooms',v)} type="number"/></div>
         </div>
         <button onClick={async()=>{try{
-          const updates={name:sf2.name,address:sf2.address,city:sf2.city,state:sf2.state,type:sf2.type,purchasePrice:parseFloat(sf2.purchasePrice)||0,purchaseDate:sf2.purchaseDate||'',manager:sf2.manager,managerCommission:parseFloat(sf2.managerCommission)||15,bedrooms:parseInt(sf2.bedrooms)||0,bathrooms:parseInt(sf2.bathrooms)||0};
+          const updates={name:sf2.name,address:sf2.address,city:sf2.city,state:sf2.state,type:sf2.type,country:sf2.country||'US',currency:sf2.currency||'USD',purchasePrice:parseFloat(sf2.purchasePrice)||0,purchaseDate:sf2.purchaseDate||'',manager:sf2.manager,managerCommission:parseFloat(sf2.managerCommission)||15,bedrooms:parseInt(sf2.bedrooms)||0,bathrooms:parseInt(sf2.bathrooms)||0};
           await updateDoc(doc(db,'properties',propertyId),updates);
           const mv=parseFloat(sf2.marketValue)||0;
           if(mv>0&&mv!==(latestVal?latestVal.value:prop.purchasePrice)){await addDoc(collection(db,'properties',propertyId,'valuations'),{date:new Date().toISOString().split('T')[0],value:mv,source:'manual',notes:'Actualizado desde Configuración',createdAt:serverTimestamp()})}
