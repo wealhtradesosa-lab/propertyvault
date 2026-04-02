@@ -42,7 +42,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   useEffect(()=>{if(isAdmin)return;const unsub=onSnapshot(doc(db,'users',userEmail.toLowerCase()),snap=>{if(snap.exists()){const d=snap.data();if(d.status==='active'||d.status==='past_due')setUserPlan(d.plan||'free');else setUserPlan('free');}},()=>{});return()=>unsub()},[userEmail,isAdmin]);
   const plan=isAdmin?'pro':userPlan;
   const canUse=(feature)=>{if(isAdmin)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio']};return(access[plan]||access.free).includes(feature);};
-  const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');
+  const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');const [viewCur,setViewCur]=useState(null);
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);
@@ -305,6 +305,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       // Currency conversion helper
       const xRate=prop.exchangeRate||1;
+      const vc=viewCur||propCurrency;
+      const dConv=(v)=>{if(vc===propCurrency||xRate<=1)return v;if(vc==='USD'&&propCurrency!=='USD')return v/xRate;if(vc!=='USD'&&propCurrency==='USD')return v*xRate;return v};
+      const dFm=(v)=>fmCurrency(dConv(v),vc);
       const toPC=(amt,cur)=>{
         if(!cur||cur===propCurrency)return amt;
         if(cur==='USD'&&propCurrency!=='USD')return amt*xRate;
@@ -365,6 +368,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {annual.length>0&&<div className="flex items-center gap-1.5 mb-4 no-print overflow-x-auto pb-1">
         <button onClick={()=>setDashYear('all')} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear==='all'?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>Acumulado</button>
         {annual.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear===y.year?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
+        {xRate>1&&<div className="ml-auto flex gap-1 shrink-0">{[propCurrency,'USD'].filter((v,i,a)=>a.indexOf(v)===i).map(c=><button key={c} onClick={()=>setViewCur(c===propCurrency?null:c)} className={`px-3 py-2 rounded-xl text-[10px] font-bold transition ${(viewCur||propCurrency)===c?'bg-blue-600 text-white':'bg-white border border-blue-200 text-blue-500 hover:bg-blue-50'}`}>{c}</button>)}</div>}
       </div>}
 
       {fRev>0?<>
@@ -372,7 +376,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 mb-5">
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm">
           <div className="text-[10px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Ingreso Bruto</div>
-          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{fm(fRev)}</div>
+          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{dFm(fRev)}</div>
           <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">{n} meses</div>
           {revChg!==null&&<div className={`text-[11px] md:text-[10px] font-bold mt-0.5 ${revChg>=0?'text-emerald-600':'text-rose-500'}`}>{revChg>=0?'▲':'▼'} {Math.abs(revChg).toFixed(0)}% YoY</div>}
         </div>
@@ -383,14 +387,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
         <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
           <div className="text-[10px] md:text-[9px] font-bold text-slate-500 uppercase tracking-widest">Cash Flow</div>
-          <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fCF)}</div>
-          <div className={`text-[11px] md:text-[10px] mt-0.5 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{fm(fCFmo)}/mo</div>
+          <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{dFm(fCF)}</div>
+          <div className={`text-[11px] md:text-[10px] mt-0.5 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mo</div>
         </div>
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-400 border border-slate-200 shadow-sm">
           <div className="text-[10px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Ocupación</div>
           <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{fNights>0?occupancy.toFixed(0)+'%':'—'}</div>
           <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">{fNights>0?`${fNights} noches`:'Sin datos'}</div>
-          {fNights>0&&<div className="text-[11px] md:text-[10px] text-slate-500 mt-0.5">ADR: <b className="text-blue-600">{fm(adr)}</b></div>}
+          {fNights>0&&<div className="text-[11px] md:text-[10px] text-slate-500 mt-0.5">ADR: <b className="text-blue-600">{dFm(adr)}</b></div>}
         </div>
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
           <div className="text-[10px] md:text-[9px] font-bold text-purple-600 uppercase tracking-widest">Retorno CoC{partial?' (ann.)':''}</div>
@@ -404,31 +408,31 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="col-span-1 md:col-span-7 bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden">
           <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-4">Radiografía de Costos{partial?` (${n} meses)`:''}</h3>
           <div className="space-y-1.5">
-            <div className="rounded-lg relative overflow-hidden" style={{height:"34px"}}><div className="absolute inset-0 bg-blue-500"/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] md:text-[11px] font-bold text-white truncate">Ingreso Bruto</span><span className="text-[12px] font-extrabold text-white">{fm(fRev)}</span></div></div>
+            <div className="rounded-lg relative overflow-hidden" style={{height:"34px"}}><div className="absolute inset-0 bg-blue-500"/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] md:text-[11px] font-bold text-white truncate">Ingreso Bruto</span><span className="text-[12px] font-extrabold text-white">{dFm(fRev)}</span></div></div>
 
             {isOwnerManaged?<>
               <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5">Gastos del Propietario</div>
-              {expByCat.map(c=><div key={c.name} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-rose-400 opacity-75" style={{width:Math.max(2,(c.value||0)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{c.name}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{fm(c.value)} <span className="text-slate-400">({(c.value/fRev*100).toFixed(0)}%)</span></span></div></div>)}
+              {expByCat.map(c=><div key={c.name} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-rose-400 opacity-75" style={{width:Math.max(2,(c.value||0)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{c.name}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(c.value)} <span className="text-slate-400">({(c.value/fRev*100).toFixed(0)}%)</span></span></div></div>)}
             </>:<>
               <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5">Gastos Operativos (descuenta el administrador)</div>
               {[[`Comisión PM (${prop.managerCommission||15}%)`,fComm,'bg-rose-400'],['Electricidad',fDuke,'bg-amber-400'],['Agua',fWater,'bg-cyan-400'],[propTerms.hoa,fHoa,'bg-purple-400'],['Mantenimiento',fMaint,'bg-teal-400'],['Vendor / Otros',fVendor,'bg-slate-400']].filter(([_,v])=>v>0).map(([l,v,bg])=>
-                <div key={l} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className={`absolute inset-y-0 left-0 ${bg} opacity-75`} style={{width:Math.max(2,v/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{l}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{fm(v)} <span className="text-slate-400">({(v/fRev*100).toFixed(0)}%)</span></span></div></div>
+                <div key={l} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className={`absolute inset-y-0 left-0 ${bg} opacity-75`} style={{width:Math.max(2,v/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{l}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(v)} <span className="text-slate-400">({(v/fRev*100).toFixed(0)}%)</span></span></div></div>
               )}
             </>}
 
-            <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi>0?fNoi/fRev*100:0)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden bg-emerald-50"><span className="text-[9px] md:text-[11px] font-bold text-emerald-800 truncate">= NOI <span className="text-[9px] font-normal">(Ingreso Operativo Neto)</span></span><span className="text-[12px] font-extrabold text-emerald-800">{fm(fNoi)} <span className="text-emerald-600 text-[10px]">{(fRev>0?(fNoi/fRev*100):0).toFixed(0)}%</span></span></div></div>
+            <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi>0?fNoi/fRev*100:0)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden bg-emerald-50"><span className="text-[9px] md:text-[11px] font-bold text-emerald-800 truncate">= NOI <span className="text-[9px] font-normal">(Ingreso Operativo Neto)</span></span><span className="text-[12px] font-extrabold text-emerald-800">{dFm(fNoi)} <span className="text-emerald-600 text-[10px]">{(fRev>0?(fNoi/fRev*100):0).toFixed(0)}%</span></span></div></div>
 
             {/* Mortgage */}
             {fMortP>0&&<>
               <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Hipoteca</div>
-              <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Hipoteca ({fm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{fm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>
+              <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Hipoteca ({dFm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{dFm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>
             </>}
 
             {/* Owner costs for PM-managed only */}
             {!isOwnerManaged&&(insExp>0||taxExp>0)&&<>
               <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Gastos del Propietario</div>
-              {insExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,insExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Seguro</span><span className="text-[10px] font-bold text-slate-700">{fm(insExp)}</span></div></div>}
-              {taxExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-violet-400 opacity-75" style={{width:Math.max(2,taxExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Impuestos</span><span className="text-[10px] font-bold text-slate-700">{fm(taxExp)}</span></div></div>}
+              {insExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,insExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Seguro</span><span className="text-[10px] font-bold text-slate-700">{dFm(insExp)}</span></div></div>}
+              {taxExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-violet-400 opacity-75" style={{width:Math.max(2,taxExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Impuestos</span><span className="text-[10px] font-bold text-slate-700">{dFm(taxExp)}</span></div></div>}
             </>}
 
             {/* Cash Flow */}
@@ -436,7 +440,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
               <div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden">
                 <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Cash Flow Neto</span>
-                <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{fm(fCF)}</span>
+                <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)}</span>
               </div>
             </div>
             {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded py-1.5 mt-1">Periodo parcial ({n} meses) · Proyección anualizada: <b>{fm(proyAnual)}</b></div>}
@@ -460,8 +464,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Rendimiento STR{partial?' (proy.)':''}</h3>
             <div className="space-y-2">
               {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400 truncate">Noches Ocupadas</span><span className="text-[11px] font-bold text-slate-700">{fNights} de {availNights} <span className="text-slate-400">({occupancy.toFixed(0)}%)</span></span></div>}
-              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">ADR <span className="text-[9px] text-slate-300">(Tarifa Promedio/Noche)</span></span><span className="text-[11px] font-bold text-blue-600">{fm(adr)}</span></div>}
-              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">RevPAR <span className="text-[9px] text-slate-300">(Ingreso/Noche Disponible)</span></span><span className={`text-[11px] font-bold ${revpar>100?'text-emerald-600':'text-amber-500'}`}>{fm(revpar)}</span></div>}
+              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">ADR <span className="text-[9px] text-slate-300">(Tarifa Promedio/Noche)</span></span><span className="text-[11px] font-bold text-blue-600">{dFm(adr)}</span></div>}
+              {fNights>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">RevPAR <span className="text-[9px] text-slate-300">(Ingreso/Noche Disponible)</span></span><span className={`text-[11px] font-bold ${revpar>100?'text-emerald-600':'text-amber-500'}`}>{dFm(revpar)}</span></div>}
               {fRes>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Reservaciones</span><span className="text-[11px] font-bold text-slate-700">{fRes} <span className="text-slate-400">({(fNights/fRes).toFixed(1)} noches prom.)</span></span></div>}
               <div className="border-t border-slate-100 my-0.5"/>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cap Rate</span><span className={`text-[11px] font-bold ${fCapR>6?'text-emerald-600':fCapR>4?'text-amber-500':'text-rose-500'}`}>{fCapR.toFixed(2)}%</span></div>
@@ -534,21 +538,21 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               });
 
               // Cash Flow health
-              if(fCF<0) insights.push({type:'danger',icon:'🔴',title:`Cash flow negativo: ${fm(fCF)}`,desc:`La propiedad no cubre sus costos. La hipoteca (${fm(fMortP)}) consume ${fRev>0?(fMortP/fRev*100).toFixed(0):0}% del ingreso bruto. ${monthlyMort>avgNetMo?'El pago mensual de hipoteca es mayor que lo que deposita el PM.':'Considera refinanciar o aumentar tarifas.'}`});
-              else if(fCF>0&&fCFmo<500) insights.push({type:'warn',icon:'🟡',title:`Cash flow ajustado: ${fm(fCFmo)}/mes`,desc:'Cualquier reparación mayor o mes de baja ocupación puede dejarte en negativo. Considera construir una reserva de emergencia.'});
-              else if(fCFmo>1000) insights.push({type:'good',icon:'🟢',title:`Cash flow saludable: ${fm(fCFmo)}/mes`,desc:'La propiedad genera excedente consistente después de todos los costos.'});
+              if(fCF<0) insights.push({type:'danger',icon:'🔴',title:`Cash flow negativo: ${dFm(fCF)}`,desc:`La propiedad no cubre sus costos. La hipoteca (${dFm(fMortP)}) consume ${fRev>0?(fMortP/fRev*100).toFixed(0):0}% del ingreso bruto. ${monthlyMort>avgNetMo?'El pago mensual de hipoteca es mayor que lo que deposita el PM.':'Considera refinanciar o aumentar tarifas.'}`});
+              else if(fCF>0&&fCFmo<500) insights.push({type:'warn',icon:'🟡',title:`Cash flow ajustado: ${dFm(fCFmo)}/mes`,desc:'Cualquier reparación mayor o mes de baja ocupación puede dejarte en negativo. Considera construir una reserva de emergencia.'});
+              else if(fCFmo>1000) insights.push({type:'good',icon:'🟢',title:`Cash flow saludable: ${dFm(fCFmo)}/mes`,desc:'La propiedad genera excedente consistente después de todos los costos.'});
 
               // Occupancy
               if(fNights>0){
                 if(occupancy>=80) insights.push({type:'good',icon:'📈',title:`Ocupación excelente: ${occupancy.toFixed(0)}%`,desc:`Con ${occupancy.toFixed(0)}% de ocupación, puedes considerar subir tarifas. Un aumento de $20/noche generaría ~${fm(fNights/n*20*12)} adicionales al año.`});
-                else if(occupancy>=60) insights.push({type:'warn',icon:'📊',title:`Ocupación aceptable: ${occupancy.toFixed(0)}%`,desc:`Hay espacio para ${Math.round(availNights-fNights)} noches más. Si llenas ${Math.round((availNights-fNights)*0.5)} noches adicionales al ADR actual (${fm(adr)}), generarías ${fm(Math.round((availNights-fNights)*0.5)*adr)} extra.`});
+                else if(occupancy>=60) insights.push({type:'warn',icon:'📊',title:`Ocupación aceptable: ${occupancy.toFixed(0)}%`,desc:`Hay espacio para ${Math.round(availNights-fNights)} noches más. Si llenas ${Math.round((availNights-fNights)*0.5)} noches adicionales al ADR actual (${dFm(adr)}), generarías ${fm(Math.round((availNights-fNights)*0.5)*adr)} extra.`});
                 else insights.push({type:'danger',icon:'📉',title:`Ocupación baja: ${occupancy.toFixed(0)}%`,desc:`Solo ${fNights} de ${availNights} noches ocupadas. Revisa precios, fotos del listing, y la competencia en la zona.`});
               }
 
               // ADR vs market (Orlando STR avg ~$180-250)
               if(adr>0){
-                if(adr>300) insights.push({type:'good',icon:'💎',title:`ADR premium: ${fm(adr)}/noche`,desc:'Tu tarifa está por encima del promedio del mercado de Orlando. Asegúrate de que las reseñas y amenities justifiquen el premium.'});
-                else if(adr<150) insights.push({type:'warn',icon:'💰',title:`ADR por debajo del mercado: ${fm(adr)}/noche`,desc:'Considera mejorar amenities (hot tub, game room, tematización) para subir tarifa. Cada $25 de aumento = ~'+fm(fNights/n*25*12)+'/año extra.'});
+                if(adr>300) insights.push({type:'good',icon:'💎',title:`ADR premium: ${dFm(adr)}/noche`,desc:'Tu tarifa está por encima del promedio del mercado de Orlando. Asegúrate de que las reseñas y amenities justifiquen el premium.'});
+                else if(adr<150) insights.push({type:'warn',icon:'💰',title:`ADR por debajo del mercado: ${dFm(adr)}/noche`,desc:'Considera mejorar amenities (hot tub, game room, tematización) para subir tarifa. Cada $25 de aumento = ~'+fm(fNights/n*25*12)+'/año extra.'});
               }
 
               // Mortgage burden
@@ -560,13 +564,13 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               // Expense efficiency
               if(fRev>0){
                 const opExPct=fOpEx/fRev*100;
-                if(opExPct>55) insights.push({type:'warn',icon:'📋',title:`Ratio de gastos alto: ${opExPct.toFixed(0)}%`,desc:`Los gastos operativos consumen más de la mitad del ingreso. Los principales: Comisión PM ${fm(fComm)} (${(fComm/fRev*100).toFixed(0)}%), Electricidad ${fm(fDuke)} (${(fDuke/fRev*100).toFixed(0)}%), HOA ${fm(fHoa)} (${(fHoa/fRev*100).toFixed(0)}%).`});
+                if(opExPct>55) insights.push({type:'warn',icon:'📋',title:`Ratio de gastos alto: ${opExPct.toFixed(0)}%`,desc:`Los gastos operativos consumen más de la mitad del ingreso. Los principales: Comisión PM ${dFm(fComm)} (${(fComm/fRev*100).toFixed(0)}%), Electricidad ${dFm(fDuke)} (${(fDuke/fRev*100).toFixed(0)}%), HOA ${dFm(fHoa)} (${(fHoa/fRev*100).toFixed(0)}%).`});
               }
 
               // Duke Energy trend
               if(fDuke>0&&fRev>0){
                 const dukePct=fDuke/fRev*100;
-                if(dukePct>15) insights.push({type:'warn',icon:'⚡',title:`Electricidad alta: ${(dukePct).toFixed(0)}% del ingreso`,desc:`Duke Energy ${fm(fDuke)} (${fm(fDuke/n)}/mes). Para una propiedad STR en Orlando, lo típico es 8-12%. Verifica termostato inteligente, pool heater timer, y eficiencia del A/C.`});
+                if(dukePct>15) insights.push({type:'warn',icon:'⚡',title:`Electricidad alta: ${(dukePct).toFixed(0)}% del ingreso`,desc:`Duke Energy ${dFm(fDuke)} (${fm(fDuke/n)}/mes). Para una propiedad STR en Orlando, lo típico es 8-12%. Verifica termostato inteligente, pool heater timer, y eficiencia del A/C.`});
               }
 
               // YoY comparison
@@ -596,9 +600,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Ingreso Bruto</span><span className="text-[11px] font-bold text-blue-600">{fm(n>0?fRev/n:0)}/mes</span></div>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Gastos Operativos</span><span className="text-[11px] font-bold text-rose-500">{fm(n>0?fOpEx/n:0)}/mes</span></div>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Neto del PM</span><span className="text-[11px] font-bold text-emerald-600">{fm(n>0?fNet/n:0)}/mes</span></div>
-              {mMort>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Hipoteca</span><span className="text-[11px] font-bold text-red-500">{fm(mMort)}/mes</span></div>}
+              {mMort>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Hipoteca</span><span className="text-[11px] font-bold text-red-500">{dFm(mMort)}/mes</span></div>}
               <div className="border-t border-slate-100 my-0.5"/>
-              <div className="flex justify-between"><span className="text-[11px] font-bold text-slate-600">Cash Flow</span><span className={`text-[11px] font-extrabold ${fCFmo>=0?'text-emerald-600':'text-rose-600'}`}>{fm(fCFmo)}/mes</span></div>
+              <div className="flex justify-between"><span className="text-[11px] font-bold text-slate-600">Cash Flow</span><span className={`text-[11px] font-extrabold ${fCFmo>=0?'text-emerald-600':'text-rose-600'}`}>{dFm(fCFmo)}/mes</span></div>
             </div>
           </div>
           <div className="bg-white rounded-2xl p-3 md:p-4 border border-slate-200 shadow-sm overflow-hidden">
@@ -612,7 +616,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                 <div className="text-3xl font-black text-slate-800">{beNights}</div>
                 <div className="text-[10px] text-slate-400">noches/mes para cubrir todos los costos</div>
                 <div className="text-xs text-slate-500 mt-1">Costos mensuales totales: {fm(beMo)}</div>
-                <div className="text-xs text-slate-500">ADR actual: {fm(adr)}/noche</div>
+                <div className="text-xs text-slate-500">ADR actual: {dFm(adr)}/noche</div>
                 {avgNMo>0&&<div className={`text-xs font-bold mt-2 px-3 py-1 rounded-full inline-block ${surplus>=0?'bg-emerald-100 text-emerald-700':'bg-rose-100 text-rose-700'}`}>{surplus>=0?`+${surplus} noches de margen`:`${Math.abs(surplus)} noches de déficit`}</div>}
               </div>;
             })()}
@@ -664,7 +668,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               return <div className="space-y-2">
                 <div className="flex justify-between items-end">
                   <div><div className="text-lg font-extrabold text-slate-800">{fm(mort.balance)}</div><div className="text-[10px] text-slate-400">Balance actual</div></div>
-                  <div className="text-right"><div className="text-sm font-bold text-emerald-600">{fm(mMort)}/mes</div><div className="text-[10px] text-slate-400">{mort.rate}% · {mort.termYears} años</div></div>
+                  <div className="text-right"><div className="text-sm font-bold text-emerald-600">{dFm(mMort)}/mes</div><div className="text-[10px] text-slate-400">{mort.rate}% · {mort.termYears} años</div></div>
                 </div>
                 {/* Progress bar */}
                 <div>
@@ -1317,9 +1321,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {modal==='expense'&&<Mdl title={editId?'✏️ Editar Gasto':'Registrar Gasto'} grad="from-rose-500 to-rose-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...expenseForm,amount:parseFloat(expenseForm.amount)};if(editId){update('expenses',editId,data)}else{save('expenses',data)}}} disabled={!expenseForm.amount||!expenseForm.concept} className="flex-1 py-2.5 bg-rose-500 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={expenseForm.date} onChange={v=>ue('date',v)} type="date" required/><Sel label="Categoría" value={expenseForm.category} onChange={v=>ue('category',v)} options={propCats.map(c=>({v:c.v,l:c.i+' '+c.l}))}/></div>
       <Inp label="Concepto" value={expenseForm.concept} onChange={v=>ue('concept',v)} placeholder="Descripción del gasto" required error={expenseForm.concept===''&&expenseForm.amount?'Ingresa una descripción':''}/>
-      {propCurrency!=='USD'&&<div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moneda del gasto</label><div className="grid grid-cols-2 gap-2">{[[propCurrency,propCurrency],['USD','USD ($)']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('expCurrency',v)} className={`py-2 rounded-xl border-2 text-xs font-medium transition ${(expenseForm.expCurrency||propCurrency)===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>}
-      <Inp label={`Monto (${(expenseForm.expCurrency||propCurrency)})`} value={expenseForm.amount} onChange={v=>ue('amount',v)} prefix={propCurrency==='EUR'||expenseForm.expCurrency==='EUR'?'€':propCurrency==='GBP'||expenseForm.expCurrency==='GBP'?'£':'$'} type="number" min="0" required error={expenseForm.amount&&parseFloat(expenseForm.amount)<=0?'El monto debe ser mayor a 0':''}/>
-      {(expenseForm.expCurrency||propCurrency)!==propCurrency&&prop.exchangeRate>0&&expenseForm.amount&&<div className="text-[11px] text-blue-500 font-semibold bg-blue-50 px-3 py-2 rounded-xl">= {fmCurrency(parseFloat(expenseForm.amount)*(expenseForm.expCurrency==='USD'?prop.exchangeRate:1/prop.exchangeRate),propCurrency)} {propCurrency}</div>}
+      <div className="grid grid-cols-2 gap-3">
+        <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moneda</label><div className="grid grid-cols-3 gap-1">{[['USD','🇺🇸 USD'],['COP','🇨🇴 COP'],['EUR','🇪🇺 EUR']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('expCurrency',v)} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${(expenseForm.expCurrency||propCurrency)===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
+        <Inp label={`Monto (${expenseForm.expCurrency||propCurrency})`} value={expenseForm.amount} onChange={v=>ue('amount',v)} prefix={(expenseForm.expCurrency||propCurrency)==='EUR'?'€':(expenseForm.expCurrency||propCurrency)==='GBP'?'£':'$'} type="number" min="0" required error={expenseForm.amount&&parseFloat(expenseForm.amount)<=0?'El monto debe ser mayor a 0':''}/>
+      </div>
+      {(expenseForm.expCurrency||propCurrency)!==propCurrency&&prop.exchangeRate>0&&expenseForm.amount&&<div className="text-[11px] text-blue-500 font-semibold bg-blue-50 px-3 py-2 rounded-xl">= {fmCurrency(parseFloat(expenseForm.amount)*((expenseForm.expCurrency||'USD')==='USD'?prop.exchangeRate:1/prop.exchangeRate),propCurrency)} {propCurrency}</div>}
       <div className="grid grid-cols-2 gap-3">
         <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tipo</label><div className="grid grid-cols-2 gap-2">{[['fixed','🔄 Fijo'],['additional','➕ Único']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('type',v)} className={`py-2.5 rounded-xl border-2 text-xs font-medium transition ${expenseForm.type===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
         <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Frecuencia</label><div className="grid grid-cols-3 gap-1">{[['once','1 vez'],['monthly','Mensual'],['annual','Anual']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('frequency',v)} className={`py-2.5 rounded-xl border-2 text-[11px] font-medium transition ${expenseForm.frequency===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
