@@ -7,7 +7,7 @@ import { Inp, Sel } from './ui';
 
 export function Onboarding({userId,onComplete,onBack}) {
   const [step,setStep]=useState(0);const [busy,setBusy]=useState(false);
-  const [p,setP]=useState({name:'',address:'',city:'',state:'',type:'vacation',price:'',date:'',beds:'',baths:'',pm:'',pmFee:'15',country:'US',currency:'USD'});
+  const [p,setP]=useState({name:'',address:'',city:'',state:'',type:'vacation',price:'',date:'',beds:'',baths:'',pm:'',pmFee:'15',country:'US',currency:'USD',managedBy:'pm'});
   const [prs,setPrs]=useState([{name:'',email:'',own:'100',cap:''}]);
   const [mt,setMt]=useState({bal:'',rate:'',term:'30',pay:'',start:''});
   const up=useCallback((k,v)=>{
@@ -23,7 +23,7 @@ export function Onboarding({userId,onComplete,onBack}) {
   const finish=async()=>{setBusy(true);try{
     const pl=prs.map((x,i)=>({id:'p'+i,name:x.name,email:x.email||'',ownership:parseFloat(x.own)||0,initialCapital:parseFloat(x.cap)||0,color:C[i%C.length]}));
     const me=[auth.currentUser.email,...pl.map(x=>x.email).filter(Boolean)];
-    const d={name:p.name,address:p.address,city:p.city,state:p.state,type:p.type,country:p.country||'US',currency:p.currency||'USD',purchasePrice:parseFloat(p.price)||0,purchaseDate:p.date,bedrooms:parseInt(p.beds)||0,bathrooms:parseInt(p.baths)||0,manager:p.pm,managerCommission:parseFloat(p.pmFee)||15,partners:pl,memberEmails:me,
+    const d={name:p.name,address:p.address,city:p.city,state:p.state,type:p.type,country:p.country||'US',currency:p.currency||'USD',managedBy:p.managedBy||'pm',purchasePrice:parseFloat(p.price)||0,purchaseDate:p.date,bedrooms:parseInt(p.beds)||0,bathrooms:parseInt(p.baths)||0,manager:p.managedBy==='pm'?p.pm:'',managerCommission:p.managedBy==='pm'?(parseFloat(p.pmFee)||15):0,partners:pl,memberEmails:me,
       mortgage:{balance:parseFloat(mt.bal)||0,rate:parseFloat(mt.rate)||0,termYears:parseInt(mt.term)||30,monthlyPayment:parseFloat(mt.pay)||0,startDate:mt.start||''},ownerId:userId,createdAt:serverTimestamp()};
     const ref=await addDoc(collection(db,'properties'),d);
     for(const x of d.partners){if(x.initialCapital>0)await addDoc(collection(db,'properties',ref.id,'contributions'),{partnerId:x.id,amount:x.initialCapital,type:'contribution',concept:'Capital Inicial',date:p.date||new Date().toISOString().split('T')[0],createdAt:serverTimestamp()});}
@@ -42,7 +42,10 @@ export function Onboarding({userId,onComplete,onBack}) {
           <Inp label="Dirección" value={p.address} onChange={v=>up('address',v)} placeholder="Km 5 Vía La Ceja"/>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Ciudad" value={p.city} onChange={v=>up('city',v)} placeholder="Medellín"/>{stateList.length>0?<Sel label={terms.state} value={p.state} onChange={v=>up('state',v)} options={stateList.map(s=>({v:s,l:s}))}/>:<Inp label={terms.state} value={p.state} onChange={v=>up('state',v)} placeholder="Región"/>}</div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Precio compra" value={p.price} onChange={v=>up('price',v)} prefix={p.currency==='EUR'?'€':p.currency==='GBP'?'£':'$'} type="number"/><Inp label="Fecha compra" value={p.date} onChange={v=>up('date',v)} type="date"/></div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3"><Inp label="Habitaciones" value={p.beds} onChange={v=>up('beds',v)} type="number"/><Inp label="Baños" value={p.baths} onChange={v=>up('baths',v)} type="number"/><Inp label="Property Manager" value={p.pm} onChange={v=>up('pm',v)} placeholder="IHM"/><Inp label="Comisión (%)" value={p.pmFee} onChange={v=>up('pmFee',v)} type="number"/></div></div>
+          <div className="grid grid-cols-2 gap-3"><Inp label="Habitaciones" value={p.beds} onChange={v=>up('beds',v)} type="number"/><Inp label="Baños" value={p.baths} onChange={v=>up('baths',v)} type="number"/></div>
+          <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién administra?</label><div className="grid grid-cols-2 gap-2">{[['owner','👤 Propietario'],['pm','🏢 Administrador externo']].map(([v,l])=><button key={v} type="button" onClick={()=>up('managedBy',v)} className={`py-2.5 rounded-xl border-2 text-xs font-medium transition ${p.managedBy===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
+          {p.managedBy==='pm'&&<div className="grid grid-cols-2 gap-3"><Inp label="Nombre del Administrador" value={p.pm} onChange={v=>up('pm',v)} placeholder="IHM, Vacasa, Host U..."/><Inp label="Comisión (%)" value={p.pmFee} onChange={v=>up('pmFee',v)} type="number"/></div>}
+          </div>
           <div className="flex justify-end mt-6"><button onClick={()=>setStep(1)} disabled={!p.name||!p.address} className="px-7 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-30 transition shadow-lg shadow-blue-500/20">Siguiente →</button></div></div>}
         {step===1&&<div><h2 className="text-lg font-extrabold text-slate-800 mb-1 flex items-center gap-2"><Users size={20} className="text-blue-500"/> Socios</h2><p className="text-sm text-slate-400 mb-5">Único dueño = tu nombre con 100%.</p>
           {prs.map((x,i)=><div key={i} className="rounded-2xl p-4 mb-3 bg-slate-50 border-l-4" style={{borderLeftColor:C[i%C.length]}}><div className="flex justify-between items-center mb-3"><span className="text-xs font-extrabold uppercase tracking-widest" style={{color:C[i%C.length]}}>Socio {i+1}</span>{prs.length>1&&<button onClick={()=>rmPr(i)} className="text-slate-300 hover:text-rose-500 p-1 rounded-lg hover:bg-rose-50"><X size={16}/></button>}</div>
