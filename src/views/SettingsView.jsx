@@ -4,7 +4,7 @@ import { useDashboard } from '../context/DashboardContext';
 import { Inp, Sel } from '../components/ui';
 
 export function SettingsView() {
-  const { prop, propertyId, partners, latestVal, settingsForm, setSettingsForm, editPartners, setEditPartners, stmts, expenses, income, contribs, valuations, US, PT, M, fm } = useDashboard();
+  const { prop, propertyId, partners, latestVal, settingsForm, setSettingsForm, editPartners, setEditPartners, stmts, expenses, income, contribs, valuations, notify, US, PT, M, fm } = useDashboard();
       const sf2=settingsForm||{name:prop.name||'',address:prop.address||'',city:prop.city||'',state:prop.state||'FL',type:prop.type||'vacation',purchasePrice:String(prop.purchasePrice||''),purchaseDate:prop.purchaseDate||'',marketValue:String(latestVal?latestVal.value:prop.purchasePrice||''),manager:prop.manager||'',managerCommission:String(prop.managerCommission||15),bedrooms:String(prop.bedrooms||''),bathrooms:String(prop.bathrooms||'')};
       const uf=(k,v)=>setSettingsForm({...sf2,[k]:v});
       const ep=editPartners||partners.map(p=>({...p,email:p.email||''}));

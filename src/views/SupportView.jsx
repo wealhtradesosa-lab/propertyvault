@@ -5,8 +5,7 @@ import { useDashboard } from '../context/DashboardContext';
 import { Inp, Empty } from '../components/ui';
 
 export function SupportView() {
-  const { isAdmin, ticketForm, setTicketForm, userEmail, prop, propertyId, tickets, toast, setToast } = useDashboard();
-  const notify = (msg, type='ok') => { setToast({ msg, type }); setTimeout(() => setToast(null), 3000); };
+  const { isAdmin, ticketForm, setTicketForm, userEmail, prop, propertyId, tickets, notify } = useDashboard();
 
   return <>
     <div className="flex justify-between items-start mb-6">
