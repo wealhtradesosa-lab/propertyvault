@@ -419,11 +419,28 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
       </div>
 
-      {/* ── Obligaciones — link to dedicated section ── */}
-      {tasks.filter(t=>t.status==='pending').length>0&&<div className="bg-amber-50 rounded-2xl p-3 border border-amber-200 mb-4 flex items-center justify-between cursor-pointer hover:bg-amber-100 transition" onClick={()=>setView('pipeline')}>
-        <div className="flex items-center gap-2"><AlertTriangle size={16} className="text-amber-500"/><span className="text-xs font-bold text-amber-700">{tasks.filter(t=>t.status==='pending').length} obligación{tasks.filter(t=>t.status==='pending').length>1?'es':''} pendiente{tasks.filter(t=>t.status==='pending').length>1?'s':''}</span></div>
-        <span className="text-[10px] font-semibold text-amber-600">Ver →</span>
-      </div>}
+      {/* ── Obligaciones — smart alerts ── */}
+      {(()=>{
+        if(!tasks.length)return null;
+        const today=new Date();today.setHours(0,0,0,0);
+        const alerts=tasks.filter(t=>t.status!=='done'&&t.dueDate).map(t=>{
+          const due=new Date(t.dueDate+'T00:00:00');
+          const days=Math.ceil((due-today)/(1000*60*60*24));
+          const threshold=t.frequency==='monthly'?5:30;
+          if(days<0)return {...t,days,level:'overdue'};
+          if(days<=threshold)return {...t,days,level:'soon'};
+          return null;
+        }).filter(Boolean).sort((a,b)=>a.days-b.days);
+        if(!alerts.length)return null;
+        return <div className="space-y-2 mb-4">{alerts.map(a=><div key={a.id} onClick={()=>setView('pipeline')} className={`rounded-2xl p-3 border flex items-center gap-3 cursor-pointer transition ${a.level==='overdue'?'bg-rose-50 border-rose-200 hover:bg-rose-100':'bg-amber-50 border-amber-200 hover:bg-amber-100'}`}>
+          <span className="text-lg shrink-0">{a.level==='overdue'?'🚨':'⏰'}</span>
+          <div className="flex-1 min-w-0">
+            <div className={`text-xs font-bold ${a.level==='overdue'?'text-rose-700':'text-amber-700'}`}>{a.title}{a.amount?' · '+fm(parseFloat(a.amount)):''}</div>
+            <div className={`text-[10px] ${a.level==='overdue'?'text-rose-500':'text-amber-500'}`}>{a.days<0?`Vencido hace ${Math.abs(a.days)} día${Math.abs(a.days)>1?'s':''}`:`Vence en ${a.days} día${a.days>1?'s':''}`} · {fmDate(a.dueDate)}</div>
+          </div>
+          <button onClick={e=>{e.stopPropagation();update('tasks',a.id,{status:'done'})}} className={`px-3 py-1.5 rounded-xl text-[11px] font-bold shrink-0 transition ${a.level==='overdue'?'bg-rose-200 text-rose-700 hover:bg-rose-300':'bg-amber-200 text-amber-700 hover:bg-amber-300'}`}>Pagado ✓</button>
+        </div>)}</div>;
+      })()}
 
       {/* ── ROW 3: INSIGHTS — What the data tells you ── */}      {n>=2&&(canUse('insights')?<div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
         {/* Smart Insights */}
@@ -972,27 +989,34 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {/* Obligations list */}
       {tasks.length>0&&<div className="space-y-2">
-        {tasks.map(t=>{
+        {[...tasks].sort((a,b)=>{const sa=a.status==='done'?1:0,sb=b.status==='done'?1:0;if(sa!==sb)return sa-sb;return(a.dueDate||'9').localeCompare(b.dueDate||'9')}).map(t=>{
           const icons={'Hipoteca':'🏦','Impuestos':'🏛️','Seguro':'🛡️','Contabilidad':'📊','HOA':'🏢'};
           const ic=icons[t.title]||'📄';
           const isPaid=t.status==='done';
-          return <div key={t.id} className={`bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-4 ${isPaid?'border-emerald-200':'border-slate-200'}`}>
+          const today=new Date();today.setHours(0,0,0,0);
+          const days=t.dueDate?Math.ceil((new Date(t.dueDate+'T00:00:00')-today)/(1000*60*60*24)):null;
+          const threshold=t.frequency==='monthly'?5:30;
+          const isOverdue=days!==null&&days<0&&!isPaid;
+          const isSoon=days!==null&&days>=0&&days<=threshold&&!isPaid;
+          return <div key={t.id} className={`bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-3 md:gap-4 ${isOverdue?'border-rose-300 bg-rose-50/30':isSoon?'border-amber-300 bg-amber-50/30':isPaid?'border-emerald-200':'border-slate-200'}`}>
             <span className="text-xl shrink-0">{ic}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-bold text-slate-800">{t.title}</span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${t.frequency==='monthly'?'bg-blue-100 text-blue-700':'bg-purple-100 text-purple-700'}`}>{t.frequency==='monthly'?'Mensual':'Anual'}</span>
-                {isPaid&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Pagado ✓</span>}
-                {!isPaid&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Pendiente</span>}
+                {isPaid&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Al día ✓</span>}
+                {isOverdue&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">Vencido hace {Math.abs(days)}d</span>}
+                {isSoon&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Vence en {days}d</span>}
+                {!isPaid&&!isOverdue&&!isSoon&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Pendiente</span>}
               </div>
               <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400">
-                {t.amount&&<span className="font-semibold text-slate-600">{fm(parseFloat(t.amount)||0)}</span>}
+                {t.amount&&<span className="font-semibold text-slate-600">{fm(parseFloat(t.amount)||0)}{t.frequency==='monthly'?'/mes':'/año'}</span>}
                 {t.dueDate&&<span className="flex items-center gap-1"><Calendar size={10}/>{fmDate(t.dueDate)}</span>}
-                {t.notes&&<span>{t.notes}</span>}
+                {t.notes&&<span className="truncate">{t.notes}</span>}
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {!isPaid&&<button onClick={()=>update('tasks',t.id,{status:'done'})} className="px-3 py-2 bg-emerald-100 text-emerald-600 rounded-xl text-[11px] font-bold hover:bg-emerald-200 active:bg-emerald-300 transition">Pagado ✓</button>}
+              {!isPaid&&<button onClick={()=>update('tasks',t.id,{status:'done'})} className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${isOverdue?'bg-rose-200 text-rose-700 hover:bg-rose-300':isSoon?'bg-amber-200 text-amber-700 hover:bg-amber-300':'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'}`}>Pagado ✓</button>}
               {isPaid&&<button onClick={()=>update('tasks',t.id,{status:'pending'})} className="px-3 py-2 bg-slate-100 text-slate-500 rounded-xl text-[11px] font-bold hover:bg-slate-200 transition">Reactivar</button>}
               <button onClick={()=>{setTaskForm({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||'',amount:String(t.amount||''),frequency:t.frequency||'annual'});setEditId(t.id);setModal('task')}} className="p-2 text-slate-300 hover:text-blue-500 rounded-xl hover:bg-blue-50 transition"><Pencil size={14}/></button>
               <button onClick={()=>del('tasks',t.id)} className="p-2 text-slate-300 hover:text-red-500 rounded-xl hover:bg-red-50 transition"><Trash2 size={14}/></button>
