@@ -53,7 +53,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const notify=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),4000)};
   const [valForm,setValForm]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setValForm(x=>({...x,[k]:v})),[]);
   const [repairForm,setRepairForm]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRepairForm(x=>({...x,[k]:v})),[]);
-  const [taskForm,setTaskForm]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});const ut=useCallback((k,v)=>setTaskForm(x=>({...x,[k]:v})),[]);
+  const [taskForm,setTaskForm]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual'});const ut=useCallback((k,v)=>setTaskForm(x=>({...x,[k]:v})),[]);
   const [settingsForm,setSettingsForm]=useState(null);
   const [editPartners,setEditPartners]=useState(null);
   const [mortConfig,setMortConfig]=useState({bal:'',rate:'',term:'30',pay:'',start:''});const [savingMort,setSavingMort]=useState(false);
@@ -214,7 +214,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>partners.find(p=>p.id===id)?.name||id;const pCl=id=>partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'repairs',icon:<Wrench size={18}/>,l:'Reparaciones'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Valorización'},{id:'pipeline',icon:<Clock size={18}/>,l:'Pipeline'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'support',icon:<MessageSquare size={18}/>,l:'Soporte'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:'Dashboard'},{id:'partners',icon:<Users size={18}/>,l:'Socios & Capital'},{id:'statements',icon:<ClipboardList size={18}/>,l:'Statements'},{id:'expenses',icon:<Receipt size={18}/>,l:'Gastos'},{id:'income',icon:<DollarSign size={18}/>,l:'Ingresos'},{id:'mortgage',icon:<Landmark size={18}/>,l:'Hipoteca'},{id:'repairs',icon:<Wrench size={18}/>,l:'Reparaciones'},{id:'valuation',icon:<TrendingUp size={18}/>,l:'Valorización'},{id:'pipeline',icon:<Clock size={18}/>,l:'Obligaciones'},{id:'reports',icon:<Target size={18}/>,l:'Reportes'},{id:'support',icon:<MessageSquare size={18}/>,l:'Soporte'},{id:'settings',icon:<Settings size={18}/>,l:'Configuración'}];
 
   if(loading)return<div className="min-h-screen bg-slate-50">
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 border-b border-slate-200 z-40 px-3 py-3 flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 rounded-xl animate-pulse"/><div className="flex-1"><div className="h-4 bg-slate-200 rounded-lg w-32 animate-pulse"/><div className="h-2.5 bg-slate-100 rounded w-20 mt-1.5 animate-pulse"/></div></div>
@@ -419,53 +419,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
       </div>
 
-      {/* ── Obligaciones Anuales — auto-detected from expenses ── */}
-      {(()=>{
-        const yr=dashYear==='all'?new Date().getFullYear():dashYear;
-        const yearExps=expenses.filter(e=>{const d=e.date||'';return d.startsWith(String(yr))});
-        const yearStmts=dashYear==='all'?stmts:stmts.filter(s=>s.year===yr);
-        const pmPaysHoa=yearStmts.some(s=>(s.hoa||0)>0);
-
-        const obligations=[
-          {key:'insurance',label:'Seguro',icon:'🛡️'},
-          {key:'taxes',label:'Impuestos',icon:'🏛️'},
-        ];
-        if(!pmPaysHoa) obligations.push({key:'hoa',label:'HOA',icon:'🏢'});
-
-        const taxKeywords=/tax|impuesto|property tax|county|irs/i;
-        const insKeywords=/insurance|seguro|póliza|hazard|homeowner/i;
-
-        const items=obligations.map(o=>{
-          const paid=yearExps.filter(e=>{
-            if(e.category===o.key) return true;
-            const c=(e.concept||'').toLowerCase();
-            if(o.key==='taxes') return taxKeywords.test(c);
-            if(o.key==='insurance') return insKeywords.test(c);
-            return false;
-          });
-          const total=paid.reduce((s,e)=>s+(e.amount||0),0);
-          const lastDate=paid.length>0?paid.sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date:null;
-          return {...o,paid:paid.length>0,total,count:paid.length,lastDate};
-        });
-        if(!items.length)return null;
-        const hasSome=expenses.some(e=>['insurance','taxes'].includes(e.category))||expenses.some(e=>taxKeywords.test(e.concept||'')||insKeywords.test(e.concept||''));
-        if(!hasSome&&expenses.length<3)return null;
-        return <div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm mb-4">
-          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Obligaciones {yr}</h3>
-          <div className={`grid grid-cols-1 ${items.length>1?'sm:grid-cols-'+items.length:''} gap-2`}>
-            {items.map(o=><div key={o.key} className={`flex items-center gap-3 p-3 rounded-xl border ${o.paid?'bg-emerald-50/50 border-emerald-200':'bg-amber-50/50 border-amber-200'}`}>
-              <span className="text-lg">{o.icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold text-slate-700">{o.label}</div>
-                {o.paid?<div className="text-[10px] text-emerald-600 font-semibold">{fm(o.total)} · {o.count} pago{o.count>1?'s':''}{o.lastDate?' · '+fmDate(o.lastDate):''}</div>
-                :<div className="text-[10px] text-amber-600 font-semibold">Sin registrar en {yr}</div>}
-              </div>
-              {o.paid?<CheckCircle size={16} className="text-emerald-500 shrink-0"/>:<AlertTriangle size={16} className="text-amber-400 shrink-0"/>}
-            </div>)}
-          </div>
-          {items.some(o=>!o.paid)&&<button onClick={()=>{setExpenseForm({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||'',category:items.find(o=>!o.paid)?.key||'insurance',type:'fixed'});setModal('expense')}} className="mt-3 w-full py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-bold hover:bg-slate-200 active:bg-slate-300 transition flex items-center justify-center gap-1.5"><Plus size={13}/> Registrar Pago</button>}
-        </div>;
-      })()}
+      {/* ── Obligaciones — link to dedicated section ── */}
+      {tasks.filter(t=>t.status==='pending').length>0&&<div className="bg-amber-50 rounded-2xl p-3 border border-amber-200 mb-4 flex items-center justify-between cursor-pointer hover:bg-amber-100 transition" onClick={()=>setView('pipeline')}>
+        <div className="flex items-center gap-2"><AlertTriangle size={16} className="text-amber-500"/><span className="text-xs font-bold text-amber-700">{tasks.filter(t=>t.status==='pending').length} obligación{tasks.filter(t=>t.status==='pending').length>1?'es':''} pendiente{tasks.filter(t=>t.status==='pending').length>1?'s':''}</span></div>
+        <span className="text-[10px] font-semibold text-amber-600">Ver →</span>
+      </div>}
 
       {/* ── ROW 3: INSIGHTS — What the data tells you ── */}      {n>=2&&(canUse('insights')?<div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
         {/* Smart Insights */}
@@ -982,40 +940,66 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ PIPELINE ═══ */}
     {view==='pipeline'&&<>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">📋 Pipeline de Tareas</h1><button onClick={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Nueva Tarea</button></div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+        <div><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">📋 Obligaciones del Propietario</h1><p className="text-xs text-slate-400 mt-1">Pagos recurrentes que debes cubrir como dueño</p></div>
+        <button onClick={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual'});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 active:bg-indigo-800 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Agregar</button>
+      </div>
 
-      {tasks.length>0&&<div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-        <KPI label="Total Tareas" value={String(tasks.length)} color="blue"/>
-        <KPI label="Pendientes" value={String(tasks.filter(t=>t.status==='pending').length)} color="red" alert={tasks.filter(t=>t.status==='pending').length>2?'red':null}/>
-        <KPI label="En Progreso" value={String(tasks.filter(t=>t.status==='progress').length)} color="amber"/>
-        <KPI label="Completadas" value={String(tasks.filter(t=>t.status==='done').length)} color="green"/>
+      {/* Quick-add templates */}
+      {!tasks.length&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
+        <p className="text-sm text-slate-500 mb-4">Agrega las obligaciones de tu propiedad:</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {[['🏦','Hipoteca','monthly'],['🏛️','Impuestos','annual'],['🛡️','Seguro','annual'],['📊','Contabilidad','monthly']].map(([ic,t,fr])=>
+            <button key={t} onClick={()=>{setTaskForm({title:t,dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:fr});setEditId(null);setModal('task')}} className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 hover:bg-blue-50 hover:border-blue-200 active:bg-blue-100 transition text-left">
+              <span className="text-lg">{ic}</span><span className="text-xs font-semibold text-slate-700">{t}</span>
+            </button>)}
+        </div>
       </div>}
 
-      {/* Kanban-style columns */}
-      {tasks.length>0?<div className="grid grid-cols-3 gap-4">
-        {[['pending','⚠ Pendientes','bg-amber-50 border-amber-200'],['progress','⏳ En Progreso','bg-blue-50 border-blue-200'],['done','✓ Completadas','bg-emerald-50 border-emerald-200']].map(([st,label,cls])=>(
-          <div key={st} className={`rounded-2xl border p-4 ${cls} min-h-[200px]`}>
-            <h3 className="text-sm font-bold text-slate-700 mb-3">{label} ({tasks.filter(t=>t.status===st).length})</h3>
-            <div className="space-y-2">{tasks.filter(t=>t.status===st).map(t=>(
-              <div key={t.id} className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 hover:shadow-md transition-all">
-                <div className="flex justify-between items-start mb-1">
-                  <span className="font-semibold text-sm text-slate-700">{t.title}</span>
-                  <div className="flex gap-0.5">
-                    <button onClick={()=>{setTaskForm({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||''});setEditId(t.id);setModal('task')}} className="text-slate-300 hover:text-blue-500 p-1 rounded"><Pencil size={12}/></button>
-                    <button onClick={()=>del('tasks',t.id)} className="text-slate-300 hover:text-red-500 p-1 rounded"><Trash2 size={12}/></button>
-                  </div>
-                </div>
-                {t.notes&&<p className="text-[11px] text-slate-400 mb-2">{t.notes}</p>}
-                <div className="flex justify-between items-center">
-                  {t.dueDate&&<span className="text-[10px] text-slate-400 flex items-center gap-1"><Calendar size={10}/>{fmDate(t.dueDate)}</span>}
-                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${t.priority==='high'?'bg-rose-100 text-rose-600':t.priority==='low'?'bg-slate-100 text-slate-500':'bg-amber-100 text-amber-600'}`}>{t.priority==='high'?'Alta':t.priority==='low'?'Baja':'Media'}</span>
-                </div>
-                {t.status!=='done'&&<div className="flex gap-1 mt-2">{t.status==='pending'&&<button onClick={()=>update('tasks',t.id,{status:'progress'})} className="flex-1 py-1 bg-blue-100 text-blue-600 rounded-lg text-[10px] font-bold hover:bg-blue-200">Iniciar →</button>}{t.status!=='done'&&<button onClick={()=>update('tasks',t.id,{status:'done'})} className="flex-1 py-1 bg-emerald-100 text-emerald-600 rounded-lg text-[10px] font-bold hover:bg-emerald-200">Completar ✓</button>}</div>}
+      {/* Summary KPIs */}
+      {tasks.length>0&&(()=>{
+        const monthly=tasks.filter(t=>t.frequency==='monthly').reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+        const annual=tasks.filter(t=>t.frequency==='annual').reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
+        const totalAnnual=monthly*12+annual;
+        const pending=tasks.filter(t=>t.status==='pending').length;
+        return <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-5">
+          <KPI label="Costo Mensual" value={fm(monthly)} color="blue"/>
+          <KPI label="Costo Anual" value={fm(totalAnnual)} color="purple"/>
+          <KPI label="Al Día" value={String(tasks.filter(t=>t.status==='done').length)+'/'+tasks.length} color="green"/>
+          {pending>0&&<KPI label="Pendientes" value={String(pending)} color="red"/>}
+        </div>
+      })()}
+
+      {/* Obligations list */}
+      {tasks.length>0&&<div className="space-y-2">
+        {tasks.map(t=>{
+          const icons={'Hipoteca':'🏦','Impuestos':'🏛️','Seguro':'🛡️','Contabilidad':'📊','HOA':'🏢'};
+          const ic=icons[t.title]||'📄';
+          const isPaid=t.status==='done';
+          return <div key={t.id} className={`bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-4 ${isPaid?'border-emerald-200':'border-slate-200'}`}>
+            <span className="text-xl shrink-0">{ic}</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-bold text-slate-800">{t.title}</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${t.frequency==='monthly'?'bg-blue-100 text-blue-700':'bg-purple-100 text-purple-700'}`}>{t.frequency==='monthly'?'Mensual':'Anual'}</span>
+                {isPaid&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Pagado ✓</span>}
+                {!isPaid&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Pendiente</span>}
               </div>
-            ))}</div>
-          </div>
-        ))}
-      </div>:<Empty icon={Clock} title="Sin tareas" desc="Crea tareas para llevar control de pagos pendientes, renovaciones de seguro, inspecciones y más." action="Nueva Tarea" onAction={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});setModal('task')}}/>}
+              <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400">
+                {t.amount&&<span className="font-semibold text-slate-600">{fm(parseFloat(t.amount)||0)}</span>}
+                {t.dueDate&&<span className="flex items-center gap-1"><Calendar size={10}/>{fmDate(t.dueDate)}</span>}
+                {t.notes&&<span>{t.notes}</span>}
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {!isPaid&&<button onClick={()=>update('tasks',t.id,{status:'done'})} className="px-3 py-2 bg-emerald-100 text-emerald-600 rounded-xl text-[11px] font-bold hover:bg-emerald-200 active:bg-emerald-300 transition">Pagado ✓</button>}
+              {isPaid&&<button onClick={()=>update('tasks',t.id,{status:'pending'})} className="px-3 py-2 bg-slate-100 text-slate-500 rounded-xl text-[11px] font-bold hover:bg-slate-200 transition">Reactivar</button>}
+              <button onClick={()=>{setTaskForm({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||'',amount:String(t.amount||''),frequency:t.frequency||'annual'});setEditId(t.id);setModal('task')}} className="p-2 text-slate-300 hover:text-blue-500 rounded-xl hover:bg-blue-50 transition"><Pencil size={14}/></button>
+              <button onClick={()=>del('tasks',t.id)} className="p-2 text-slate-300 hover:text-red-500 rounded-xl hover:bg-red-50 transition"><Trash2 size={14}/></button>
+            </div>
+          </div>})}
+      </div>}
+      {!tasks.length&&<div/>}
     </>}
 
     {/* ═══ SUPPORT / TICKETS ═══ */}
@@ -1227,14 +1211,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {partners.length>0&&<div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={repairForm.paidBy} onChange={v=>ur('paidBy',v)}/></div>}
     </Mdl>}
 
-    {modal==='task'&&<Mdl title={editId?'✏️ Editar Tarea':'📋 Nueva Tarea'} grad="from-indigo-500 to-indigo-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...taskForm};if(editId){update('tasks',editId,data)}else{save('tasks',data)}}} disabled={!taskForm.title} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <Inp label="Título" value={taskForm.title} onChange={v=>ut('title',v)} placeholder="Ej: Renovar seguro, Pagar property tax"/>
+    {modal==='task'&&<Mdl title={editId?'✏️ Editar Obligación':'📋 Nueva Obligación'} grad="from-indigo-500 to-indigo-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...taskForm,amount:taskForm.amount||''};if(editId){update('tasks',editId,data)}else{save('tasks',data)}}} disabled={!taskForm.title} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <Inp label="Obligación" value={taskForm.title} onChange={v=>ut('title',v)} placeholder="Ej: Hipoteca, Seguro, Impuestos" required/>
       <div className="grid grid-cols-2 gap-3">
-        <Inp label="Fecha límite" value={taskForm.dueDate} onChange={v=>ut('dueDate',v)} type="date"/>
-        <Sel label="Prioridad" value={taskForm.priority} onChange={v=>ut('priority',v)} options={[{v:'high',l:'🔴 Alta'},{v:'medium',l:'🟡 Media'},{v:'low',l:'🟢 Baja'}]}/>
+        <Inp label="Monto (USD)" value={taskForm.amount} onChange={v=>ut('amount',v)} prefix="$" type="number" placeholder="1,850"/>
+        <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Frecuencia</label><div className="grid grid-cols-2 gap-2">{[['monthly','Mensual'],['annual','Anual']].map(([v,l])=><button key={v} type="button" onClick={()=>ut('frequency',v)} className={`py-2.5 rounded-xl border-2 text-xs font-medium transition ${taskForm.frequency===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
       </div>
-      <Sel label="Estado" value={taskForm.status} onChange={v=>ut('status',v)} options={[{v:'pending',l:'⚠ Pendiente'},{v:'progress',l:'⏳ En Progreso'},{v:'done',l:'✓ Completada'}]}/>
-      <Inp label="Notas (opcional)" value={taskForm.notes} onChange={v=>ut('notes',v)} placeholder="Detalles adicionales..."/>
+      <Inp label="Próximo pago" value={taskForm.dueDate} onChange={v=>ut('dueDate',v)} type="date"/>
+      <Inp label="Notas (opcional)" value={taskForm.notes} onChange={v=>ut('notes',v)} placeholder="Ej: Póliza #12345, County Tax"/>
     </Mdl>}
 
     {modal==='valuation'&&<Mdl title={editId?'✏️ Editar Valorización':'📈 Registrar Valor de Mercado'} grad="from-emerald-600 to-teal-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={date:valForm.date,value:parseFloat(valForm.value)||0,source:valForm.source,notes:valForm.notes};if(editId){update('valuations',editId,data)}else{save('valuations',data)}}} disabled={!valForm.value} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
