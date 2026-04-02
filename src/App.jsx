@@ -79,7 +79,35 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     return()=>unsub();
   },[userEmail,isAdmin]);
 
-  const save=async(sub,data)=>{await addDoc(collection(db,'properties',propertyId,sub),{...data,createdAt:serverTimestamp()});setModal(null);setEditId(null)};
+  const save=async(sub,data)=>{
+    await addDoc(collection(db,'properties',propertyId,sub),{...data,createdAt:serverTimestamp()});
+    // Auto-sync: expense → mark matching obligation as paid
+    if(sub==='expenses'){
+      const cat=data.category||'';const concept=(data.concept||'').toLowerCase();
+      const matches=[
+        [cat==='taxes'||/tax|impuesto|county/i.test(concept),/impuesto|tax/i],
+        [cat==='insurance'||/insurance|seguro|póliza|hazard/i.test(concept),/seguro|insurance/i],
+        [cat==='hoa'||/hoa|association/i.test(concept),/hoa/i],
+        [cat==='mortgage_pay'||/hipoteca|mortgage/i.test(concept),/hipoteca|mortgage/i],
+        [cat==='contabilidad'||/contab|accounting|cpa/i.test(concept),/contab|accounting/i],
+      ];
+      for(const [isMatch,rx] of matches){
+        if(!isMatch)continue;
+        const ob=tasks.find(t=>t.status!=='done'&&rx.test(t.title));
+        if(ob){await updateDoc(doc(db,'properties',propertyId,'tasks',ob.id),{status:'done'});notify(ob.title+' marcado como pagado');break}
+      }
+    }
+    setModal(null);setEditId(null);
+  };
+  // Mark obligation paid → auto-register expense
+  const catMap={'Hipoteca':'mortgage_pay','Impuestos':'taxes','Seguro':'insurance','Contabilidad':'contabilidad','HOA':'hoa'};
+  const markPaid=async(task)=>{
+    await updateDoc(doc(db,'properties',propertyId,'tasks',task.id),{status:'done'});
+    if(task.amount&&parseFloat(task.amount)>0){
+      await addDoc(collection(db,'properties',propertyId,'expenses'),{date:new Date().toISOString().split('T')[0],concept:task.title+(task.notes?' — '+task.notes:''),amount:parseFloat(task.amount),category:catMap[task.title]||'otros',type:'fixed',paidBy:partners[0]?.id||'',createdAt:serverTimestamp()});
+      notify(task.title+' pagado y registrado en gastos');
+    } else { notify(task.title+' marcado como pagado') }
+  };
   const update=async(sub,id,data)=>{await updateDoc(doc(db,'properties',propertyId,sub,id),data);setModal(null);setEditId(null)};
   const del=async(sub,id)=>{if(!confirm('¿Eliminar?'))return;await deleteDoc(doc(db,'properties',propertyId,sub,id))};
   const saveMortgage=async()=>{setSavingMort(true);try{await updateDoc(doc(db,'properties',propertyId),{mortgage:{balance:parseFloat(mortConfig.bal)||0,rate:parseFloat(mortConfig.rate)||0,termYears:parseInt(mortConfig.term)||30,monthlyPayment:parseFloat(mortConfig.pay)||0,startDate:mortConfig.start||''}})}catch(e){notify('Error: '+e.message,'error')}setSavingMort(false)};
@@ -222,7 +250,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     <div className="flex-1 p-3 md:p-6 pt-[72px] md:pt-6"><div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">{Array(5).fill(0).map((_,i)=><div key={i} className="bg-white rounded-2xl p-4 border border-slate-200 animate-pulse" style={{animationDelay:i*100+'ms'}}><div className="h-2.5 bg-slate-200 rounded w-16 mb-3"/><div className="h-6 bg-slate-200 rounded w-24 mb-2"/><div className="h-2 bg-slate-100 rounded w-20"/></div>)}</div>
     <div className="grid grid-cols-1 md:grid-cols-12 gap-4"><div className="md:col-span-7 bg-white rounded-2xl p-5 border border-slate-200 h-64 animate-pulse"/><div className="md:col-span-5 bg-white rounded-2xl p-5 border border-slate-200 h-64 animate-pulse" style={{animationDelay:'200ms'}}/></div></div></div>
   </div>;
-  const ctx={propertyId,prop,allProperties,onSwitchProperty,onLogout,onAddProperty,userEmail,isAdmin,plan,canUse,view,setView,modal,setModal,editId,setEditId,mobileNav,setMobileNav,dark,setDark,stmts,expenses,income,contribs,valuations,repairs,tasks,tickets,partners,mort,annual,revenue,stmtNet:stmts.reduce((s,x)=>s+(x.net||0),0),stmtComm:stmts.reduce((s,x)=>s+(x.commission||0),0),totNet:income.reduce((s,i)=>s+(i.netAmount||0),0),totCont:contribs.reduce((s,c)=>s+(c.amount||0),0)+(partners||[]).reduce((s,p)=>s+(p.initialCapital||0),0),marketValue,realEquity,realLTV,appreciation,latestVal,pt,fixedExp,additionalExp,expByCat,dashYear,setDashYear,stmtPage,setStmtPage,stmtYearFilter,setStmtYearFilter,rptTab,setRptTab,uploadLog,setUploadLog,toast,setToast,loading,expenseForm,ue,contribForm,uc,stmtForm,us,valForm,uv,repairForm,ur,taskForm,ut,mortConfig,umc,savingMort,ticketForm,setTicketForm,settingsForm,setSettingsForm,editPartners,setEditPartners,save,update,del,handlePDFs,saveMortgage,notify,M,fm,fmDate,pct,CATS,US,PT,C,PER_PAGE};
+  const ctx={propertyId,prop,allProperties,onSwitchProperty,onLogout,onAddProperty,userEmail,isAdmin,plan,canUse,view,setView,modal,setModal,editId,setEditId,mobileNav,setMobileNav,dark,setDark,stmts,expenses,income,contribs,valuations,repairs,tasks,tickets,partners,mort,annual,revenue,stmtNet:stmts.reduce((s,x)=>s+(x.net||0),0),stmtComm:stmts.reduce((s,x)=>s+(x.commission||0),0),totNet:income.reduce((s,i)=>s+(i.netAmount||0),0),totCont:contribs.reduce((s,c)=>s+(c.amount||0),0)+(partners||[]).reduce((s,p)=>s+(p.initialCapital||0),0),marketValue,realEquity,realLTV,appreciation,latestVal,pt,fixedExp,additionalExp,expByCat,dashYear,setDashYear,stmtPage,setStmtPage,stmtYearFilter,setStmtYearFilter,rptTab,setRptTab,uploadLog,setUploadLog,toast,setToast,loading,expenseForm,ue,contribForm,uc,stmtForm,us,valForm,uv,repairForm,ur,taskForm,ut,mortConfig,umc,savingMort,ticketForm,setTicketForm,settingsForm,setSettingsForm,editPartners,setEditPartners,save,update,del,handlePDFs,saveMortgage,markPaid,notify,M,fm,fmDate,pct,CATS,US,PT,C,PER_PAGE};
   return <DashboardContext.Provider value={ctx}><div className="min-h-screen bg-[#F8FAFC] flex">
     {/* MOBILE HEADER */}
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-b border-slate-200 z-40 px-3 py-2.5 flex items-center gap-3">
@@ -438,7 +466,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <div className={`text-xs font-bold ${a.level==='overdue'?'text-rose-700':'text-amber-700'}`}>{a.title}{a.amount?' · '+fm(parseFloat(a.amount)):''}</div>
             <div className={`text-[10px] ${a.level==='overdue'?'text-rose-500':'text-amber-500'}`}>{a.days<0?`Vencido hace ${Math.abs(a.days)} día${Math.abs(a.days)>1?'s':''}`:`Vence en ${a.days} día${a.days>1?'s':''}`} · {fmDate(a.dueDate)}</div>
           </div>
-          <button onClick={e=>{e.stopPropagation();update('tasks',a.id,{status:'done'})}} className={`px-3 py-1.5 rounded-xl text-[11px] font-bold shrink-0 transition ${a.level==='overdue'?'bg-rose-200 text-rose-700 hover:bg-rose-300':'bg-amber-200 text-amber-700 hover:bg-amber-300'}`}>Pagado ✓</button>
+          <button onClick={e=>{e.stopPropagation();markPaid(a)}} className={`px-3 py-1.5 rounded-xl text-[11px] font-bold shrink-0 transition ${a.level==='overdue'?'bg-rose-200 text-rose-700 hover:bg-rose-300':'bg-amber-200 text-amber-700 hover:bg-amber-300'}`}>Pagado ✓</button>
         </div>)}</div>;
       })()}
 
@@ -1016,7 +1044,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {!isPaid&&<button onClick={()=>update('tasks',t.id,{status:'done'})} className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${isOverdue?'bg-rose-200 text-rose-700 hover:bg-rose-300':isSoon?'bg-amber-200 text-amber-700 hover:bg-amber-300':'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'}`}>Pagado ✓</button>}
+              {!isPaid&&<button onClick={()=>markPaid(t)} className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${isOverdue?'bg-rose-200 text-rose-700 hover:bg-rose-300':isSoon?'bg-amber-200 text-amber-700 hover:bg-amber-300':'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'}`}>Pagado ✓</button>}
               {isPaid&&<button onClick={()=>update('tasks',t.id,{status:'pending'})} className="px-3 py-2 bg-slate-100 text-slate-500 rounded-xl text-[11px] font-bold hover:bg-slate-200 transition">Reactivar</button>}
               <button onClick={()=>{setTaskForm({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||'',amount:String(t.amount||''),frequency:t.frequency||'annual'});setEditId(t.id);setModal('task')}} className="p-2 text-slate-300 hover:text-blue-500 rounded-xl hover:bg-blue-50 transition"><Pencil size={14}/></button>
               <button onClick={()=>del('tasks',t.id)} className="p-2 text-slate-300 hover:text-red-500 rounded-xl hover:bg-red-50 transition"><Trash2 size={14}/></button>
