@@ -27,6 +27,31 @@ html.dark .bg-blue-50 { background: rgba(37,99,235,0.15) !important; }
 html.dark .bg-emerald-50 { background: rgba(16,185,129,0.15) !important; }
 html.dark .bg-rose-50 { background: rgba(244,63,94,0.15) !important; }
 html.dark .bg-amber-50 { background: rgba(245,158,11,0.15) !important; }
+html.dark .bg-rose-50\/30 { background: rgba(244,63,94,0.1) !important; }
+html.dark .bg-amber-50\/30 { background: rgba(245,158,11,0.1) !important; }
+html.dark .bg-rose-100 { background: rgba(244,63,94,0.2) !important; }
+html.dark .bg-amber-100 { background: rgba(245,158,11,0.2) !important; }
+html.dark .bg-rose-200 { background: rgba(244,63,94,0.3) !important; }
+html.dark .bg-amber-200 { background: rgba(245,158,11,0.3) !important; }
+html.dark .bg-emerald-100 { background: rgba(16,185,129,0.2) !important; }
+html.dark .bg-emerald-50\/50 { background: rgba(16,185,129,0.08) !important; }
+html.dark .text-rose-700 { color: #FDA4AF !important; }
+html.dark .text-rose-600 { color: #FB7185 !important; }
+html.dark .text-rose-500 { color: #F43F5E !important; }
+html.dark .text-amber-700 { color: #FCD34D !important; }
+html.dark .text-amber-600 { color: #FBBF24 !important; }
+html.dark .text-amber-500 { color: #F59E0B !important; }
+html.dark .text-emerald-700 { color: #6EE7B7 !important; }
+html.dark .text-emerald-600 { color: #34D399 !important; }
+html.dark .text-emerald-500 { color: #10B981 !important; }
+html.dark .text-blue-700 { color: #93C5FD !important; }
+html.dark .text-blue-600 { color: #60A5FA !important; }
+html.dark .text-blue-500 { color: #3B82F6 !important; }
+html.dark .text-purple-700 { color: #C4B5FD !important; }
+html.dark .text-purple-600 { color: #A78BFA !important; }
+html.dark .border-rose-200, html.dark .border-rose-300 { border-color: rgba(244,63,94,0.3) !important; }
+html.dark .border-amber-200, html.dark .border-amber-300 { border-color: rgba(245,158,11,0.3) !important; }
+html.dark .border-emerald-200 { border-color: rgba(16,185,129,0.3) !important; }
 html.dark .bg-purple-50 { background: rgba(139,92,246,0.15) !important; }
 html.dark .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important; }
 html.dark input, html.dark select, html.dark textarea { background: #0F172A !important; color: #E2E8F0 !important; border-color: #475569 !important; }
