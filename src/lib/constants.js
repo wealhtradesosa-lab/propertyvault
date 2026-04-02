@@ -47,7 +47,7 @@ const baseCats=(t)=>[
 const coCats=(t)=>[
   {v:'personal',l:'Personal de Servicio',i:'👷',fixed:true},{v:'prestaciones',l:'Prestaciones Sociales',i:'📋',fixed:true},
   {v:'electricity',l:'Energía',i:'⚡',fixed:true},{v:'water',l:'Agua',i:'💧',fixed:true},
-  {v:'gas',l:'Gas',i:'🔥',fixed:true},{v:'hoa',l:t.hoa,i:'🏢',fixed:true},
+  {v:'gas',l:'Gas',i:'🔥',fixed:true},{v:'internet',l:'Internet / WiFi',i:'📶',fixed:true},{v:'cable',l:'Cable / TV',i:'📺',fixed:true},{v:'hoa',l:t.hoa,i:'🏢',fixed:true},
   {v:'pool',l:'Piscina',i:'🏊',fixed:true},{v:'jardineria',l:'Jardinería / Zonas Verdes',i:'🌿',fixed:true},
   {v:'maintenance',l:'Mantenimiento Preventivo',i:'🔧',fixed:true},
   {v:'repairs',l:'Reparaciones',i:'🛠️'},
