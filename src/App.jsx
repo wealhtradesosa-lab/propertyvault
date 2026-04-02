@@ -181,7 +181,20 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const isRecurring=(e)=>{if(!e)return false;const f=eFreq(e);return f==='monthly'||f==='annual';};
   const pt=useMemo(()=>{const r={};partners.forEach(p=>{r[p.id]={name:p.name,color:p.color,own:p.ownership,cont:0,exp:0,inc:0}});contribs.forEach(c=>{if(r[c.paidBy])r[c.paidBy].cont+=c.amount||0});expenses.forEach(e=>{if(r[e.paidBy])r[e.paidBy].exp+=e.amount||0});const tn=income.reduce((s,i)=>s+(i.netAmount||0),0);partners.forEach(p=>{r[p.id].inc=tn*(p.ownership/100)});return r},[partners,contribs,expenses,income]);
 
-  const xr=prop.exchangeRate||(liveTRM&&liveTRM.COP?liveTRM.COP:1);const toPropCur=(amt,cur)=>{if(!cur||cur===propCurrency)return amt;if(cur==='USD'&&propCurrency!=='USD')return amt*xr;if(cur!=='USD'&&propCurrency==='USD')return amt/xr;return amt;};
+  const propCountry=prop.country||'US';
+  const propCurrency=prop.currency||'USD';
+  const fmP=v=>fmCurrency(v,propCurrency);
+  const propCats=getCats(propCountry);
+  const propTerms=getTerms(propCountry);
+
+  // Global display formatter — respects currency toggle everywhere
+  const gXr=prop.exchangeRate||(liveTRM&&liveTRM.COP?liveTRM.COP:1);
+  const gVc=viewCur||propCurrency;
+  const gConv=(v)=>{if(gVc===propCurrency||gXr<=1)return v;if(gVc==='USD'&&propCurrency!=='USD')return v/gXr;if(gVc!=='USD'&&propCurrency==='USD')return v*gXr;return v};
+  const gFm=(v)=>fmCurrency(gConv(v),gVc);
+  const CurToggle=()=>gXr>1?<div className="flex gap-1 shrink-0">{[propCurrency,...(propCurrency==='USD'?['COP']:['USD'])].map(c=><button key={c} onClick={()=>setViewCur(c===propCurrency?null:c)} className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition ${(viewCur||propCurrency)===c?'bg-blue-600 text-white':'bg-white border border-blue-200 text-blue-500 hover:bg-blue-50'}`}>{c}</button>)}</div>:null;
+
+  const xr=gXr;const toPropCur=(amt,cur)=>{if(!cur||cur===propCurrency)return amt;if(cur==='USD'&&propCurrency!=='USD')return amt*xr;if(cur!=='USD'&&propCurrency==='USD')return amt/xr;return amt;};
   const totExp=expenses.reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
   const totGross=income.reduce((s,i)=>s+(i.grossAmount||0),0);
   const totNet=income.reduce((s,i)=>s+(i.netAmount||0),0);
@@ -216,19 +229,6 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const equity = (prop.purchasePrice || 0) - (mort.balance || 0);
   // LTV
   const ltv = prop.purchasePrice > 0 && mort.balance > 0 ? (mort.balance / prop.purchasePrice) * 100 : 0;
-
-  const propCountry=prop.country||'US';
-  const propCurrency=prop.currency||'USD';
-  const fmP=v=>fmCurrency(v,propCurrency);
-  const propCats=getCats(propCountry);
-  const propTerms=getTerms(propCountry);
-
-  // Global display formatter — respects currency toggle everywhere
-  const gXr=prop.exchangeRate||(liveTRM&&liveTRM.COP?liveTRM.COP:1);
-  const gVc=viewCur||propCurrency;
-  const gConv=(v)=>{if(gVc===propCurrency||gXr<=1)return v;if(gVc==='USD'&&propCurrency!=='USD')return v/gXr;if(gVc!=='USD'&&propCurrency==='USD')return v*gXr;return v};
-  const gFm=(v)=>fmCurrency(gConv(v),gVc);
-  const CurToggle=()=>gXr>1?<div className="flex gap-1 shrink-0">{[propCurrency,...(propCurrency==='USD'?['COP']:['USD'])].map(c=><button key={c} onClick={()=>setViewCur(c===propCurrency?null:c)} className={`px-3 py-1.5 rounded-xl text-[10px] font-bold transition ${(viewCur||propCurrency)===c?'bg-blue-600 text-white':'bg-white border border-blue-200 text-blue-500 hover:bg-blue-50'}`}>{c}</button>)}</div>:null;
 
   const fixedExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return c?.fixed||e.type==='fixed'}),[expenses,propCats]);
   const additionalExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return !c?.fixed&&e.type!=='fixed'}),[expenses,propCats]);
