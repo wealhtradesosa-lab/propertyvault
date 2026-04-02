@@ -438,27 +438,27 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {fRev>0?<>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 mb-5">
-        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm">
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm cursor-help" title="Total income from guests before any deductions">
           <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Gross Revenue</div>
           <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-1">{dFm(fRev)}</div>
           <div className="text-[10px] text-slate-400">{n} months{revChg!==null?` · ${revChg>=0?'+':''}${revChg.toFixed(0)}% YoY`:''}</div>
         </div>
-        <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fNoi>=0?'border-l-amber-500':'border-l-rose-500'}`}>
+        <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm cursor-help ${fNoi>=0?'border-l-amber-500':'border-l-rose-500'}`} title="Net Operating Income = Revenue minus ALL operating costs (PM fees, utilities, maintenance, insurance, taxes, etc.). Measures property profitability before mortgage.">
           <div className={`text-[10px] font-bold uppercase tracking-widest ${fNoi>=0?'text-amber-600':'text-rose-500'}`}>NOI</div>
           <div className={`text-base md:text-[22px] font-extrabold mt-1 ${fNoi>=0?'text-amber-700':'text-rose-600'}`}>{dFm(fNoi)}</div>
           <div className="text-[10px] text-slate-400">Margin {fMargin.toFixed(0)}%</div>
         </div>
-        <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
+        <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm cursor-help ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`} title="Cash Flow = NOI minus mortgage. What's actually left in your pocket after everything.">
           <div className={`text-[10px] font-bold uppercase tracking-widest ${fCF>=0?'text-emerald-600':'text-rose-500'}`}>Cash Flow</div>
           <div className={`text-base md:text-[22px] font-extrabold mt-1 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{dFm(fCF)}</div>
-          <div className={`text-[10px] ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mo</div>
+          <div className={`text-[10px] ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mo{!fMortP&&' · = NOI (no mortgage)'}</div>
         </div>
-        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-cyan-500 border border-slate-200 shadow-sm">
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-cyan-500 border border-slate-200 shadow-sm cursor-help" title="Percentage of available nights that were booked. ADR = Average Daily Rate per booked night.">
           <div className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">Occupancy</div>
           <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-1">{fNights>0?occupancy.toFixed(0)+'%':'—'}</div>
           <div className="text-[10px] text-slate-400">{fNights>0?`${fNights} nights · ADR ${dFm(adr)}`:'No data'}</div>
         </div>
-        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm cursor-help" title="Cash-on-Cash Return = Annual Cash Flow ÷ Total capital invested. Measures your return on the money you put in.">
           <div className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">Cash-on-Cash{partial?' (ann.)':''}</div>
           <div className={`text-base md:text-[22px] font-extrabold mt-1 ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
           <div className="text-[10px] text-slate-400">Capital: {dFm(totCont)}</div>
