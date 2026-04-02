@@ -5,8 +5,8 @@ export const M=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov
 
 // Currency formatting — dynamic per property
 export const CURRENCIES={USD:{symbol:'$',locale:'en-US'},COP:{symbol:'$',locale:'es-CO'},EUR:{symbol:'€',locale:'de-DE'},MXN:{symbol:'$',locale:'es-MX'},GBP:{symbol:'£',locale:'en-GB'},BRL:{symbol:'R$',locale:'pt-BR'}};
-export const fmCurrency=(v,cur='USD')=>{const c=CURRENCIES[cur]||CURRENCIES.USD;return c.symbol+Math.abs(v||0).toLocaleString(c.locale,{minimumFractionDigits:0,maximumFractionDigits:0})};
-export const fm=v=>'$'+Math.abs(v||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0});
+export const fmCurrency=(v,cur='USD')=>{const c=CURRENCIES[cur]||CURRENCIES.USD;const neg=(v||0)<0;return (neg?'-':'')+c.symbol+Math.abs(v||0).toLocaleString(c.locale,{minimumFractionDigits:0,maximumFractionDigits:0})};
+export const fm=v=>{const neg=(v||0)<0;return (neg?'-':'')+'$'+Math.abs(v||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0})};
 export const fmDate=d=>d?new Date(d+'T12:00:00').toLocaleDateString('es',{day:'2-digit',month:'short',year:'numeric'}):'';
 export const pct=(a,b)=>b?((a/b)*100).toFixed(1)+'%':'—';
 
