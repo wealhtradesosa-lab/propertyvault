@@ -177,8 +177,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   // ═══ CALCULATIONS ═══
   // Effective frequency: "Fijo" without explicit frequency = monthly (permanent)
-  const eFreq=(e)=>e.frequency||(e.type==='fixed'?'monthly':'once');
-  const isRecurring=(e)=>{const f=eFreq(e);return f==='monthly'||f==='annual';};
+  const eFreq=(e)=>{if(!e)return 'once';return e.frequency||(e.type==='fixed'?'monthly':'once')};
+  const isRecurring=(e)=>{if(!e)return false;const f=eFreq(e);return f==='monthly'||f==='annual';};
   const pt=useMemo(()=>{const r={};partners.forEach(p=>{r[p.id]={name:p.name,color:p.color,own:p.ownership,cont:0,exp:0,inc:0}});contribs.forEach(c=>{if(r[c.paidBy])r[c.paidBy].cont+=c.amount||0});expenses.forEach(e=>{if(r[e.paidBy])r[e.paidBy].exp+=e.amount||0});const tn=income.reduce((s,i)=>s+(i.netAmount||0),0);partners.forEach(p=>{r[p.id].inc=tn*(p.ownership/100)});return r},[partners,contribs,expenses,income]);
 
   const xr=prop.exchangeRate||(liveTRM&&liveTRM.COP?liveTRM.COP:1);const toPropCur=(amt,cur)=>{if(!cur||cur===propCurrency)return amt;if(cur==='USD'&&propCurrency!=='USD')return amt*xr;if(cur!=='USD'&&propCurrency==='USD')return amt/xr;return amt;};
