@@ -30,20 +30,15 @@ function nights(text) {
   let n = 0;
   // English: "15 nights"
   const nm = text.match(/(\d+)\s*nights?/gi);
-  if (nm) nm.forEach(m => { const v = parseInt(m); if (v > 0 && v < 500) n += v; });
-  if (n > 0) return n;
-  // Spanish: "Noches reservadas" table — sum all numbers after this header
-  const nrMatch = text.match(/[Nn]oches\s*reservadas[\s\S]{0,300}/);
-  if (nrMatch) {
-    const nums = nrMatch[0].match(/\b(\d{1,3})\b/g);
-    if (nums) nums.forEach(x => { const v = parseInt(x); if (v > 0 && v < 500) n += v; });
-  }
-  // Spanish: "X noches"
-  if (n === 0) {
-    const sn = text.match(/(\d+)\s*noches?/gi);
-    if (sn) sn.forEach(m => { const v = parseInt(m); if (v > 0 && v < 500) n += v; });
-  }
-  return n;
+  if (nm) nm.forEach(m => { const v = parseInt(m); if (v > 0 && v < 366) n += v; });
+  if (n > 0) return Math.min(n, 365);
+  // Spanish: "Noches reservadas" — grab FIRST number directly after
+  const nrDirect = text.match(/[Nn]oches\s*reservadas\s*(\d+)/);
+  if (nrDirect) return Math.min(parseInt(nrDirect[1]), 365);
+  // Spanish: "X noches" — take FIRST match only
+  const sn = text.match(/(\d+)\s*noches?\b/i);
+  if (sn) { const v = parseInt(sn[1]); if (v > 0 && v <= 365) return v; }
+  return 0;
 }
 
 function reservations(text) {
@@ -160,8 +155,8 @@ function parseAirbnbAnnual(t) {
     }
   }
 
-  // Extract total nights
-  const totalNights = nights(t);
+  // Extract total nights — cap at 365 (single property)
+  let totalNights = Math.min(nights(t), 365);
   if (totalNights > 0 && results.length > 0) {
     const totalRev = results.reduce((s, r) => s + r.revenue, 0);
     if (totalRev > 0) {
