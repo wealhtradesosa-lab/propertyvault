@@ -12,6 +12,9 @@ import { LandingPage } from './components/LandingPage';
 import { AuthScreen } from './components/AuthScreen';
 
 import { Onboarding } from './components/Onboarding';
+import { DashboardContext } from './context/DashboardContext';
+import { SupportView } from './views/SupportView';
+import { SettingsView } from './views/SettingsView';
 
 // ═══════════════════════════════════════════════════════════════
 // DASHBOARD
@@ -199,7 +202,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     <div className="flex-1 p-3 md:p-6 pt-[72px] md:pt-6"><div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">{Array(5).fill(0).map((_,i)=><div key={i} className="bg-white rounded-2xl p-4 border border-slate-200 animate-pulse" style={{animationDelay:i*100+'ms'}}><div className="h-2.5 bg-slate-200 rounded w-16 mb-3"/><div className="h-6 bg-slate-200 rounded w-24 mb-2"/><div className="h-2 bg-slate-100 rounded w-20"/></div>)}</div>
     <div className="grid grid-cols-1 md:grid-cols-12 gap-4"><div className="md:col-span-7 bg-white rounded-2xl p-5 border border-slate-200 h-64 animate-pulse"/><div className="md:col-span-5 bg-white rounded-2xl p-5 border border-slate-200 h-64 animate-pulse" style={{animationDelay:'200ms'}}/></div></div></div>
   </div>;
-  return <div className="min-h-screen bg-[#F8FAFC] flex">
+  const ctx={propertyId,prop,allProperties,onSwitchProperty,onLogout,onAddProperty,userEmail,isAdmin,plan,canUse,view,setView,modal,setModal,editId,setEditId,mobileNav,setMobileNav,dark,setDark,stmts,expenses,income,contribs,valuations,repairs,tasks,tickets,partners,mort,annual,revenue,stmtNet:stmts.reduce((s,x)=>s+(x.net||0),0),stmtComm:stmts.reduce((s,x)=>s+(x.commission||0),0),totNet:income.reduce((s,i)=>s+(i.netAmount||0),0),totCont:contribs.reduce((s,c)=>s+(c.amount||0),0)+(partners||[]).reduce((s,p)=>s+(p.initialCapital||0),0),marketValue,realEquity,realLTV,appreciation,latestVal,pt,fixedExp,additionalExp,expByCat,dashYear,setDashYear,stmtPage,setStmtPage,stmtYearFilter,setStmtYearFilter,rptTab,setRptTab,uploadLog,setUploadLog,toast,setToast,loading,expenseForm,ue,contribForm,uc,stmtForm,us,valForm,uv,repairForm,ur,taskForm,ut,mortConfig,umc,savingMort,ticketForm,setTicketForm,settingsForm,setSettingsForm,editPartners,setEditPartners,save,update,del,handlePDFs,saveMortgage,M,fm,fmDate,pct,CATS,US,PT,C,PER_PAGE};
+  return <DashboardContext.Provider value={ctx}><div className="min-h-screen bg-[#F8FAFC] flex">
     {/* MOBILE HEADER */}
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-b border-slate-200 z-40 px-3 py-2.5 flex items-center gap-3">
       <button onClick={()=>setMobileNav(true)} aria-label="Abrir menú" className="p-2 hover:bg-slate-100 rounded-xl active:bg-slate-200 transition"><Menu size={20} className="text-slate-600"/></button>
@@ -933,146 +937,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     </>}
 
     {/* ═══ SUPPORT / TICKETS ═══ */}
-    {view==='support'&&<>
-      <div className="flex justify-between items-start mb-6">
-        <div><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">💬 Soporte{isAdmin?' — Panel Admin':''}</h1><p className="text-sm text-slate-400 mt-1">{isAdmin?'Todos los tickets de usuarios':'Reporta bugs, sugiere mejoras, o haz preguntas'}</p></div>
-      </div>
+    {view==='support'&&<SupportView/>}
 
-      {/* New ticket form */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl mb-6">
-        <h3 className="text-base font-bold text-slate-700 mb-4">Nuevo Ticket</h3>
-        <div className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tipo</label>
-              <div className="grid grid-cols-3 gap-2">{[['bug','🐛 Bug'],['feature','💡 Mejora'],['question','❓ Pregunta']].map(([v,l])=><button key={v} type="button" onClick={()=>setTicketForm(f=>({...f,type:v}))} className={`py-2 rounded-xl border-2 text-xs font-medium transition ${ticketForm.type===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500 hover:border-slate-300'}`}>{l}</button>)}</div>
-            </div>
-            <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Prioridad</label>
-              <div className="grid grid-cols-3 gap-2">{[['low','🟢 Baja'],['medium','🟡 Media'],['high','🔴 Alta']].map(([v,l])=><button key={v} type="button" onClick={()=>setTicketForm(f=>({...f,priority:v}))} className={`py-2 rounded-xl border-2 text-xs font-medium transition ${ticketForm.priority===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500 hover:border-slate-300'}`}>{l}</button>)}</div>
-            </div>
-          </div>
-          <Inp label="Asunto" value={ticketForm.subject} onChange={v=>setTicketForm(f=>({...f,subject:v}))} placeholder="Ej: El parser no lee mi statement"/>
-          <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Descripción</label>
-            <textarea value={ticketForm.message} onChange={e=>setTicketForm(f=>({...f,message:e.target.value}))} rows={4} className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-sm text-slate-800 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-400/20 resize-none" placeholder="Describe el problema o sugerencia con el mayor detalle posible..."/>
-          </div>
-        </div>
-        <button onClick={async()=>{
-          if(!ticketForm.subject||!ticketForm.message){notify('Llena asunto y descripción','error');return;}
-          try{
-            await addDoc(collection(db,'tickets'),{...ticketForm,userEmail,propertyName:prop.name||'',propertyId,status:'open',createdAt:serverTimestamp()});
-            setTicketForm({type:'bug',subject:'',message:'',priority:'medium'});
-            notify('Ticket enviado');
-          }catch(e){notify('Error: '+e.message,'error')}
-        }} disabled={!ticketForm.subject||!ticketForm.message} className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20 disabled:opacity-30 flex items-center gap-2"><Send size={15}/> Enviar Ticket</button>
-      </div>
-
-      {/* Tickets list */}
-      {tickets.length>0&&<div className="max-w-2xl">
-        <h3 className="text-sm font-bold text-slate-600 uppercase tracking-wider mb-3">{isAdmin?'Todos los Tickets':'Mis Tickets'} ({tickets.length})</h3>
-        <div className="space-y-2">{tickets.map(t=><div key={t.id} className={`bg-white rounded-2xl border shadow-sm p-4 ${t.status==='open'?'border-blue-200':'border-slate-200'}`}>
-          <div className="flex justify-between items-start mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-sm">{t.type==='bug'?'🐛':t.type==='feature'?'💡':'❓'}</span>
-              <span className="text-sm font-bold text-slate-800">{t.subject}</span>
-              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${t.status==='open'?'bg-blue-100 text-blue-700':t.status==='resolved'?'bg-emerald-100 text-emerald-700':'bg-slate-100 text-slate-500'}`}>{t.status==='open'?'ABIERTO':t.status==='resolved'?'RESUELTO':'CERRADO'}</span>
-              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${t.priority==='high'?'bg-rose-100 text-rose-700':t.priority==='medium'?'bg-amber-100 text-amber-700':'bg-emerald-100 text-emerald-700'}`}>{t.priority==='high'?'ALTA':t.priority==='medium'?'MEDIA':'BAJA'}</span>
-            </div>
-            <span className="text-[10px] text-slate-400">{t.createdAt?.toDate?t.createdAt.toDate().toLocaleDateString('es'):''}</span>
-          </div>
-          <p className="text-sm text-slate-500 leading-relaxed">{t.message}</p>
-          {isAdmin&&<div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-            <div className="text-[10px] text-slate-400"><span className="font-bold text-slate-500">{t.userEmail}</span> · {t.propertyName}</div>
-            <div className="flex gap-1">
-              {t.status==='open'&&<button onClick={async()=>{await updateDoc(doc(db,'tickets',t.id),{status:'resolved'})}} className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-lg hover:bg-emerald-100 transition">✓ Resolver</button>}
-              <button onClick={async()=>{if(confirm('¿Eliminar ticket?'))await deleteDoc(doc(db,'tickets',t.id))}} className="text-[10px] font-bold text-rose-500 bg-rose-50 px-3 py-1 rounded-lg hover:bg-rose-100 transition">Eliminar</button>
-            </div>
-          </div>}
-        </div>)}</div>
-      </div>}
-
-      {tickets.length===0&&<div className="max-w-2xl"><Empty icon={MessageSquare} title="Sin tickets" desc="No hay tickets registrados. Usa el formulario arriba para reportar un bug o sugerir una mejora."/></div>}
-    </>}
 
     {/* ═══ SETTINGS ═══ */}
-    {view==='settings'&&(()=>{
-      const sf2=settingsForm||{name:prop.name||'',address:prop.address||'',city:prop.city||'',state:prop.state||'FL',type:prop.type||'vacation',purchasePrice:String(prop.purchasePrice||''),purchaseDate:prop.purchaseDate||'',marketValue:String(latestVal?latestVal.value:prop.purchasePrice||''),manager:prop.manager||'',managerCommission:String(prop.managerCommission||15),bedrooms:String(prop.bedrooms||''),bathrooms:String(prop.bathrooms||'')};
-      const uf=(k,v)=>setSettingsForm({...sf2,[k]:v});
-      const ep=editPartners||partners.map(p=>({...p,email:p.email||''}));
-      const upEp=(i,k,v)=>{const n=[...ep];n[i]={...n[i],[k]:v};setEditPartners(n)};
-      return <>
-      <h1 className="text-[22px] font-extrabold text-slate-800 mb-6">⚙️ Configuración de la Propiedad</h1>
+    {view==='settings'&&<SettingsView/>}
 
-      {/* General */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl">
-        <h3 className="text-base font-bold text-slate-700 mb-4">Datos Generales</h3>
-        <div className="space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Nombre" value={sf2.name} onChange={v=>uf('name',v)}/><Inp label="Dirección" value={sf2.address} onChange={v=>uf('address',v)}/></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Ciudad" value={sf2.city} onChange={v=>uf('city',v)}/><Sel label="Estado" value={sf2.state} onChange={v=>uf('state',v)} options={US.map(s=>({v:s,l:s}))}/><Sel label="Tipo" value={sf2.type} onChange={v=>uf('type',v)} options={PT}/></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Precio de Compra" value={sf2.purchasePrice} onChange={v=>uf('purchasePrice',v)} prefix="$" type="number"/><Inp label="Fecha de Compra" value={sf2.purchaseDate} onChange={v=>uf('purchaseDate',v)} type="date"/><Inp label="Valor Comercial Actual" value={sf2.marketValue} onChange={v=>uf('marketValue',v)} prefix="$" type="number"/></div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3"><Inp label="Property Manager" value={sf2.manager} onChange={v=>uf('manager',v)}/><Inp label="Comisión (%)" value={sf2.managerCommission} onChange={v=>uf('managerCommission',v)} type="number"/><Inp label="Habitaciones" value={sf2.bedrooms} onChange={v=>uf('bedrooms',v)} type="number"/><Inp label="Baños" value={sf2.bathrooms} onChange={v=>uf('bathrooms',v)} type="number"/></div>
-        </div>
-        <button onClick={async()=>{try{
-          const updates={name:sf2.name,address:sf2.address,city:sf2.city,state:sf2.state,type:sf2.type,purchasePrice:parseFloat(sf2.purchasePrice)||0,purchaseDate:sf2.purchaseDate||'',manager:sf2.manager,managerCommission:parseFloat(sf2.managerCommission)||15,bedrooms:parseInt(sf2.bedrooms)||0,bathrooms:parseInt(sf2.bathrooms)||0};
-          await updateDoc(doc(db,'properties',propertyId),updates);
-          const mv=parseFloat(sf2.marketValue)||0;
-          if(mv>0&&mv!==(latestVal?latestVal.value:prop.purchasePrice)){await addDoc(collection(db,'properties',propertyId,'valuations'),{date:new Date().toISOString().split('T')[0],value:mv,source:'manual',notes:'Actualizado desde Configuración',createdAt:serverTimestamp()})}
-          notify('Guardado correctamente')
-        }catch(e){notify('Error: '+e.message,'error')}}} className="mt-5 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20">💾 Guardar Cambios</button>
-      </div>
-
-      {/* Partners — editable */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl mt-4">
-        <div className="flex justify-between items-center mb-4"><h3 className="text-base font-bold text-slate-700">Socios</h3></div>
-        <div className="space-y-3">{ep.map((p,i)=><div key={p.id} className="rounded-xl p-4 bg-slate-50 border-l-4" style={{borderLeftColor:p.color}}>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <Inp label="Nombre" value={p.name} onChange={v=>upEp(i,'name',v)}/>
-            <Inp label="Email (para acceso)" value={p.email} onChange={v=>upEp(i,'email',v)} type="email" placeholder="socio@email.com"/>
-            <Inp label="Participación (%)" value={String(p.ownership)} onChange={v=>upEp(i,'ownership',v)} type="number"/>
-            <Inp label="Capital Inicial" value={String(p.initialCapital||'')} onChange={v=>upEp(i,'initialCapital',v)} prefix="$" type="number"/>
-          </div>
-        </div>)}</div>
-        <button onClick={async()=>{try{
-          const updatedPartners=ep.map(p=>({id:p.id,name:p.name,email:p.email||'',ownership:parseFloat(p.ownership)||0,initialCapital:parseFloat(p.initialCapital)||0,color:p.color}));
-          const memberEmails=[auth.currentUser.email,...updatedPartners.map(x=>x.email).filter(Boolean)];
-          await updateDoc(doc(db,'properties',propertyId),{partners:updatedPartners,memberEmails});
-          notify('Socios actualizados')
-        }catch(e){notify('Error: '+e.message,'error')}}} className="mt-4 px-6 py-3 bg-purple-600 text-white rounded-xl font-bold text-sm hover:bg-purple-700 transition shadow-lg shadow-purple-500/20">👥 Guardar Socios</button>
-        <p className="text-[10px] text-slate-400 mt-2">El email del socio le permite acceder a esta propiedad con su propia cuenta de OwnerDesk.</p>
-      </div>
-
-      {/* Data Export */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl mt-4">
-        <h3 className="text-base font-bold text-slate-700 mb-2">Exportar Datos</h3>
-        <p className="text-xs text-slate-400 mb-4">Descarga un respaldo completo de tu propiedad.</p>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={()=>{
-            const data={property:{name:prop.name,address:prop.address,city:prop.city,state:prop.state,purchasePrice:prop.purchasePrice,type:prop.type},
-              statements:stmts.map(s=>({periodo:`${M[s.month-1]} ${s.year}`,revenue:s.revenue,commission:s.commission,duke:s.duke,water:s.water,hoa:s.hoa,maintenance:s.maintenance,vendor:s.vendor,net:s.net,nights:s.nights,reservations:s.reservations})),
-              expenses:expenses.map(e=>({fecha:e.date,concepto:e.concept,monto:e.amount,categoria:e.category,tipo:e.type})),
-              contributions:contribs.map(c=>({fecha:c.date,concepto:c.concept,monto:c.amount})),
-              valuations:valuations.map(v=>({fecha:v.date,valor:v.value,fuente:v.source})),
-              repairs:repairs.map(r=>({fecha:r.date,titulo:r.title,monto:r.amount,vendor:r.vendor,estado:r.status})),
-              partners:partners.map(p=>({nombre:p.name,participacion:p.ownership,capital:p.initialCapital})),
-              exportDate:new Date().toISOString()};
-            const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
-            const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`ownerdesk-${prop.name?.replace(/\s+/g,'-')||'export'}-${new Date().toISOString().split('T')[0]}.json`;a.click();URL.revokeObjectURL(url);
-          }} className="px-5 py-3 bg-slate-700 text-white rounded-xl font-bold text-sm hover:bg-slate-800 active:bg-slate-900 transition flex items-center gap-2">📦 Exportar JSON</button>
-          <button onClick={()=>{
-            if(!stmts.length){notify('No hay statements para exportar','error');return}
-            const header='Periodo,Revenue,Comision,Electricidad,Agua,HOA,Mantenimiento,Otros,Net,Noches,Reservaciones\n';
-            const rows=stmts.sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>`${M[s.month-1]} ${s.year},${s.revenue||0},${s.commission||0},${s.duke||0},${s.water||0},${s.hoa||0},${s.maintenance||0},${s.vendor||0},${s.net||0},${s.nights||0},${s.reservations||0}`).join('\n');
-            const blob=new Blob([header+rows],{type:'text/csv'});
-            const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`statements-${prop.name?.replace(/\s+/g,'-')||'export'}-${new Date().toISOString().split('T')[0]}.csv`;a.click();URL.revokeObjectURL(url);
-          }} className="px-5 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 active:bg-emerald-800 transition flex items-center gap-2">📊 Statements CSV</button>
-        </div>
-      </div>
-
-      {/* Danger zone */}
-      <div className="bg-rose-50 rounded-2xl border border-rose-200 p-6 max-w-2xl mt-4">
-        <h3 className="text-base font-bold text-rose-700 mb-2">Zona de Peligro</h3>
-        <p className="text-xs text-rose-500 mb-4">Estas acciones son irreversibles.</p>
-        <button onClick={async()=>{if(!confirm('¿ELIMINAR esta propiedad y TODOS sus datos? Esta acción NO se puede deshacer.'))return;if(!confirm('¿Estás SEGURO? Se borrarán todos los statements, gastos, ingresos y aportes.'))return;for(const sub of['expenses','income','contributions','statements','valuations']){const snap=await getDocs(collection(db,'properties',propertyId,sub));for(const d of snap.docs)await deleteDoc(doc(db,'properties',propertyId,sub,d.id))}await deleteDoc(doc(db,'properties',propertyId));window.location.reload()}} className="px-5 py-2.5 bg-rose-600 text-white rounded-xl font-bold text-sm hover:bg-rose-700 transition">🗑️ Eliminar Propiedad</button>
-      </div>
-    </>;})()}
 
     {/* ═══ REPORTS ═══ */}
     {view==='reports'&&<>
@@ -1325,7 +1195,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {toast&&<div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-2 animate-slide-in ${toast.type==='error'?'bg-rose-600 text-white':'bg-slate-800 text-white'}`} style={{animation:'slide-up 0.3s ease-out'}} onClick={()=>setToast(null)}>
       <span>{toast.type==='error'?'❌':'✅'}</span>{toast.msg}
     </div>}
-  </div>;
+  </div></DashboardContext.Provider>;
 }
 
 // ═══ ROOT ═══
