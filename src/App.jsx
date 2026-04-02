@@ -215,7 +215,7 @@ function LandingPage({onLogin}) {
         <div className="max-w-5xl mx-auto">
           <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl">
             <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-              {[['Gross Revenue','$188,991','text-blue-400','↑ 12%'],['Net Income','$99,338','text-emerald-400','↑ 8%'],['Cash Flow','-$31,565','text-rose-400','↓ debt'],['Occupancy','70%','text-cyan-400','24 nights'],['CoC Return','-12.6%','text-purple-400','equity +28%']].map(([l,v,c,sub])=>
+              {[['Ingreso Bruto','$188,991','text-blue-400','↑ 12%'],['Ingreso Neto','$99,338','text-emerald-400','↑ 8%'],['Cash Flow','-$31,565','text-rose-400','↓ deuda'],['Ocupación','70%','text-cyan-400','24 noches'],['Retorno (CoC)','-12.6%','text-purple-400','equity +28%']].map(([l,v,c,sub])=>
                 <div key={l} className="text-center md:text-left px-2 py-1"><div className="text-[9px] md:text-[10px] font-bold text-white/30 uppercase tracking-wider">{l}</div><div className={`text-base md:text-xl font-extrabold ${c} mt-0.5`}>{v}</div><div className="text-[8px] md:text-[9px] text-white/25 font-medium mt-0.5">{sub}</div></div>
               )}
             </div>
@@ -719,13 +719,13 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {/* ── ROW 1: Key Performance Indicators ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-5">
         <div className="bg-white rounded-2xl p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm">
-          <div className="text-[8px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Gross Revenue</div>
+          <div className="text-[8px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Ingreso Bruto</div>
           <div className="text-lg md:text-[22px] font-extrabold text-slate-800 mt-1">{fm(fRev)}</div>
           <div className="text-[10px] text-slate-400 mt-1">Ingreso bruto de la propiedad · {n}m</div>
           {revChg!==null&&<div className={`text-[10px] font-bold mt-1 ${revChg>=0?'text-emerald-600':'text-rose-500'}`}>{revChg>=0?'▲':'▼'} {Math.abs(revChg).toFixed(0)}% YoY</div>}
         </div>
         <div className="bg-white rounded-2xl p-4 border-l-4 border-l-emerald-500 border border-slate-200 shadow-sm">
-          <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Net Income</div>
+          <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Ingreso Neto</div>
           <div className="text-lg md:text-[22px] font-extrabold text-emerald-700 mt-1">{fm(fNet)}</div>
           <div className="text-[10px] text-slate-400 mt-1">Lo que depositó el PM</div>
           <div className="text-[10px] text-slate-500 mt-0.5">Margen Op.: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{fMargin.toFixed(0)}%</b></div>
@@ -737,15 +737,15 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className={`text-[10px] mt-0.5 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{fm(fCFmo)}/mo{partial?` · Ann: ${fm(proyAnual)}`:''}</div>
         </div>
         <div className="bg-white rounded-2xl p-4 border-l-4 border-l-blue-400 border border-slate-200 shadow-sm">
-          <div className="text-[8px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Occupancy</div>
+          <div className="text-[8px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Ocupación</div>
           <div className="text-lg md:text-[22px] font-extrabold text-slate-800 mt-1">{fNights>0?occupancy.toFixed(0)+'%':'—'}</div>
           <div className="text-[10px] text-slate-400 mt-1">{fNights>0?`${fNights} de ${availNights} noches`:`Re-sube PDFs para ver`}</div>
           {fNights>0&&<div className="text-[10px] text-slate-500 mt-0.5">ADR: <b className="text-blue-600">{fm(adr)}</b></div>}
         </div>
         <div className="bg-white rounded-2xl p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
-          <div className="text-[9px] font-bold text-purple-600 uppercase tracking-widest">CoC Return{partial?' (ann.)':''}</div>
+          <div className="text-[9px] font-bold text-purple-600 uppercase tracking-widest">Retorno CoC{partial?' (ann.)':''}</div>
           <div className={`text-lg md:text-[22px] font-extrabold mt-1 ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
-          <div className="text-[10px] text-slate-400 mt-1">Cash-on-Cash Return</div>
+          <div className="text-[10px] text-slate-400 mt-1">Cash-on-Cash · Retorno sobre Capital</div>
           <div className="text-[10px] text-slate-500 mt-0.5">Capital: {fm(totCont)}</div>
         </div>
       </div>
@@ -753,7 +753,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {/* ── ROW 2: Visual P&L Cascade + Metrics ── */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
         <div className="col-span-1 md:col-span-7 bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden">
-          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-4">P&L — Profit & Loss{partial?` (${n} meses)`:''}</h3>
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-4">Radiografía de Costos{partial?` (${n} meses)`:''}</h3>
           <div className="space-y-1.5">
             <div className="rounded-lg relative overflow-hidden" style={{height:"34px"}}><div className="absolute inset-0 bg-blue-500"/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] md:text-[11px] font-bold text-white truncate">Ingreso Bruto</span><span className="text-[12px] font-extrabold text-white">{fm(fRev)}</span></div></div>
 
@@ -808,7 +808,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <div className="border-t border-slate-100 my-0.5"/>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cap Rate</span><span className={`text-[11px] font-bold ${fCapR>6?'text-emerald-600':fCapR>4?'text-amber-500':'text-rose-500'}`}>{fCapR.toFixed(2)}%</span></div>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Cash-on-Cash</span><span className={`text-[11px] font-bold ${fCoc>8?'text-emerald-600':fCoc>4?'text-amber-500':'text-rose-500'}`}>{fCoc.toFixed(1)}%</span></div>
-              {fDscr>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">DSCR <span className="text-[9px] text-slate-300">(Debt Service Coverage)</span></span><span className={`text-[11px] font-bold ${fDscr>1.25?'text-emerald-600':fDscr>1?'text-amber-500':'text-rose-500'}`}>{fDscr.toFixed(2)}x</span></div>}
+              {fDscr>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">DSCR <span className="text-[9px] text-slate-300">(Cobertura de Deuda)</span></span><span className={`text-[11px] font-bold ${fDscr>1.25?'text-emerald-600':fDscr>1?'text-amber-500':'text-rose-500'}`}>{fDscr.toFixed(2)}x</span></div>}
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Ratio de Gastos</span><span className={`text-[11px] font-bold ${fOpEx/fRev<0.5?'text-emerald-600':fOpEx/fRev<0.6?'text-amber-500':'text-rose-500'}`}>{(fOpEx/fRev*100).toFixed(0)}%</span></div>
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Capital Invertido</span><span className="text-[11px] font-bold text-slate-700">{fm(totCont)}</span></div>
             </div>
@@ -1148,7 +1148,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           {label:'Periodo',render:r=><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>},
           {label:'Gross Rev.',r:true,render:r=><span className="text-blue-600 font-semibold">{fm(r.revenue)}</span>},
           {label:'Nights',r:true,render:r=>r.nights?<span className="text-slate-600">{r.nights} <span className="text-[9px] text-slate-400">({r.reservations||'—'}res)</span></span>:<span className="text-slate-300">—</span>},
-          {label:'Commission',r:true,render:r=><span className="text-rose-400">{fm(r.commission)}</span>},
+          {label:'Comisión',r:true,render:r=><span className="text-rose-400">{fm(r.commission)}</span>},
           {label:'Electric',r:true,render:r=><span className="text-slate-500">{fm(r.duke)}</span>},
           {label:'HOA',r:true,render:r=><span className="text-slate-500">{fm(r.hoa)}</span>},
           {label:'Agua',r:true,render:r=><span className="text-slate-500">{fm(r.water)}</span>},
@@ -1174,10 +1174,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="bg-slate-50 rounded-xl p-3 mt-3 flex justify-between items-center text-xs border border-slate-100">
           <span className="text-slate-400 font-semibold">{stmtYearFilter==='all'?'Total':'Total '+stmtYearFilter} ({filtered.length} meses):</span>
           <div className="flex gap-5">
-            <span>Gross Revenue: <b className="text-blue-600">{fm(filtered.reduce((s,x)=>s+(x.revenue||0),0))}</b></span>
-            <span>OpEx: <b className="text-rose-500">{fm(filtered.reduce((s,x)=>s+(x.revenue||0)-(x.net||0),0))}</b></span>
-            <span>Net to Owner: <b className="text-emerald-600">{fm(filtered.reduce((s,x)=>s+(x.net||0),0))}</b></span>
-            <span>Margen: <b className="text-slate-700">{(()=>{const r=filtered.reduce((s,x)=>s+(x.revenue||0),0),n=filtered.reduce((s,x)=>s+(x.net||0),0);return r?((n/r)*100).toFixed(0)+'%':'—'})()}</b></span>
+            <span>Ingreso Bruto: <b className="text-blue-600">{fm(filtered.reduce((s,x)=>s+(x.revenue||0),0))}</b></span>
+            <span>Gastos Op.: <b className="text-rose-500">{fm(filtered.reduce((s,x)=>s+(x.revenue||0)-(x.net||0),0))}</b></span>
+            <span>Neto al Owner: <b className="text-emerald-600">{fm(filtered.reduce((s,x)=>s+(x.net||0),0))}</b></span>
             <span>Margen: <b className="text-slate-700">{(()=>{const r=filtered.reduce((s,x)=>s+(x.revenue||0),0),n=filtered.reduce((s,x)=>s+(x.net||0),0);return r?((n/r)*100).toFixed(1)+'%':'—'})()}</b></span>
           </div>
         </div>
@@ -1231,8 +1230,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden"><h3 className="text-sm font-bold text-slate-700 mb-3">Detalle Mensual</h3>
           <Tbl cols={[
             {label:'Periodo',render:r=><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>},
-            {label:'Revenue',r:true,render:r=><span className="text-blue-600 font-semibold">{fm(r.revenue)}</span>},
-            {label:'Commission',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},
+            {label:'Ingreso',r:true,render:r=><span className="text-blue-600 font-semibold">{fm(r.revenue)}</span>},
+            {label:'Comisión',r:true,render:r=><span className="text-rose-500">{fm(r.commission)}</span>},
             {label:'Gastos Op.',r:true,render:r=><span className="text-rose-400">{fm((r.duke||0)+(r.water||0)+(r.hoa||0)+(r.maintenance||0)+(r.vendor||0))}</span>},
             {label:'Net',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.net)}</span>},
             {label:'Margin',r:true,render:r=>{const m=r.revenue?(r.net/r.revenue*100):0;return<span className={`font-bold ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(0)}%</span>}},
