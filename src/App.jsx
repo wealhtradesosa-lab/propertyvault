@@ -81,6 +81,20 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   const save=async(sub,data)=>{
     await addDoc(collection(db,'properties',propertyId,sub),{...data,createdAt:serverTimestamp()});
+    // If expense matches an obligation category → auto-mark obligation as paid
+    if(sub==='expenses'&&data.category){
+      const catToObligation={'taxes':/impuesto|tax/i,'insurance':/seguro|insurance/i,'mortgage_pay':/hipoteca|mortgage/i,'contabilidad':/contab/i,'hoa':/hoa/i};
+      const rx=catToObligation[data.category];
+      if(rx){
+        const ob=tasks.find(t=>rx.test(t.title)&&t.dueDate);
+        if(ob){
+          const d=new Date(ob.dueDate+'T00:00:00');
+          if(ob.frequency==='monthly'){d.setMonth(d.getMonth()+1)}else{d.setFullYear(d.getFullYear()+1)}
+          await updateDoc(doc(db,'properties',propertyId,'tasks',ob.id),{dueDate:d.toISOString().split('T')[0],lastPaid:new Date().toISOString().split('T')[0]});
+          notify(ob.title+' actualizado en Obligaciones');
+        }
+      }
+    }
     setModal(null);setEditId(null);
   };
   // Mark obligation paid → auto-register expense + advance due date
