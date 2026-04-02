@@ -176,6 +176,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   };
 
   // ═══ CALCULATIONS ═══
+  // Effective frequency: "Fijo" without explicit frequency = monthly (permanent)
+  const eFreq=(e)=>e.frequency||(e.type==='fixed'?'monthly':'once');
+  const isRecurring=(e)=>{const f=eFreq(e);return f==='monthly'||f==='annual';};
   const pt=useMemo(()=>{const r={};partners.forEach(p=>{r[p.id]={name:p.name,color:p.color,own:p.ownership,cont:0,exp:0,inc:0}});contribs.forEach(c=>{if(r[c.paidBy])r[c.paidBy].cont+=c.amount||0});expenses.forEach(e=>{if(r[e.paidBy])r[e.paidBy].exp+=e.amount||0});const tn=income.reduce((s,i)=>s+(i.netAmount||0),0);partners.forEach(p=>{r[p.id].inc=tn*(p.ownership/100)});return r},[partners,contribs,expenses,income]);
 
   const xr=prop.exchangeRate||(liveTRM&&liveTRM.COP?liveTRM.COP:1);const toPropCur=(amt,cur)=>{if(!cur||cur===propCurrency)return amt;if(cur==='USD'&&propCurrency!=='USD')return amt*xr;if(cur!=='USD'&&propCurrency==='USD')return amt/xr;return amt;};
@@ -229,7 +232,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   const fixedExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return c?.fixed||e.type==='fixed'}),[expenses,propCats]);
   const additionalExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return !c?.fixed&&e.type!=='fixed'}),[expenses,propCats]);
-  const expByCat=useMemo(()=>{const r={};expenses.forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!r[e.category])r[e.category]={name:c.l,value:0,monthly:0};const amt=toPropCur(e.amount||0,e.expCurrency);const mo=e.frequency==='annual'?amt/12:e.frequency==='monthly'?amt:amt;r[e.category].value+=amt;r[e.category].monthly+=(e.frequency==='annual'?amt/12:e.frequency==='monthly'?amt:0)});return Object.values(r).sort((a,b)=>b.monthly-a.monthly||b.value-a.value)},[expenses,propCats]);
+  const expByCat=useMemo(()=>{const r={};expenses.forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!r[e.category])r[e.category]={name:c.l,value:0,monthly:0};const amt=toPropCur(e.amount||0,e.expCurrency);const f=eFreq(e);const mo=f==='annual'?amt/12:f==='monthly'?amt:amt;r[e.category].value+=amt;r[e.category].monthly+=(f==='annual'?amt/12:f==='monthly'?amt:0)});return Object.values(r).sort((a,b)=>b.monthly-a.monthly||b.value-a.value)},[expenses,propCats]);
 
   const annual=useMemo(()=>{const y={};stmts.forEach(s=>{if(!y[s.year])y[s.year]={year:s.year,revenue:0,net:0,commission:0,duke:0,water:0,hoa:0,maintenance:0,vendor:0,nights:0,reservations:0,n:0};const a=y[s.year];a.revenue+=s.revenue||0;a.net+=s.net||0;a.commission+=s.commission||0;a.duke+=s.duke||0;a.water+=s.water||0;a.hoa+=s.hoa||0;a.maintenance+=s.maintenance||0;a.vendor+=s.vendor||0;a.nights+=s.nights||0;a.reservations+=s.reservations||0;a.n++});return Object.values(y).sort((a,b)=>a.year-b.year)},[stmts]);
 
@@ -352,14 +355,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       };
 
       // Owner expenses — recurring apply to ALL periods, one-time filtered by year
-      const recurringExp=expenses.filter(e=>e.frequency==='monthly'||e.frequency==='annual');
-      const oneTimeExp=dashYear==='all'?expenses.filter(e=>!e.frequency||e.frequency==='once'):expenses.filter(e=>(!e.frequency||e.frequency==='once')&&(e.date||'').startsWith(String(dashYear)));
+      const recurringExp=expenses.filter(e=>isRecurring(e));
+      const oneTimeExp=dashYear==='all'?expenses.filter(e=>!isRecurring(e)):expenses.filter(e=>!isRecurring(e)&&(e.date||'').startsWith(String(dashYear)));
       const yearExpenses=[...recurringExp,...oneTimeExp];
       const ownerExpTotal=yearExpenses.reduce((s,e)=>{
         const raw=e.amount||0;
         const amt=toPC(raw,e.expCurrency);
-        if(e.frequency==='annual')return s+amt/12*(n||1);
-        if(e.frequency==='monthly')return s+amt*(n||1);
+        const f=eFreq(e);if(f==='annual')return s+amt/12*(n||1);
+        if(f==='monthly')return s+amt*(n||1);
         return s+amt;
       },0);
 
@@ -388,7 +391,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const revChg=prevYr&&prevYr.revenue?((fRev-prevYr.revenue)/prevYr.revenue*100):null;
       const chartColors=['#E11D48','#F59E0B','#06B6D4','#8B5CF6','#10B981','#64748B','#DB2777','#EA580C'];
       const expData=isOwnerManaged?
-        (()=>{const cp={};yearExpenses.forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!cp[e.category])cp[e.category]={name:c.l,value:0};const amt=toPC(e.amount||0,e.expCurrency);if(e.frequency==='annual')cp[e.category].value+=amt/12*(n||1);else if(e.frequency==='monthly')cp[e.category].value+=amt*(n||1);else cp[e.category].value+=amt});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
+        (()=>{const cp={};yearExpenses.forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!cp[e.category])cp[e.category]={name:c.l,value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[e.category].value+=amt/12*(n||1);else if(ef==='monthly')cp[e.category].value+=amt*(n||1);else cp[e.category].value+=amt});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
         [['Comisión',fComm,'#E11D48'],['Electricidad',fDuke,'#F59E0B'],['Agua',fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],['Mantenimiento',fMaint,'#10B981'],['Otros',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
       const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>({m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:stmtToPC(s.revenue||0),net:stmtToPC(s.net||0),libre:stmtToPC(s.net||0)-mMort}));
 
@@ -457,8 +460,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                   const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};
                   if(!catPeriod[e.category])catPeriod[e.category]={name:c.l,value:0};
                   const amt=toPC(e.amount||0,e.expCurrency);
-                  if(e.frequency==='annual')catPeriod[e.category].value+=amt/12*(n||1);
-                  else if(e.frequency==='monthly')catPeriod[e.category].value+=amt*(n||1);
+                  const ef2=eFreq(e);if(ef2==='annual')catPeriod[e.category].value+=amt/12*(n||1);
+                  else if(ef2==='monthly')catPeriod[e.category].value+=amt*(n||1);
                   else catPeriod[e.category].value+=amt;
                 });
                 return Object.values(catPeriod).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map(c=>
@@ -924,15 +927,15 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {view==='expenses'&&<>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6"><div className="flex items-center gap-2"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🧾 Gastos</h1><span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span><CurToggle/></div><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 active:bg-rose-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button></div>
       {expenses.length>0&&(()=>{
-        const monthlyRecurring=expenses.filter(e=>e.frequency==='monthly').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
-        const annualRecurring=expenses.filter(e=>e.frequency==='annual').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
-        const oneTime=expenses.filter(e=>!e.frequency||e.frequency==='once').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
+        const monthlyRecurring=expenses.filter(e=>eFreq(e)==='monthly').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
+        const annualRecurring=expenses.filter(e=>eFreq(e)==='annual').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
+        const oneTime=expenses.filter(e=>!isRecurring(e)).reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
         const monthlyEquiv=monthlyRecurring+(annualRecurring/12);
         return <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-5">
           <KPI label={`Costo Mensual`} value={gFm(monthlyEquiv)} sub="Fijos + anuales/12" color="blue"/>
-          <KPI label="Mensuales" value={gFm(monthlyRecurring)} sub={expenses.filter(e=>e.frequency==='monthly').length+' gastos'} color="amber"/>
+          <KPI label="Mensuales" value={gFm(monthlyRecurring)} sub={expenses.filter(e=>eFreq(e)==='monthly').length+' gastos'} color="amber"/>
           <KPI label="Anuales" value={gFm(annualRecurring)} sub={gFm(annualRecurring/12)+'/mes equiv.'} color="purple"/>
-          <KPI label="Únicos" value={gFm(oneTime)} sub={expenses.filter(e=>!e.frequency||e.frequency==='once').length+' gastos'} color="red"/>
+          <KPI label="Únicos" value={gFm(oneTime)} sub={expenses.filter(e=>!isRecurring(e)).length+' gastos'} color="red"/>
         </div>
       })()}
       {expByCat.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4"><h3 className="text-sm font-bold text-slate-700 mb-3">Costo Mensual por Categoría <span className="text-[10px] text-slate-400 font-normal">(anuales ÷ 12)</span></h3><ResponsiveContainer width="100%" height={Math.max(150,expByCat.length*35)}><BarChart data={expByCat.map(c=>({...c,mensual:c.monthly||c.value}))} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis type="number" tickFormatter={v=>gFm(v)} tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#64748b'}} width={120}/><Tooltip content={<Tip/>}/><Bar dataKey="mensual" name="Mensual" fill="#DC2626" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer></div>}
@@ -947,9 +950,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             {label:'Fecha',render:r=><span className="text-slate-500 text-xs">{r.date?r.date.slice(8):''}</span>},
             {label:'Concepto',key:'concept',cls:'text-slate-700 font-medium'},
             {label:'Categoría',render:r=>{const c=propCats.find(x=>x.v===r.category);return<span className="text-xs">{c?c.i+' '+c.l:r.category}</span>}},
-            {label:'Tipo',render:r=><div className="flex gap-1 flex-wrap"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.type==='fixed'?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}`}>{r.type==='fixed'?'Fijo':'Único'}</span>{r.frequency&&r.frequency!=='once'&&<span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.frequency==='annual'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}`}>{r.frequency==='annual'?'Anual':'Mensual'}</span>}</div>},
+            {label:'Tipo',render:r=>{const ef=eFreq(r);return<div className="flex gap-1 flex-wrap"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.type==='fixed'?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}`}>{r.type==='fixed'?'Fijo':'Único'}</span>{ef!=='once'&&<span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ef==='annual'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}`}>{ef==='annual'?'Anual':'Mensual'}</span>}</div>}},
             {label:'Pagó',render:r=><span style={{color:pCl(r.paidBy)}} className="text-xs font-semibold">{pN(r.paidBy)}</span>},
-            {label:'Monto',r:true,render:r=>{const cv=toPropCur(r.amount||0,r.expCurrency);return<div className="text-right"><span className="font-bold text-rose-500">{gFm(cv)}</span>{r.expCurrency&&r.expCurrency!==propCurrency&&<div className="text-[9px] text-slate-400">({fmCurrency(r.amount,r.expCurrency)} {r.expCurrency})</div>}{r.frequency==='annual'&&<div className="text-[9px] text-slate-400">{gFm(cv/12)}/mes</div>}</div>}}
+            {label:'Monto',r:true,render:r=>{const cv=toPropCur(r.amount||0,r.expCurrency);return<div className="text-right"><span className="font-bold text-rose-500">{gFm(cv)}</span>{r.expCurrency&&r.expCurrency!==propCurrency&&<div className="text-[9px] text-slate-400">({fmCurrency(r.amount,r.expCurrency)} {r.expCurrency})</div>}{eFreq(r)==='annual'&&<div className="text-[9px] text-slate-400">{gFm(cv/12)}/mes</div>}</div>}}
           ]} rows={g.items} onDel={del} dc="expenses" onEdit={r=>{setExpenseForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'additional',frequency:r.frequency||'once',expCurrency:r.expCurrency||''});setEditId(r.id);setModal('expense')}}/>
         </div>)
       })()}
