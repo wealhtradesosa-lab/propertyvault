@@ -98,7 +98,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     setModal(null);setEditId(null);
   };
   // Mark obligation paid → auto-register expense + advance due date
-  const catMap={'Hipoteca':'mortgage_pay','Impuestos':'taxes','Seguro':'insurance','Contabilidad':'contabilidad','HOA':'hoa'};
+  const catMap={'Hipoteca':'mortgage_pay','Impuestos':'taxes','Impuesto Predial':'predial','Seguro':'insurance','Seguros':'insurance','Contabilidad':'contabilidad','HOA':'hoa','Administración':'hoa','Personal de Servicio':'personal','Prestaciones Sociales':'prestaciones','Jardinería':'jardineria'};
   const markPaid=async(task)=>{
     const today=new Date().toISOString().split('T')[0];
     // Advance due date to next period
@@ -1016,6 +1016,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         const coObligations=[
           {title:'Personal de Servicio',icon:'👷',freq:'monthly'},
           {title:'Prestaciones Sociales',icon:'📋',freq:'monthly'},
+          {title:'Jardinería',icon:'🌿',freq:'monthly'},
           {title:'Impuesto Predial',icon:'🏛️',freq:'annual'},
           {title:'Seguros',icon:'🛡️',freq:'annual'},
           {title:'Contabilidad',icon:'📊',freq:'monthly'},

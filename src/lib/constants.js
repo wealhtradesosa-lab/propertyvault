@@ -48,13 +48,15 @@ const coCats=(t)=>[
   {v:'personal',l:'Personal de Servicio',i:'👷',fixed:true},{v:'prestaciones',l:'Prestaciones Sociales',i:'📋',fixed:true},
   {v:'electricity',l:'Energía',i:'⚡',fixed:true},{v:'water',l:'Agua',i:'💧',fixed:true},
   {v:'gas',l:'Gas',i:'🔥',fixed:true},{v:'hoa',l:t.hoa,i:'🏢',fixed:true},
-  {v:'pool',l:'Piscina',i:'🏊',fixed:true},{v:'maintenance',l:'Mantenimiento',i:'🔧',fixed:true},
-  {v:'insurance',l:'Seguros',i:'🛡️'},{v:'predial',l:'Impuesto Predial',i:'🏛️'},
-  {v:'taxes',l:'Otros Impuestos',i:'🏛️'},{v:'commission',l:'Comisión PM',i:'💼'},
-  {v:'contabilidad',l:'Contabilidad',i:'📊'},{v:'legal',l:'Legal',i:'⚖️'},
-  {v:'renovacion',l:'Renovación',i:'🔨'},{v:'equipamiento',l:'Equipamiento',i:'🛋️'},
-  {v:'cleaning',l:'Aseo / Limpieza',i:'🧹'},{v:'vendor',l:'Proveedor',i:'🛠️'},
-  {v:'mortgage_pay',l:'Pago Hipoteca',i:'🏦',fixed:true},{v:'otros',l:'Otros',i:'📦'},
+  {v:'pool',l:'Piscina',i:'🏊',fixed:true},{v:'jardineria',l:'Jardinería / Zonas Verdes',i:'🌿',fixed:true},
+  {v:'maintenance',l:'Mantenimiento Preventivo',i:'🔧',fixed:true},
+  {v:'repairs',l:'Reparaciones',i:'🛠️'},{v:'insurance',l:'Seguros',i:'🛡️'},
+  {v:'predial',l:'Impuesto Predial',i:'🏛️'},{v:'taxes',l:'Otros Impuestos',i:'🏛️'},
+  {v:'commission',l:'Comisión PM',i:'💼'},{v:'contabilidad',l:'Contabilidad',i:'📊'},
+  {v:'legal',l:'Legal',i:'⚖️'},{v:'renovacion',l:'Renovación / Mejoras',i:'🔨'},
+  {v:'equipamiento',l:'Equipamiento / Mobiliario',i:'🛋️'},{v:'cleaning',l:'Aseo / Limpieza',i:'🧹'},
+  {v:'vendor',l:'Proveedor / Otro Servicio',i:'📦'},{v:'mortgage_pay',l:'Pago Hipoteca',i:'🏦',fixed:true},
+  {v:'otros',l:'Otros',i:'📦'},
 ];
 export const getCats=(country)=>{
   const t=getTerms(country);
