@@ -50,6 +50,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   useEffect(()=>{document.documentElement.classList.toggle('dark',dark);try{localStorage.setItem('od-dark',dark?'1':'0')}catch{}},[dark]);
   const [tickets,setTickets]=useState([]);const [ticketForm,setTicketForm]=useState({type:'bug',subject:'',message:'',priority:'medium'});
   const [toast,setToast]=useState(null);
+  const [liveTRM,setLiveTRM]=useState(null);
+  useEffect(()=>{
+    const fetchTRM=async()=>{try{const r=await fetch('https://open.er-api.com/v6/latest/USD');const d=await r.json();if(d.rates)setLiveTRM({COP:d.rates.COP,EUR:d.rates.EUR,MXN:d.rates.MXN,GBP:d.rates.GBP,BRL:d.rates.BRL,updated:new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})})}catch(e){console.log('TRM fetch failed',e)}};
+    fetchTRM();const interval=setInterval(fetchTRM,3600000);return()=>clearInterval(interval);
+  },[]);
   const notify=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),4000)};
   const [valForm,setValForm]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setValForm(x=>({...x,[k]:v})),[]);
   const [repairForm,setRepairForm]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRepairForm(x=>({...x,[k]:v})),[]);
@@ -285,7 +290,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>
     </div>
 
-    <div className="flex-1 overflow-auto overflow-x-hidden" role="main"><div className="p-3 md:p-6 pt-[72px] md:pt-6 max-w-[1200px] lg:mx-auto"><ViewGuard>
+    <div className="flex-1 overflow-auto overflow-x-hidden" role="main"><div className="p-3 md:p-6 pt-[72px] md:pt-6 max-w-[1200px] lg:mx-auto">
+    {liveTRM&&propCurrency!=='USD'&&liveTRM[propCurrency]&&<div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/30 rounded-xl px-3 py-1.5 mb-3 border border-blue-100 dark:border-blue-800">
+      <div className="flex items-center gap-2 text-[11px]"><span className="font-bold text-blue-700 dark:text-blue-300">TRM Hoy</span><span className="text-blue-600 dark:text-blue-400">1 USD = <b>{liveTRM[propCurrency].toLocaleString('es',{maximumFractionDigits:2})}</b> {propCurrency}</span><span className="text-blue-300 dark:text-blue-500">· {liveTRM.updated}</span></div>
+      {Math.abs((liveTRM[propCurrency]||0)-(prop.exchangeRate||0))>10&&<button onClick={async()=>{try{await updateDoc(doc(db,'properties',propertyId),{exchangeRate:liveTRM[propCurrency]});notify(`Tasa actualizada: 1 USD = ${liveTRM[propCurrency].toLocaleString('es')} ${propCurrency}`)}catch(e){notify('Error: '+e.message,'error')}}} className="text-[10px] font-bold text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded-lg hover:bg-blue-200 transition shrink-0">Actualizar tasa ↗</button>}
+    </div>}
+    <ViewGuard>
 
     {/* ═══ DASHBOARD VIEW ═══ */}
     {view==='dashboard'&&(()=>{try{
