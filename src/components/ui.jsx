@@ -26,10 +26,10 @@ export function PPick({partners,selected,onChange}) {
 export function Mdl({title,grad='from-blue-600 to-blue-700',onClose,children,footer}) {
   return <div className="fixed inset-0 z-50 flex justify-end" onClick={e=>e.target===e.currentTarget&&onClose()}>
     <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}/>
-    <div className="relative w-full md:max-w-md bg-white shadow-2xl flex flex-col animate-slide-in">
-      <div className={`bg-gradient-to-r ${grad} text-white px-5 py-4 flex justify-between items-center shrink-0`}><span className="font-bold text-sm">{title}</span><button onClick={onClose} aria-label="Cerrar" className="hover:bg-white/20 p-1.5 rounded-lg transition"><X size={18}/></button></div>
-      <div className="flex-1 overflow-y-auto p-5 space-y-4">{children}</div>
-      {footer&&<div className="shrink-0 p-4 bg-slate-50 border-t flex gap-2">{footer}</div>}
+    <div className="relative w-full md:max-w-md bg-white shadow-2xl flex flex-col animate-slide-in max-h-screen">
+      <div className={`bg-gradient-to-r ${grad} text-white px-5 py-4 flex justify-between items-center shrink-0`}><span className="font-bold text-sm">{title}</span><button onClick={onClose} aria-label="Cerrar" className="hover:bg-white/20 active:bg-white/30 p-2 rounded-lg transition"><X size={18}/></button></div>
+      <div className="flex-1 overflow-y-auto p-5 space-y-4 overscroll-contain">{children}</div>
+      {footer&&<div className="shrink-0 p-4 bg-slate-50 border-t flex gap-2 safe-area-pb">{footer}</div>}
     </div></div>;
 }
 
@@ -39,7 +39,7 @@ export function Empty({icon:Ic,title,desc,action,onAction}) {
 
 export function Tbl({cols,rows,onDel,dc,onEdit}) {
   if(!rows.length)return null;
-  return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"><div className="overflow-x-auto"><table className="w-full"><thead><tr className="bg-slate-50/80">{cols.map((c,i)=><th key={i} className={`py-3.5 px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider ${c.r?'text-right':'text-left'}`}>{c.label}</th>)}{(onDel||onEdit)&&<th className="w-16"/>}</tr></thead><tbody className="divide-y divide-slate-100">{rows.map((r,ri)=><tr key={r.id||ri} className="hover:bg-blue-50/30 transition-colors">{cols.map((c,ci)=><td key={ci} className={`py-3 px-4 text-sm ${c.r?'text-right':''} ${c.cls||''}`}>{c.render?c.render(r):r[c.key]}</td>)}{(onDel||onEdit)&&<td className="py-3 pr-3"><div className="flex items-center gap-0.5 justify-end">{onEdit&&<button onClick={()=>onEdit(r)} aria-label="Editar" className="text-slate-300 hover:text-blue-500 p-1.5 rounded-lg hover:bg-blue-50 transition"><Pencil size={13}/></button>}{onDel&&<button onClick={()=>onDel(dc,r.id)} aria-label="Eliminar" className="text-slate-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-red-50 transition"><Trash2 size={13}/></button>}</div></td>}</tr>)}</tbody></table></div></div>;
+  return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden"><div className="overflow-x-auto scrollbar-thin" style={{WebkitOverflowScrolling:'touch'}}><table className="w-full min-w-[600px]"><thead><tr className="bg-slate-50/80">{cols.map((c,i)=><th key={i} className={`py-3 px-3 md:px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap ${c.r?'text-right':'text-left'}`}>{c.label}</th>)}{(onDel||onEdit)&&<th className="w-14"/>}</tr></thead><tbody className="divide-y divide-slate-100">{rows.map((r,ri)=><tr key={r.id||ri} className="hover:bg-blue-50/30 active:bg-blue-50/50 transition-colors">{cols.map((c,ci)=><td key={ci} className={`py-2.5 px-3 md:px-4 text-sm ${c.r?'text-right':''} ${c.cls||''}`}>{c.render?c.render(r):r[c.key]}</td>)}{(onDel||onEdit)&&<td className="py-2.5 pr-2"><div className="flex items-center gap-0.5 justify-end">{onEdit&&<button onClick={()=>onEdit(r)} aria-label="Editar" className="text-slate-300 hover:text-blue-500 active:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition"><Pencil size={14}/></button>}{onDel&&<button onClick={()=>onDel(dc,r.id)} aria-label="Eliminar" className="text-slate-300 hover:text-red-500 active:text-red-600 p-2 rounded-lg hover:bg-red-50 transition"><Trash2 size={14}/></button>}</div></td>}</tr>)}</tbody></table></div></div>;
 }
 
 export const Tip=({active,payload,label})=>{if(!active||!payload?.length)return null;return<div className="bg-slate-800 rounded-xl px-4 py-3 shadow-xl border border-slate-700"><div className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1.5">{label}</div>{payload.map((p,i)=><div key={i} className="text-xs" style={{color:p.color}}>{p.name}: <b className="text-white">{fm(p.value)}</b></div>)}</div>};

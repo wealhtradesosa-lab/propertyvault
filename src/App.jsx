@@ -193,10 +193,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   if(loading)return<div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 size={36} className="animate-spin text-blue-500"/></div>;
   return <div className="min-h-screen bg-[#F8FAFC] flex">
     {/* MOBILE HEADER */}
-    <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-200 z-40 px-4 py-3 flex items-center justify-between">
-      <button onClick={()=>setMobileNav(true)} aria-label="Abrir menú" className="p-1.5 hover:bg-slate-100 rounded-lg"><Menu size={22} className="text-slate-600"/></button>
-      <div className="flex items-center gap-2"><span className="text-sm font-extrabold text-slate-800">Owner<span className="text-blue-600">Desk</span></span></div>
-      <div className="w-8"/>
+    <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-b border-slate-200 z-40 px-3 py-2.5 flex items-center gap-3">
+      <button onClick={()=>setMobileNav(true)} aria-label="Abrir menú" className="p-2 hover:bg-slate-100 rounded-xl active:bg-slate-200 transition"><Menu size={20} className="text-slate-600"/></button>
+      <div className="flex-1 min-w-0"><div className="text-sm font-extrabold text-slate-800 truncate">{prop.name||'OwnerDesk'}</div><div className="text-[10px] text-slate-400 truncate">{prop.city} {prop.state}</div></div>
+      <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="p-2 bg-blue-600 text-white rounded-xl active:bg-blue-700 transition" aria-label="Subir statements"><Upload size={16}/></button>
     </div>
 
     {/* SIDEBAR — hidden on mobile, overlay when open */}
@@ -264,11 +264,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div className="hidden print-header"><div style={{display:'flex',justifyContent:'space-between'}}><div><h1 style={{fontSize:'18px',fontWeight:800,margin:0}}>{prop.name}</h1><p style={{fontSize:'9px',color:'#64748B',margin:'3px 0'}}>{prop.address}, {prop.city} {prop.state} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div><div style={{fontSize:'18px',fontWeight:900,color:'#1E3A5F'}}>OD</div></div></div>
 
       <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-3 mb-4 no-print">
-        <div><h1 className="text-lg md:text-xl font-extrabold text-slate-800">{prop.name}</h1><p className="text-xs text-slate-400 mt-0.5">{prop.address}, {prop.city} {prop.state}</p></div>
+        <div className="hidden md:block"><h1 className="text-lg md:text-xl font-extrabold text-slate-800">{prop.name}</h1><p className="text-xs text-slate-400 mt-0.5">{prop.address}, {prop.city} {prop.state}</p></div>
         <div className="flex gap-2">
-          <button onClick={()=>window.print()} aria-label="Imprimir" className="px-3 py-2 bg-slate-100 text-slate-500 text-xs rounded-xl font-bold hover:bg-slate-200 flex items-center gap-1.5"><Printer size={13}/></button>
-          <button onClick={()=>{setEf({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="px-3 py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 flex items-center gap-1.5 shadow-sm"><Plus size={13}/> Gasto</button>
-          <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="px-3 py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Upload size={13}/> Statements</button>
+          <button onClick={()=>window.print()} aria-label="Imprimir" className="hidden md:flex px-3 py-2 bg-slate-100 text-slate-500 text-xs rounded-xl font-bold hover:bg-slate-200 items-center gap-1.5"><Printer size={13}/></button>
+          <button onClick={()=>{setEf({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 active:bg-slate-900 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button>
+          <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-1.5 shadow-sm"><Upload size={14}/> Statements</button>
         </div>
       </div>
 
@@ -279,36 +279,33 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {fRev>0?<>
       {/* ── ROW 1: Key Performance Indicators ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-5">
-        <div className="bg-white rounded-2xl p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm">
-          <div className="text-[8px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Ingreso Bruto</div>
-          <div className="text-lg md:text-[22px] font-extrabold text-slate-800 mt-1">{fm(fRev)}</div>
-          <div className="text-[10px] text-slate-400 mt-1">Ingreso bruto de la propiedad · {n}m</div>
-          {revChg!==null&&<div className={`text-[10px] font-bold mt-1 ${revChg>=0?'text-emerald-600':'text-rose-500'}`}>{revChg>=0?'▲':'▼'} {Math.abs(revChg).toFixed(0)}% YoY</div>}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 mb-5">
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm">
+          <div className="text-[10px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Ingreso Bruto</div>
+          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{fm(fRev)}</div>
+          <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">{n} meses</div>
+          {revChg!==null&&<div className={`text-[11px] md:text-[10px] font-bold mt-0.5 ${revChg>=0?'text-emerald-600':'text-rose-500'}`}>{revChg>=0?'▲':'▼'} {Math.abs(revChg).toFixed(0)}% YoY</div>}
         </div>
-        <div className="bg-white rounded-2xl p-4 border-l-4 border-l-emerald-500 border border-slate-200 shadow-sm">
-          <div className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Ingreso Neto</div>
-          <div className="text-lg md:text-[22px] font-extrabold text-emerald-700 mt-1">{fm(fNet)}</div>
-          <div className="text-[10px] text-slate-400 mt-1">Lo que depositó el PM</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Margen Op.: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{fMargin.toFixed(0)}%</b></div>
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-emerald-500 border border-slate-200 shadow-sm">
+          <div className="text-[10px] md:text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Ingreso Neto</div>
+          <div className="text-base md:text-[22px] font-extrabold text-emerald-700 mt-0.5">{fm(fNet)}</div>
+          <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">Margen: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{fMargin.toFixed(0)}%</b></div>
         </div>
-        <div className={`bg-white rounded-2xl p-4 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
-          <div className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Cash Flow</div>
-          <div className={`text-lg md:text-[22px] font-extrabold mt-1 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fCF)}</div>
-          <div className="text-[10px] text-slate-400 mt-1">NOI − Debt Service − Seguro</div>
-          <div className={`text-[10px] mt-0.5 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{fm(fCFmo)}/mo{partial?` · Ann: ${fm(proyAnual)}`:''}</div>
+        <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
+          <div className="text-[10px] md:text-[9px] font-bold text-slate-500 uppercase tracking-widest">Cash Flow</div>
+          <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{fm(fCF)}</div>
+          <div className={`text-[11px] md:text-[10px] mt-0.5 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{fm(fCFmo)}/mo</div>
         </div>
-        <div className="bg-white rounded-2xl p-4 border-l-4 border-l-blue-400 border border-slate-200 shadow-sm">
-          <div className="text-[8px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Ocupación</div>
-          <div className="text-lg md:text-[22px] font-extrabold text-slate-800 mt-1">{fNights>0?occupancy.toFixed(0)+'%':'—'}</div>
-          <div className="text-[10px] text-slate-400 mt-1">{fNights>0?`${fNights} de ${availNights} noches`:`Re-sube PDFs para ver`}</div>
-          {fNights>0&&<div className="text-[10px] text-slate-500 mt-0.5">ADR: <b className="text-blue-600">{fm(adr)}</b></div>}
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-400 border border-slate-200 shadow-sm">
+          <div className="text-[10px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Ocupación</div>
+          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{fNights>0?occupancy.toFixed(0)+'%':'—'}</div>
+          <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">{fNights>0?`${fNights} noches`:'Sin datos'}</div>
+          {fNights>0&&<div className="text-[11px] md:text-[10px] text-slate-500 mt-0.5">ADR: <b className="text-blue-600">{fm(adr)}</b></div>}
         </div>
-        <div className="bg-white rounded-2xl p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
-          <div className="text-[9px] font-bold text-purple-600 uppercase tracking-widest">Retorno CoC{partial?' (ann.)':''}</div>
-          <div className={`text-lg md:text-[22px] font-extrabold mt-1 ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
-          <div className="text-[10px] text-slate-400 mt-1">Cash-on-Cash · Retorno sobre Capital</div>
-          <div className="text-[10px] text-slate-500 mt-0.5">Capital: {fm(totCont)}</div>
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
+          <div className="text-[10px] md:text-[9px] font-bold text-purple-600 uppercase tracking-widest">Retorno CoC{partial?' (ann.)':''}</div>
+          <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
+          <div className="text-[11px] md:text-[10px] text-slate-500 mt-0.5">Capital: {fm(totCont)}</div>
         </div>
       </div>
 
@@ -692,17 +689,17 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const page=Math.min(stmtPage,Math.max(0,totalPages-1));
       const paged=filtered.slice(page*PER_PAGE,(page+1)*PER_PAGE);
       return <>
-      <div className="flex justify-between items-center mb-4"><h1 className="text-[22px] font-extrabold text-slate-800">📋 Statements <span className="text-sm font-semibold text-slate-400 ml-1">({stmts.length})</span></h1><div className="flex gap-2">
-        {stmts.length>0&&<button onClick={async()=>{if(!confirm(`¿Eliminar los ${stmts.length} statements?`))return;for(const s of stmts)await deleteDoc(doc(db,'properties',propertyId,'statements',s.id))}} className="px-3 py-2.5 bg-rose-100 text-rose-600 text-xs rounded-xl font-bold hover:bg-rose-200 flex items-center gap-1.5"><Trash2 size={13}/> Borrar Todos</button>}
-        <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold flex items-center gap-1.5 shadow-sm"><Upload size={14}/> PDFs</button><button onClick={()=>setModal('addStmt')} className="px-4 py-2.5 bg-slate-700 text-white text-xs rounded-xl font-bold flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Manual</button></div></div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">📋 Statements <span className="text-sm font-semibold text-slate-400 ml-1">({stmts.length})</span></h1><div className="flex gap-2">
+        {stmts.length>0&&<button onClick={async()=>{if(!confirm(`¿Eliminar los ${stmts.length} statements?`))return;for(const s of stmts)await deleteDoc(doc(db,'properties',propertyId,'statements',s.id))}} className="px-3 py-2.5 bg-rose-100 text-rose-600 text-xs rounded-xl font-bold hover:bg-rose-200 active:bg-rose-300 flex items-center gap-1.5"><Trash2 size={13}/></button>}
+        <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-sm active:bg-blue-700"><Upload size={14}/> PDFs</button><button onClick={()=>setModal('addStmt')} className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-700 text-white text-xs rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-sm active:bg-slate-800"><Plus size={14}/> Manual</button></div></div>
 
       {/* Year filter + bulk delete per year */}
-      {stmts.length>0&&<div className="flex items-center gap-2 mb-4 flex-wrap">
-        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Filtrar:</span>
-        <button onClick={()=>{setStmtYearFilter('all');setStmtPage(0)}} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${stmtYearFilter==='all'?'bg-blue-600 text-white shadow-sm':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Todos ({stmts.length})</button>
-        {years.map(y=>{const cnt=stmts.filter(s=>s.year===y).length;return<button key={y} onClick={()=>{setStmtYearFilter(String(y));setStmtPage(0)}} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${stmtYearFilter===String(y)?'bg-blue-600 text-white shadow-sm':'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>{y} ({cnt})</button>})}
+      {stmts.length>0&&<div className="flex items-center gap-1.5 md:gap-2 mb-4 overflow-x-auto pb-1 scrollbar-thin">
+        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1 shrink-0">Filtrar:</span>
+        <button onClick={()=>{setStmtYearFilter('all');setStmtPage(0)}} className={`px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${stmtYearFilter==='all'?'bg-blue-600 text-white shadow-sm':'bg-white border border-slate-200 text-slate-600 active:bg-slate-100'}`}>Todos ({stmts.length})</button>
+        {years.map(y=>{const cnt=stmts.filter(s=>s.year===y).length;return<button key={y} onClick={()=>{setStmtYearFilter(String(y));setStmtPage(0)}} className={`px-3 py-2 rounded-xl text-xs font-semibold transition shrink-0 ${stmtYearFilter===String(y)?'bg-blue-600 text-white shadow-sm':'bg-white border border-slate-200 text-slate-600 active:bg-slate-100'}`}>{y} ({cnt})</button>})}
         <div className="flex-1"/>
-        {years.map(y=>{const cnt=stmts.filter(s=>s.year===y).length;return<button key={'d'+y} onClick={async()=>{if(!confirm(`¿Eliminar ${cnt} statements de ${y}?`))return;for(const s of stmts.filter(s=>s.year===y))await deleteDoc(doc(db,'properties',propertyId,'statements',s.id))}} className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-semibold text-slate-400 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-500 transition flex items-center gap-1"><Trash2 size={10}/>{y}</button>})}
+        <div className="hidden md:flex gap-1">{years.map(y=>{const cnt=stmts.filter(s=>s.year===y).length;return<button key={'d'+y} onClick={async()=>{if(!confirm(`¿Eliminar ${cnt} statements de ${y}?`))return;for(const s of stmts.filter(s=>s.year===y))await deleteDoc(doc(db,'properties',propertyId,'statements',s.id))}} className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-[10px] font-semibold text-slate-400 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-500 transition flex items-center gap-1"><Trash2 size={10}/>{y}</button>})}</div>
       </div>}
 
       {paged.length>0?<>

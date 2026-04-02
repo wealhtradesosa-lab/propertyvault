@@ -5,14 +5,33 @@
 body {
   font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
+/* Safe area for iPhone notch */
+.safe-area-pb { padding-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Smooth momentum scrolling */
+.overscroll-contain { overscroll-behavior: contain; }
+
+/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
+/* Hide scrollbar on mobile for horizontal scroll elements */
+.scrollbar-thin::-webkit-scrollbar { height: 2px; }
+@media (max-width: 768px) {
+  .scrollbar-thin::-webkit-scrollbar { height: 0px; }
+}
+
 * { scroll-behavior: smooth; }
+
+/* Active states for mobile touch feedback */
+@media (hover: none) {
+  button:active { transform: scale(0.97); }
+}
 
 /* Slide-in animation for drawer modals */
 @keyframes slide-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
