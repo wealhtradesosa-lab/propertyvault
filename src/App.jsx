@@ -1001,11 +1001,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         const pmCovers={commission:stmts.some(s=>(s.commission||0)>0),electricity:stmts.some(s=>(s.duke||0)>0),water:stmts.some(s=>(s.water||0)>0),hoa:stmts.some(s=>(s.hoa||0)>0),maintenance:stmts.some(s=>(s.maintenance||0)>0)};
         const pmTasks=tasks.filter(t=>t.payer==='pm');
         const allObligations=[
-          {title:'Hipoteca',icon:'🏦',freq:'monthly',likely:'owner'},
-          {title:'Impuestos',icon:'🏛️',freq:'annual',likely:'owner'},
-          {title:'Seguro',icon:'🛡️',freq:'annual',likely:'owner'},
-          {title:'Contabilidad',icon:'📊',freq:'monthly',likely:'owner'},
-          {title:'HOA',icon:'🏢',freq:'monthly',likely:pmCovers.hoa?'pm':'owner'},
+          {title:'Hipoteca',icon:'🏦',freq:'monthly'},
+          {title:'Impuestos',icon:'🏛️',freq:'annual'},
+          {title:'Seguro',icon:'🛡️',freq:'annual'},
+          {title:'Contabilidad',icon:'📊',freq:'monthly'},
+          ...(!pmCovers.hoa?[{title:'HOA',icon:'🏢',freq:'monthly'}]:[]),
         ];
         const existing=tasks.map(t=>t.title.toLowerCase());
         const suggestions=allObligations.filter(o=>!existing.includes(o.title.toLowerCase()));
@@ -1022,11 +1022,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
           <div className="text-[10px] font-bold text-amber-700 uppercase mb-2">Probablemente debes pagar tú:</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {suggestions.map(o=><button key={o.title} onClick={()=>{setTaskForm({title:o.title,dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:o.freq,payer:o.likely,reminderDays:o.freq==='monthly'?'7':'30'});setEditId(null);setModal('task')}} className={`flex items-center gap-3 p-3 rounded-xl border transition text-left ${o.likely==='pm'?'bg-slate-50 border-slate-200 hover:bg-slate-100':'bg-amber-50 border-amber-200 hover:bg-amber-100 active:bg-amber-200'}`}>
+            {suggestions.map(o=><button key={o.title} onClick={()=>{setTaskForm({title:o.title,dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:o.freq,payer:'owner',reminderDays:o.freq==='monthly'?'7':'30'});setEditId(null);setModal('task')}} className="flex items-center gap-3 p-3 rounded-xl border transition text-left bg-amber-50 border-amber-200 hover:bg-amber-100 active:bg-amber-200">
               <span className="text-lg">{o.icon}</span>
               <div>
                 <span className="text-xs font-bold text-slate-700">{o.title}</span>
-                <div className="text-[10px] text-slate-400">{o.freq==='monthly'?'Mensual':'Anual'} · {o.likely==='pm'?'PM podría cubrirlo':'Tú pagas'}</div>
+                <div className="text-[10px] text-slate-400">{o.freq==='monthly'?'Mensual':'Anual'}</div>
               </div>
             </button>)}
           </div>
