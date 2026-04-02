@@ -81,31 +81,23 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   const save=async(sub,data)=>{
     await addDoc(collection(db,'properties',propertyId,sub),{...data,createdAt:serverTimestamp()});
-    // Auto-sync: expense → mark matching obligation as paid
-    if(sub==='expenses'){
-      const cat=data.category||'';const concept=(data.concept||'').toLowerCase();
-      const matches=[
-        [cat==='taxes'||/tax|impuesto|county/i.test(concept),/impuesto|tax/i],
-        [cat==='insurance'||/insurance|seguro|póliza|hazard/i.test(concept),/seguro|insurance/i],
-        [cat==='hoa'||/hoa|association/i.test(concept),/hoa/i],
-        [cat==='mortgage_pay'||/hipoteca|mortgage/i.test(concept),/hipoteca|mortgage/i],
-        [cat==='contabilidad'||/contab|accounting|cpa/i.test(concept),/contab|accounting/i],
-      ];
-      for(const [isMatch,rx] of matches){
-        if(!isMatch)continue;
-        const ob=tasks.find(t=>t.status!=='done'&&rx.test(t.title));
-        if(ob){await updateDoc(doc(db,'properties',propertyId,'tasks',ob.id),{status:'done'});notify(ob.title+' marcado como pagado');break}
-      }
-    }
     setModal(null);setEditId(null);
   };
-  // Mark obligation paid → auto-register expense
+  // Mark obligation paid → auto-register expense + advance due date
   const catMap={'Hipoteca':'mortgage_pay','Impuestos':'taxes','Seguro':'insurance','Contabilidad':'contabilidad','HOA':'hoa'};
   const markPaid=async(task)=>{
-    await updateDoc(doc(db,'properties',propertyId,'tasks',task.id),{status:'done'});
+    const today=new Date().toISOString().split('T')[0];
+    // Advance due date to next period
+    let nextDue='';
+    if(task.dueDate){
+      const d=new Date(task.dueDate+'T00:00:00');
+      if(task.frequency==='monthly'){d.setMonth(d.getMonth()+1)}else{d.setFullYear(d.getFullYear()+1)}
+      nextDue=d.toISOString().split('T')[0];
+    }
+    await updateDoc(doc(db,'properties',propertyId,'tasks',task.id),{status:'pending',dueDate:nextDue||task.dueDate,lastPaid:today});
     if(task.amount&&parseFloat(task.amount)>0){
-      await addDoc(collection(db,'properties',propertyId,'expenses'),{date:new Date().toISOString().split('T')[0],concept:task.title+(task.notes?' — '+task.notes:''),amount:parseFloat(task.amount),category:catMap[task.title]||'otros',type:'fixed',paidBy:partners[0]?.id||'',createdAt:serverTimestamp()});
-      notify(task.title+' pagado y registrado en gastos');
+      await addDoc(collection(db,'properties',propertyId,'expenses'),{date:today,concept:task.title+(task.notes?' — '+task.notes:''),amount:parseFloat(task.amount),category:catMap[task.title]||'otros',type:'fixed',paidBy:partners[0]?.id||'',createdAt:serverTimestamp()});
+      notify(task.title+' pagado · próximo: '+(nextDue?fmDate(nextDue):'—'));
     } else { notify(task.title+' marcado como pagado') }
   };
   const update=async(sub,id,data)=>{await updateDoc(doc(db,'properties',propertyId,sub,id),data);setModal(null);setEditId(null)};
@@ -986,7 +978,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {/* ═══ PIPELINE ═══ */}
     {view==='pipeline'&&<>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-        <div><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">📋 Obligaciones del Propietario</h1><p className="text-xs text-slate-400 mt-1">Pagos recurrentes que debes cubrir como dueño</p></div>
+        <div><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">📋 Obligaciones del Propietario</h1><p className="text-xs text-slate-400 mt-1">Registra aquí tus pagos recurrentes. Al marcar "Pagado" el gasto se registra automáticamente.</p></div>
         <button onClick={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual'});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 active:bg-indigo-800 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Agregar</button>
       </div>
 
@@ -1006,46 +998,43 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         const monthly=tasks.filter(t=>t.frequency==='monthly').reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
         const annual=tasks.filter(t=>t.frequency==='annual').reduce((s,t)=>s+(parseFloat(t.amount)||0),0);
         const totalAnnual=monthly*12+annual;
-        const pending=tasks.filter(t=>t.status==='pending').length;
-        return <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-5">
-          <KPI label="Costo Mensual" value={fm(monthly)} color="blue"/>
-          <KPI label="Costo Anual" value={fm(totalAnnual)} color="purple"/>
-          <KPI label="Al Día" value={String(tasks.filter(t=>t.status==='done').length)+'/'+tasks.length} color="green"/>
-          {pending>0&&<KPI label="Pendientes" value={String(pending)} color="red"/>}
+        const today=new Date();today.setHours(0,0,0,0);
+        const overdue=tasks.filter(t=>t.dueDate&&new Date(t.dueDate+'T00:00:00')<today).length;
+        return <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-3 mb-5">
+          <KPI label="Costo Mensual" value={fm(monthly)} sub={monthly>0?fm(totalAnnual)+'/año':''} color="blue"/>
+          <KPI label="Obligaciones" value={String(tasks.length)} sub={overdue>0?overdue+' vencida'+(overdue>1?'s':''):''} color={overdue>0?'red':'green'}/>
+          {tasks.some(t=>t.lastPaid)&&<KPI label="Último Pago" value={fmDate(tasks.filter(t=>t.lastPaid).sort((a,b)=>(b.lastPaid||'').localeCompare(a.lastPaid||''))[0].lastPaid)} color="green"/>}
         </div>
       })()}
 
       {/* Obligations list */}
       {tasks.length>0&&<div className="space-y-2">
-        {[...tasks].sort((a,b)=>{const sa=a.status==='done'?1:0,sb=b.status==='done'?1:0;if(sa!==sb)return sa-sb;return(a.dueDate||'9').localeCompare(b.dueDate||'9')}).map(t=>{
+        {[...tasks].sort((a,b)=>(a.dueDate||'9').localeCompare(b.dueDate||'9')).map(t=>{
           const icons={'Hipoteca':'🏦','Impuestos':'🏛️','Seguro':'🛡️','Contabilidad':'📊','HOA':'🏢'};
           const ic=icons[t.title]||'📄';
-          const isPaid=t.status==='done';
           const today=new Date();today.setHours(0,0,0,0);
           const days=t.dueDate?Math.ceil((new Date(t.dueDate+'T00:00:00')-today)/(1000*60*60*24)):null;
           const threshold=t.frequency==='monthly'?5:30;
-          const isOverdue=days!==null&&days<0&&!isPaid;
-          const isSoon=days!==null&&days>=0&&days<=threshold&&!isPaid;
-          return <div key={t.id} className={`bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-3 md:gap-4 ${isOverdue?'border-rose-300 bg-rose-50/30':isSoon?'border-amber-300 bg-amber-50/30':isPaid?'border-emerald-200':'border-slate-200'}`}>
+          const isOverdue=days!==null&&days<0;
+          const isSoon=days!==null&&days>=0&&days<=threshold;
+          return <div key={t.id} className={`bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-3 md:gap-4 ${isOverdue?'border-rose-300 bg-rose-50/30':isSoon?'border-amber-300 bg-amber-50/30':'border-slate-200'}`}>
             <span className="text-xl shrink-0">{ic}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-bold text-slate-800">{t.title}</span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${t.frequency==='monthly'?'bg-blue-100 text-blue-700':'bg-purple-100 text-purple-700'}`}>{t.frequency==='monthly'?'Mensual':'Anual'}</span>
-                {isPaid&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Al día ✓</span>}
                 {isOverdue&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">Vencido hace {Math.abs(days)}d</span>}
                 {isSoon&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Vence en {days}d</span>}
-                {!isPaid&&!isOverdue&&!isSoon&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">Pendiente</span>}
               </div>
-              <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400">
+              <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400 flex-wrap">
                 {t.amount&&<span className="font-semibold text-slate-600">{fm(parseFloat(t.amount)||0)}{t.frequency==='monthly'?'/mes':'/año'}</span>}
-                {t.dueDate&&<span className="flex items-center gap-1"><Calendar size={10}/>{fmDate(t.dueDate)}</span>}
+                {t.dueDate&&<span className="flex items-center gap-1"><Calendar size={10}/>Próximo: {fmDate(t.dueDate)}</span>}
+                {t.lastPaid&&<span className="text-emerald-500 font-semibold">✓ Pagado: {fmDate(t.lastPaid)}</span>}
                 {t.notes&&<span className="truncate">{t.notes}</span>}
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {!isPaid&&<button onClick={()=>markPaid(t)} className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${isOverdue?'bg-rose-200 text-rose-700 hover:bg-rose-300':isSoon?'bg-amber-200 text-amber-700 hover:bg-amber-300':'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'}`}>Pagado ✓</button>}
-              {isPaid&&<button onClick={()=>update('tasks',t.id,{status:'pending'})} className="px-3 py-2 bg-slate-100 text-slate-500 rounded-xl text-[11px] font-bold hover:bg-slate-200 transition">Reactivar</button>}
+              <button onClick={()=>markPaid(t)} className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${isOverdue?'bg-rose-500 text-white hover:bg-rose-600':isSoon?'bg-amber-500 text-white hover:bg-amber-600':'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'}`}>Pagar ✓</button>
               <button onClick={()=>{setTaskForm({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||'',amount:String(t.amount||''),frequency:t.frequency||'annual'});setEditId(t.id);setModal('task')}} className="p-2 text-slate-300 hover:text-blue-500 rounded-xl hover:bg-blue-50 transition"><Pencil size={14}/></button>
               <button onClick={()=>del('tasks',t.id)} className="p-2 text-slate-300 hover:text-red-500 rounded-xl hover:bg-red-50 transition"><Trash2 size={14}/></button>
             </div>
