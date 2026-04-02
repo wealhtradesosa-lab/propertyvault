@@ -526,6 +526,22 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                 <div className="text-right"><span className={`text-[14px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)}</span><div className={`text-[10px] ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mes</div></div>
               </div>
             </div>
+
+            {/* Monthly comparison: Does the property cover the mortgage? */}
+            {fMortP>0&&n>0&&<div className={`rounded-xl p-3 mt-3 border ${fCF>=0?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
+              <div className="space-y-1.5">
+                <div className="flex justify-between"><span className="text-[11px] text-slate-500">Property generates</span><span className="text-[11px] font-bold text-slate-700">{dFm(fNoi/n)}/mes <span className="text-slate-400">(NOI)</span></span></div>
+                <div className="flex justify-between"><span className="text-[11px] text-slate-500">Mortgage costs</span><span className="text-[11px] font-bold text-red-500">-{dFm(mMort>0?mMort:fMortP/n)}/mes</span></div>
+                <div className="border-t border-slate-200 my-1"/>
+                <div className="flex justify-between items-center">
+                  <span className={`text-[12px] font-extrabold ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{fCF>=0?'✓ Surplus':'✗ Deficit'}</span>
+                  <span className={`text-[12px] font-extrabold ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCFmo)}/mes</span>
+                </div>
+                <div className={`text-[10px] ${fDscr>=1.25?'text-emerald-600':fDscr>=1?'text-amber-600':'text-rose-500'}`}>
+                  DSCR: {fDscr.toFixed(2)}x — {fDscr>=1.25?'Covers mortgage comfortably':fDscr>=1?'Covers mortgage, tight margin':'Does not cover mortgage'}
+                </div>
+              </div>
+            </div>}
             {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded py-1.5 mt-1">Periodo parcial ({n} meses) · Proyección anualizada: <b>{dFm(proyAnual)}</b></div>}
           </div>
         </div>
