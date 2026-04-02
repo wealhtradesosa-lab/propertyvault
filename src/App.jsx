@@ -293,21 +293,40 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const fy=dashYear==='all'?null:annual.find(y=>y.year===dashYear);
       const fStmts=dashYear==='all'?stmts:stmts.filter(s=>s.year===dashYear);
       const n=fy?fy.n:(stmts.length||0);
-      const fRev=fy?fy.revenue:(revenue||0);
-      const fNet=fy?fy.net:((stmtNet||totNet)||0);
-      const fComm=isOwnerManaged?0:(fy?(fy.commission||0):(stmtComm||0));
-      const fDuke=fy?(fy.duke||0):(stmtDuke||0);
-      const fHoa=fy?(fy.hoa||0):(stmtHoa||0);
-      const fMaint=fy?(fy.maintenance||0):(stmtMaint||0);
-      const fWater=fy?(fy.water||0):(stmtWater||0);
-      const fVendor=fy?(fy.vendor||0):(stmtVendor||0);
+
+      // Exchange rate and conversion helpers
+      const xRate=prop.exchangeRate||1;
+
+      // Convert statement values (always USD) to property currency
+      const stmtToPC=(v)=>propCurrency!=='USD'&&xRate>1?v*xRate:v;
+
+      // Raw statement values (in USD from Airbnb/PM)
+      const rawRev=fy?fy.revenue:(revenue||0);
+      const rawNet=fy?fy.net:((stmtNet||totNet)||0);
+      const rawComm=isOwnerManaged?0:(fy?(fy.commission||0):(stmtComm||0));
+      const rawDuke=fy?(fy.duke||0):(stmtDuke||0);
+      const rawHoa=fy?(fy.hoa||0):(stmtHoa||0);
+      const rawMaint=fy?(fy.maintenance||0):(stmtMaint||0);
+      const rawWater=fy?(fy.water||0):(stmtWater||0);
+      const rawVendor=fy?(fy.vendor||0):(stmtVendor||0);
+
+      // Everything in PROPERTY CURRENCY for calculations
+      const fRev=stmtToPC(rawRev);
+      const fNet=stmtToPC(rawNet);
+      const fComm=stmtToPC(rawComm);
+      const fDuke=stmtToPC(rawDuke);
+      const fHoa=stmtToPC(rawHoa);
+      const fMaint=stmtToPC(rawMaint);
+      const fWater=stmtToPC(rawWater);
+      const fVendor=stmtToPC(rawVendor);
       const fOpEx=fComm+fDuke+fHoa+fMaint+fWater+fVendor;
 
-      // Currency conversion helper
-      const xRate=prop.exchangeRate||1;
+      // Display currency toggle (converts from property currency to view currency)
       const vc=viewCur||propCurrency;
       const dConv=(v)=>{if(vc===propCurrency||xRate<=1)return v;if(vc==='USD'&&propCurrency!=='USD')return v/xRate;if(vc!=='USD'&&propCurrency==='USD')return v*xRate;return v};
       const dFm=(v)=>fmCurrency(dConv(v),vc);
+
+      // Convert expense amounts to property currency
       const toPC=(amt,cur)=>{
         if(!cur||cur===propCurrency)return amt;
         if(cur==='USD'&&propCurrency!=='USD')return amt*xRate;
@@ -351,7 +370,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const expData=isOwnerManaged?
         [['Gastos Propietario',ownerExpTotal,'#E11D48']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill})):
         [['Comisión',fComm,'#E11D48'],['Electricidad',fDuke,'#F59E0B'],['Agua',fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],['Mantenimiento',fMaint,'#10B981'],['Otros',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
-      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>({m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:s.revenue||0,net:s.net||0,libre:(s.net||0)-mMort}));
+      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>({m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:stmtToPC(s.revenue||0),net:stmtToPC(s.net||0),libre:stmtToPC(s.net||0)-mMort}));
 
       return <>
       <div className="hidden print-header"><div style={{display:'flex',justifyContent:'space-between'}}><div><h1 style={{fontSize:'18px',fontWeight:800,margin:0}}>{prop.name}</h1><p style={{fontSize:'9px',color:'#64748B',margin:'3px 0'}}>{prop.address}, {prop.city} {prop.state} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div><div style={{fontSize:'18px',fontWeight:900,color:'#1E3A5F'}}>OD</div></div></div>
@@ -597,9 +616,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="bg-white rounded-2xl p-3 md:p-4 border border-slate-200 shadow-sm overflow-hidden">
             <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Promedios Mensuales</h3>
             <div className="space-y-2">
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Ingreso Bruto</span><span className="text-[11px] font-bold text-blue-600">{fm(n>0?fRev/n:0)}/mes</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Gastos Operativos</span><span className="text-[11px] font-bold text-rose-500">{fm(n>0?fOpEx/n:0)}/mes</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Neto del PM</span><span className="text-[11px] font-bold text-emerald-600">{fm(n>0?fNet/n:0)}/mes</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Ingreso Bruto</span><span className="text-[11px] font-bold text-blue-600">{dFm(n>0?fRev/n:0)}/mes</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">{isOwnerManaged?'Gastos Propietario':'Gastos Operativos'}</span><span className="text-[11px] font-bold text-rose-500">{dFm(n>0?(isOwnerManaged?ownerExpTotal:fOpEx)/n:0)}/mes</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">{isOwnerManaged?'NOI':'Neto del PM'}</span><span className="text-[11px] font-bold text-emerald-600">{dFm(n>0?fNoi/n:0)}/mes</span></div>
               {mMort>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Hipoteca</span><span className="text-[11px] font-bold text-red-500">{dFm(mMort)}/mes</span></div>}
               <div className="border-t border-slate-100 my-0.5"/>
               <div className="flex justify-between"><span className="text-[11px] font-bold text-slate-600">Cash Flow</span><span className={`text-[11px] font-extrabold ${fCFmo>=0?'text-emerald-600':'text-rose-600'}`}>{dFm(fCFmo)}/mes</span></div>
