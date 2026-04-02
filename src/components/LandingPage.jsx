@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 
 export function LandingPage({onLogin}) {
   const [annual,setAnnual]=useState(false);
