@@ -6,7 +6,7 @@ import { Inp, Sel } from '../components/ui';
 
 export function SettingsView() {
   const { prop, propertyId, partners, latestVal, settingsForm, setSettingsForm, editPartners, setEditPartners, stmts, expenses, income, contribs, valuations, repairs, notify, propTerms, COUNTRIES, CURRENCY_LIST, US, PT, M, fm } = useDashboard();
-      const sf2=settingsForm||{name:prop.name||'',address:prop.address||'',city:prop.city||'',state:prop.state||'',type:prop.type||'vacation',purchasePrice:String(prop.purchasePrice||''),purchaseDate:prop.purchaseDate||'',marketValue:String(latestVal?latestVal.value:prop.purchasePrice||''),manager:prop.manager||'',managerCommission:String(prop.managerCommission||15),bedrooms:String(prop.bedrooms||''),bathrooms:String(prop.bathrooms||''),country:prop.country||'US',currency:prop.currency||'USD',managedBy:prop.managedBy||'pm'};
+      const sf2=settingsForm||{name:prop.name||'',address:prop.address||'',city:prop.city||'',state:prop.state||'',type:prop.type||'vacation',purchasePrice:String(prop.purchasePrice||''),purchaseDate:prop.purchaseDate||'',marketValue:String(latestVal?latestVal.value:prop.purchasePrice||''),manager:prop.manager||'',managerCommission:String(prop.managerCommission||15),bedrooms:String(prop.bedrooms||''),bathrooms:String(prop.bathrooms||''),country:prop.country||'US',currency:prop.currency||'USD',managedBy:prop.managedBy||'pm',exchangeRate:String(prop.exchangeRate||'')};
       const uf=(k,v)=>{
         const next={...sf2,[k]:v};
         if(k==='country'){const c=COUNTRIES.find(x=>x.v===v);if(c)next.currency=c.cur;next.state=''}
@@ -34,9 +34,17 @@ export function SettingsView() {
           <div className="grid grid-cols-2 gap-3"><Inp label="Habitaciones" value={sf2.bedrooms} onChange={v=>uf('bedrooms',v)} type="number"/><Inp label="Baños" value={sf2.bathrooms} onChange={v=>uf('bathrooms',v)} type="number"/></div>
           <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién administra?</label><div className="grid grid-cols-2 gap-2">{[['owner','👤 Propietario'],['pm','🏢 Administrador externo']].map(([v,l])=><button key={v} type="button" onClick={()=>uf('managedBy',v)} className={`py-2.5 rounded-xl border-2 text-xs font-medium transition ${sf2.managedBy===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
           {sf2.managedBy==='pm'&&<div className="grid grid-cols-2 gap-3"><Inp label="Nombre del Administrador" value={sf2.manager} onChange={v=>uf('manager',v)} placeholder="IHM, Vacasa, Host U..."/><Inp label="Comisión (%)" value={sf2.managerCommission} onChange={v=>uf('managerCommission',v)} type="number"/></div>}
+          {sf2.currency!=='USD'&&<div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
+            <div className="text-[10px] font-bold text-blue-700 uppercase mb-2">Tasa de Cambio</div>
+            <div className="grid grid-cols-2 gap-3">
+              <Inp label={`1 USD = ? ${sf2.currency}`} value={sf2.exchangeRate} onChange={v=>uf('exchangeRate',v)} type="number" placeholder="4200"/>
+              {sf2.exchangeRate&&<div className="flex items-center text-[11px] text-blue-600 font-semibold">1 {sf2.currency} = ${(1/parseFloat(sf2.exchangeRate)).toFixed(6)} USD</div>}
+            </div>
+            <p className="text-[10px] text-blue-400 mt-2">Permite ingresar gastos en USD y convertirlos automáticamente.</p>
+          </div>}
         </div>
         <button onClick={async()=>{try{
-          const updates={name:sf2.name,address:sf2.address,city:sf2.city,state:sf2.state,type:sf2.type,country:sf2.country||'US',currency:sf2.currency||'USD',managedBy:sf2.managedBy||'pm',purchasePrice:parseFloat(sf2.purchasePrice)||0,purchaseDate:sf2.purchaseDate||'',manager:sf2.managedBy==='pm'?sf2.manager:'',managerCommission:sf2.managedBy==='pm'?(parseFloat(sf2.managerCommission)||15):0,bedrooms:parseInt(sf2.bedrooms)||0,bathrooms:parseInt(sf2.bathrooms)||0};
+          const updates={name:sf2.name,address:sf2.address,city:sf2.city,state:sf2.state,type:sf2.type,country:sf2.country||'US',currency:sf2.currency||'USD',managedBy:sf2.managedBy||'pm',exchangeRate:parseFloat(sf2.exchangeRate)||0,purchasePrice:parseFloat(sf2.purchasePrice)||0,purchaseDate:sf2.purchaseDate||'',manager:sf2.managedBy==='pm'?sf2.manager:'',managerCommission:sf2.managedBy==='pm'?(parseFloat(sf2.managerCommission)||15):0,bedrooms:parseInt(sf2.bedrooms)||0,bathrooms:parseInt(sf2.bathrooms)||0};
           await updateDoc(doc(db,'properties',propertyId),updates);
           const mv=parseFloat(sf2.marketValue)||0;
           if(mv>0&&mv!==(latestVal?latestVal.value:prop.purchasePrice)){await addDoc(collection(db,'properties',propertyId,'valuations'),{date:new Date().toISOString().split('T')[0],value:mv,source:'manual',notes:'Actualizado desde Configuración',createdAt:serverTimestamp()})}

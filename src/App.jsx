@@ -59,7 +59,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [mortConfig,setMortConfig]=useState({bal:'',rate:'',term:'30',pay:'',start:''});const [savingMort,setSavingMort]=useState(false);
   const umc=useCallback((k,v)=>setMortConfig(x=>({...x,[k]:v})),[]);
   const partners=prop.partners||[];const mort=prop.mortgage||{};
-  const [expenseForm,setExpenseForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once'});const [editId,setEditId]=useState(null);
+  const [expenseForm,setExpenseForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});const [editId,setEditId]=useState(null);
   const [nf,setNf]=useState({date:'',month:'',grossAmount:''});
   const [contribForm,setContribForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||''});
   const [stmtForm,setStmtForm]=useState({year:new Date().getFullYear(),month:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''});
@@ -173,7 +173,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   // ═══ CALCULATIONS ═══
   const pt=useMemo(()=>{const r={};partners.forEach(p=>{r[p.id]={name:p.name,color:p.color,own:p.ownership,cont:0,exp:0,inc:0}});contribs.forEach(c=>{if(r[c.paidBy])r[c.paidBy].cont+=c.amount||0});expenses.forEach(e=>{if(r[e.paidBy])r[e.paidBy].exp+=e.amount||0});const tn=income.reduce((s,i)=>s+(i.netAmount||0),0);partners.forEach(p=>{r[p.id].inc=tn*(p.ownership/100)});return r},[partners,contribs,expenses,income]);
 
-  const totExp=expenses.reduce((s,e)=>s+(e.amount||0),0);
+  const xr=prop.exchangeRate||1;const toPropCur=(amt,cur)=>{if(!cur||cur===propCurrency)return amt;if(cur==='USD'&&propCurrency!=='USD')return amt*xr;if(cur!=='USD'&&propCurrency==='USD')return amt/xr;return amt;};
+  const totExp=expenses.reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
   const totGross=income.reduce((s,i)=>s+(i.grossAmount||0),0);
   const totNet=income.reduce((s,i)=>s+(i.netAmount||0),0);
   const totCont=contribs.reduce((s,c)=>s+(c.amount||0),0);
@@ -216,7 +217,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   const fixedExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return c?.fixed||e.type==='fixed'}),[expenses,propCats]);
   const additionalExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return !c?.fixed&&e.type!=='fixed'}),[expenses,propCats]);
-  const expByCat=useMemo(()=>{const r={};expenses.forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!r[e.category])r[e.category]={name:c.l,value:0};r[e.category].value+=e.amount||0});return Object.values(r).sort((a,b)=>b.value-a.value)},[expenses,propCats]);
+  const expByCat=useMemo(()=>{const r={};expenses.forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!r[e.category])r[e.category]={name:c.l,value:0};r[e.category].value+=toPropCur(e.amount||0,e.expCurrency)});return Object.values(r).sort((a,b)=>b.value-a.value)},[expenses,propCats]);
 
   const annual=useMemo(()=>{const y={};stmts.forEach(s=>{if(!y[s.year])y[s.year]={year:s.year,revenue:0,net:0,commission:0,duke:0,water:0,hoa:0,maintenance:0,vendor:0,nights:0,reservations:0,n:0};const a=y[s.year];a.revenue+=s.revenue||0;a.net+=s.net||0;a.commission+=s.commission||0;a.duke+=s.duke||0;a.water+=s.water||0;a.hoa+=s.hoa||0;a.maintenance+=s.maintenance||0;a.vendor+=s.vendor||0;a.nights+=s.nights||0;a.reservations+=s.reservations||0;a.n++});return Object.values(y).sort((a,b)=>a.year-b.year)},[stmts]);
 
@@ -302,10 +303,20 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const fVendor=fy?(fy.vendor||0):(stmtVendor||0);
       const fOpEx=fComm+fDuke+fHoa+fMaint+fWater+fVendor;
 
-      // Owner expenses — filter by year if needed
+      // Currency conversion helper
+      const xRate=prop.exchangeRate||1;
+      const toPC=(amt,cur)=>{
+        if(!cur||cur===propCurrency)return amt;
+        if(cur==='USD'&&propCurrency!=='USD')return amt*xRate;
+        if(cur!=='USD'&&propCurrency==='USD')return amt/xRate;
+        return amt;
+      };
+
+      // Owner expenses — filter by year if needed, convert currency
       const yearExpenses=dashYear==='all'?expenses:expenses.filter(e=>(e.date||'').startsWith(String(dashYear)));
       const ownerExpTotal=yearExpenses.reduce((s,e)=>{
-        const amt=e.amount||0;
+        const raw=e.amount||0;
+        const amt=toPC(raw,e.expCurrency);
         if(e.frequency==='annual')return s+amt/12*(n||1);
         if(e.frequency==='monthly')return s+amt*(n||1);
         return s+amt;
@@ -346,7 +357,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="hidden md:block"><h1 className="text-lg md:text-xl font-extrabold text-slate-800">{prop.name}</h1><p className="text-xs text-slate-400 mt-0.5">{prop.address}, {prop.city} {prop.state}</p></div>
         <div className="flex gap-2">
           <button onClick={()=>window.print()} aria-label="Imprimir" className="hidden md:flex px-3 py-2 bg-slate-100 text-slate-500 text-xs rounded-xl font-bold hover:bg-slate-200 items-center gap-1.5"><Printer size={13}/></button>
-          <button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once'});setModal('expense')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 active:bg-slate-900 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button>
+          <button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 active:bg-slate-900 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button>
           <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-1.5 shadow-sm"><Upload size={14}/> Statements</button>
         </div>
       </div>
@@ -713,7 +724,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           {[
             {done:stmts.length>0, step:'1', title:'Sube tus statements', desc:'Arrastra los PDFs de tu property manager (IHM, Host U, etc.)', action:'Subir PDFs', onClick:()=>{setUploadLog([]);setModal('upload')}, color:'blue'},
             {done:!!(mort.balance||mort.monthlyPayment), step:'2', title:'Configura tu hipoteca', desc:'Registra el balance, tasa y pago mensual para calcular cash flow real.', action:'Configurar', onClick:()=>setView('mortgage'), color:'indigo'},
-            {done:expenses.filter(e=>e.category==='insurance'||e.category==='taxes').length>0, step:'3', title:'Agrega seguro e impuestos', desc:'Estos gastos fijos completan tu P&L y radiografía de costos.', action:'Agregar Gastos', onClick:()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'insurance',type:'fixed',frequency:'monthly'});setModal('expense')}, color:'emerald'},
+            {done:expenses.filter(e=>e.category==='insurance'||e.category==='taxes').length>0, step:'3', title:'Agrega seguro e impuestos', desc:'Estos gastos fijos completan tu P&L y radiografía de costos.', action:'Agregar Gastos', onClick:()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'insurance',type:'fixed',frequency:'monthly',expCurrency:''});setModal('expense')}, color:'emerald'},
             {done:valuations.length>0, step:'4', title:'Registra el valor de mercado', desc:'Con esto calculas equity real, apreciación y Cap Rate correcto.', action:'Registrar Valor', onClick:()=>setView('valuation'), color:'purple'},
           ].map(s=><button key={s.step} onClick={s.onClick} className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${s.done?'bg-slate-50 border-slate-100':'bg-white border-slate-200 hover:border-blue-300 hover:shadow-sm'}`}>
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${s.done?'bg-emerald-100':'bg-'+s.color+'-50'}`}>{s.done?<CheckCircle size={18} className="text-emerald-500"/>:<span className={`text-sm font-extrabold text-${s.color}-500`}>{s.step}</span>}</div>
@@ -855,7 +866,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ EXPENSES ═══ */}
     {view==='expenses'&&<>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🧾 Gastos</h1><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once'});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 active:bg-rose-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button></div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🧾 Gastos</h1><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 active:bg-rose-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button></div>
       {expenses.length>0&&(()=>{
         const monthlyRecurring=expenses.filter(e=>e.frequency==='monthly').reduce((s,e)=>s+(e.amount||0),0);
         const annualRecurring=expenses.filter(e=>e.frequency==='annual').reduce((s,e)=>s+(e.amount||0),0);
@@ -882,11 +893,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             {label:'Categoría',render:r=>{const c=propCats.find(x=>x.v===r.category);return<span className="text-xs">{c?c.i+' '+c.l:r.category}</span>}},
             {label:'Tipo',render:r=><div className="flex gap-1 flex-wrap"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.type==='fixed'?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}`}>{r.type==='fixed'?'Fijo':'Único'}</span>{r.frequency&&r.frequency!=='once'&&<span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.frequency==='annual'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}`}>{r.frequency==='annual'?'Anual':'Mensual'}</span>}</div>},
             {label:'Pagó',render:r=><span style={{color:pCl(r.paidBy)}} className="text-xs font-semibold">{pN(r.paidBy)}</span>},
-            {label:'Monto',r:true,render:r=><div className="text-right"><span className="font-bold text-rose-500">{fm(r.amount)}</span>{r.frequency==='annual'&&<div className="text-[9px] text-slate-400">{fm(r.amount/12)}/mes</div>}</div>}
-          ]} rows={g.items} onDel={del} dc="expenses" onEdit={r=>{setExpenseForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'additional',frequency:r.frequency||'once'});setEditId(r.id);setModal('expense')}}/>
+            {label:'Monto',r:true,render:r=><div className="text-right"><span className="font-bold text-rose-500">{fm(r.amount)}{r.expCurrency&&r.expCurrency!==propCurrency&&<span className="text-[9px] text-slate-400 ml-1">{r.expCurrency}</span>}</span>{r.frequency==='annual'&&<div className="text-[9px] text-slate-400">{fm(r.amount/12)}/mes</div>}{r.expCurrency&&r.expCurrency!==propCurrency&&prop.exchangeRate>0&&<div className="text-[9px] text-blue-400">≈ {fmCurrency(toPropCur(r.amount,r.expCurrency),propCurrency)}</div>}</div>}
+          ]} rows={g.items} onDel={del} dc="expenses" onEdit={r=>{setExpenseForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'additional',frequency:r.frequency||'once',expCurrency:r.expCurrency||''});setEditId(r.id);setModal('expense')}}/>
         </div>)
       })()}
-      {!expenses.length&&<Empty icon={Receipt} title="Sin gastos" desc="Registra gastos fijos y adicionales." action="Registrar" onAction={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once'});setModal('expense')}}/>}
+      {!expenses.length&&<Empty icon={Receipt} title="Sin gastos" desc="Registra gastos fijos y adicionales." action="Registrar" onAction={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}}/>}
     </>}
 
     {/* ═══ INCOME (powered by statements) ═══ */}
@@ -1306,7 +1317,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {modal==='expense'&&<Mdl title={editId?'✏️ Editar Gasto':'Registrar Gasto'} grad="from-rose-500 to-rose-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...expenseForm,amount:parseFloat(expenseForm.amount)};if(editId){update('expenses',editId,data)}else{save('expenses',data)}}} disabled={!expenseForm.amount||!expenseForm.concept} className="flex-1 py-2.5 bg-rose-500 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={expenseForm.date} onChange={v=>ue('date',v)} type="date" required/><Sel label="Categoría" value={expenseForm.category} onChange={v=>ue('category',v)} options={propCats.map(c=>({v:c.v,l:c.i+' '+c.l}))}/></div>
       <Inp label="Concepto" value={expenseForm.concept} onChange={v=>ue('concept',v)} placeholder="Descripción del gasto" required error={expenseForm.concept===''&&expenseForm.amount?'Ingresa una descripción':''}/>
-      <Inp label="Monto (USD)" value={expenseForm.amount} onChange={v=>ue('amount',v)} prefix="$" type="number" min="0" required error={expenseForm.amount&&parseFloat(expenseForm.amount)<=0?'El monto debe ser mayor a 0':''}/>
+      {propCurrency!=='USD'&&<div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moneda del gasto</label><div className="grid grid-cols-2 gap-2">{[[propCurrency,propCurrency],['USD','USD ($)']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('expCurrency',v)} className={`py-2 rounded-xl border-2 text-xs font-medium transition ${(expenseForm.expCurrency||propCurrency)===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>}
+      <Inp label={`Monto (${(expenseForm.expCurrency||propCurrency)})`} value={expenseForm.amount} onChange={v=>ue('amount',v)} prefix={propCurrency==='EUR'||expenseForm.expCurrency==='EUR'?'€':propCurrency==='GBP'||expenseForm.expCurrency==='GBP'?'£':'$'} type="number" min="0" required error={expenseForm.amount&&parseFloat(expenseForm.amount)<=0?'El monto debe ser mayor a 0':''}/>
+      {(expenseForm.expCurrency||propCurrency)!==propCurrency&&prop.exchangeRate>0&&expenseForm.amount&&<div className="text-[11px] text-blue-500 font-semibold bg-blue-50 px-3 py-2 rounded-xl">= {fmCurrency(parseFloat(expenseForm.amount)*(expenseForm.expCurrency==='USD'?prop.exchangeRate:1/prop.exchangeRate),propCurrency)} {propCurrency}</div>}
       <div className="grid grid-cols-2 gap-3">
         <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tipo</label><div className="grid grid-cols-2 gap-2">{[['fixed','🔄 Fijo'],['additional','➕ Único']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('type',v)} className={`py-2.5 rounded-xl border-2 text-xs font-medium transition ${expenseForm.type===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
         <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Frecuencia</label><div className="grid grid-cols-3 gap-1">{[['once','1 vez'],['monthly','Mensual'],['annual','Anual']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('frequency',v)} className={`py-2.5 rounded-xl border-2 text-[11px] font-medium transition ${expenseForm.frequency===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
