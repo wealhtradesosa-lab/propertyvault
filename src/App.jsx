@@ -434,7 +434,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">Margen: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{fMargin.toFixed(0)}%</b></div>
         </div>
         <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
-          <div className={`text-[10px] md:text-[9px] font-bold uppercase tracking-widest ${fCF>=0?'text-emerald-600':'text-rose-500'}`}>Cash Flow</div>
+          <div className={`text-[10px] md:text-[9px] font-bold uppercase tracking-widest ${fCF>=0?'text-emerald-600':'text-rose-500'}`}>Te queda</div>
           <div className="text-[9px] text-slate-400 -mt-0.5">Lo que te queda después de todo</div>
           <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{dFm(fCF)}</div>
           <div className={`text-[11px] md:text-[10px] mt-0.5 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mes</div>
@@ -484,29 +484,35 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               )}
             </>}
 
-            <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi>0?fNoi/fRev*100:0)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden bg-emerald-50"><span className="text-[9px] md:text-[11px] font-bold text-emerald-800 truncate cursor-help" title="Net Operating Income — Lo que queda después de gastos operativos, ANTES de hipoteca y costos del propietario">= NOI</span><span className="text-[12px] font-extrabold text-emerald-800">{dFm(fNoi)} <span className="text-emerald-600 text-[10px]">{(fRev>0?(fNoi/fRev*100):0).toFixed(0)}%</span></span></div></div>
+            {/* If there's mortgage or extra costs, show NOI as intermediate step */}
+            {(fMortP>0||insExp>0||taxExp>0)?<>
+              <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi>0?fNoi/fRev*100:0)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden bg-emerald-50"><span className="text-[9px] md:text-[11px] font-bold text-emerald-800 truncate">= NOI <span className="text-[9px] font-normal">(antes de hipoteca)</span></span><span className="text-[12px] font-extrabold text-emerald-800">{dFm(fNoi)} <span className="text-emerald-600 text-[10px]">{(fRev>0?(fNoi/fRev*100):0).toFixed(0)}%</span></span></div></div>
 
-            {/* Mortgage */}
-            {fMortP>0&&<>
-              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Hipoteca</div>
-              <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Hipoteca ({dFm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{dFm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>
-            </>}
+              {fMortP>0&&<>
+                <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Hipoteca</div>
+                <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Hipoteca ({dFm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{dFm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>
+              </>}
 
-            {/* Owner costs for PM-managed only */}
-            {!isOwnerManaged&&(insExp>0||taxExp>0)&&<>
-              <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Gastos del Propietario</div>
-              {insExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,insExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Seguro</span><span className="text-[10px] font-bold text-slate-700">{dFm(insExp)}</span></div></div>}
-              {taxExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-violet-400 opacity-75" style={{width:Math.max(2,taxExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Impuestos</span><span className="text-[10px] font-bold text-slate-700">{dFm(taxExp)}</span></div></div>}
-            </>}
+              {!isOwnerManaged&&insExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,insExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Seguro</span><span className="text-[10px] font-bold text-slate-700">{dFm(insExp)}</span></div></div>}
+              {!isOwnerManaged&&taxExp>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-violet-400 opacity-75" style={{width:Math.max(2,taxExp/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] text-slate-600">Impuestos</span><span className="text-[10px] font-bold text-slate-700">{dFm(taxExp)}</span></div></div>}
 
-            {/* Cash Flow */}
-            <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
-              <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
-              <div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden">
-                <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'} cursor-help`} title="Lo que realmente te queda en el bolsillo después de TODO: gastos operativos + hipoteca + seguros + impuestos">= Cash Flow</span>
-                <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)}</span>
+              <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
+                <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
+                <div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden">
+                  <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Te queda</span>
+                  <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)} <span className="text-[10px]">{dFm(fCFmo)}/mes</span></span>
+                </div>
               </div>
-            </div>
+            </>:
+              /* No mortgage — just show final result */
+              <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
+                <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
+                <div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden">
+                  <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Te queda <span className="text-[9px] font-normal">(después de gastos)</span></span>
+                  <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)} <span className="text-[10px]">{(fRev>0?(fCF/fRev*100):0).toFixed(0)}%</span></span>
+                </div>
+              </div>
+            }
             {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded py-1.5 mt-1">Periodo parcial ({n} meses) · Proyección anualizada: <b>{dFm(proyAnual)}</b></div>}
           </div>
         </div>
