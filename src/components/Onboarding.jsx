@@ -5,7 +5,7 @@ import { Building2, Users, UserPlus, Landmark, Loader2, X } from 'lucide-react';
 import { C, US_STATES as US, PROPERTY_TYPES as PT } from '../lib/constants';
 import { Inp, Sel } from './ui';
 
-export function Onboarding({userId,onComplete}) {
+export function Onboarding({userId,onComplete,onBack}) {
   const [step,setStep]=useState(0);const [busy,setBusy]=useState(false);
   const [p,setP]=useState({name:'',address:'',city:'',state:'FL',type:'vacation',price:'',date:'',beds:'',baths:'',pm:'',pmFee:'15'});
   const [prs,setPrs]=useState([{name:'',email:'',own:'100',cap:''}]);
@@ -25,7 +25,9 @@ export function Onboarding({userId,onComplete}) {
   }catch(e){setBusy(false);alert('Error al crear la propiedad: '+e.message);return}setBusy(false)};
   return <div className="min-h-screen bg-[#080E1A] flex items-center justify-center p-4" style={{backgroundImage:'radial-gradient(ellipse at 50% 0%,rgba(37,99,235,.08) 0%,transparent 50%)'}}>
     <div className="w-full max-w-[580px]">
-      <div className="text-center mb-6"><div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-xl shadow-lg shadow-blue-600/20 mb-3"><span className="text-sm font-black text-white">OD</span></div><h1 className="text-2xl font-extrabold text-white tracking-tight">Configurar Propiedad</h1><p className="text-white/30 text-sm mt-1">Paso {step+1} de 3</p></div>
+      <div className="text-center mb-6">
+        {onBack&&<button onClick={onBack} className="text-white/40 hover:text-white text-sm font-medium mb-4 flex items-center gap-1 mx-auto hover:bg-white/10 px-4 py-2 rounded-xl transition">← Volver a mis propiedades</button>}
+        <div className="inline-flex items-center justify-center w-12 h-12 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-xl shadow-lg shadow-blue-600/20 mb-3"><span className="text-sm font-black text-white">OD</span></div><h1 className="text-2xl font-extrabold text-white tracking-tight">{onBack?'Nueva Propiedad':'Configurar Propiedad'}</h1><p className="text-white/30 text-sm mt-1">Paso {step+1} de 3</p></div>
       <div className="flex gap-2 mb-6">{['Propiedad','Socios','Hipoteca'].map((s,i)=><div key={i} className="flex-1"><div className={`h-1.5 rounded-full transition-all duration-500 ${i<=step?'bg-gradient-to-r from-blue-500 to-emerald-500':'bg-white/5'}`}/><div className={`text-[10px] mt-1.5 text-center font-medium ${i<=step?'text-blue-400':'text-white/20'}`}>{s}</div></div>)}</div>
       <div className="bg-white rounded-3xl shadow-2xl p-7">
         {step===0&&<div><h2 className="text-lg font-extrabold text-slate-800 mb-5 flex items-center gap-2"><Building2 size={20} className="text-blue-500"/> Datos de la Propiedad</h2>

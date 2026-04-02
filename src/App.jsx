@@ -1333,6 +1333,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 export default function App() {
   const [user,setUser]=useState(null);const [ready,setReady]=useState(false);const [allProps,setAllProps]=useState([]);const [active,setActive]=useState(null);const [checking,setChecking]=useState(false);
   const [authMode,setAuthMode]=useState(null);
+  const [addingProp,setAddingProp]=useState(false);
   useEffect(()=>onAuthStateChanged(auth,u=>{setUser(u);setReady(true);if(!u){setAllProps([]);setActive(null)}}),[]);
   useEffect(()=>{if(!user)return;setChecking(true);
     const q1=query(collection(db,'properties'),where('ownerId','==',user.uid));
@@ -1348,6 +1349,6 @@ export default function App() {
     return<LandingPage onLogin={m=>setAuthMode(m)}/>;
   }
   if(checking)return<div className="min-h-screen bg-[#080E1A] flex items-center justify-center"><div className="text-center"><div className="w-12 h-12 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/20"><span className="text-sm font-black text-white">OD</span></div><Loader2 size={24} className="animate-spin text-blue-500 mx-auto mb-3"/><p className="text-white/30 text-sm">Cargando propiedades...</p></div></div>;
-  if(!allProps.length||!ap)return<Onboarding userId={user.uid} onComplete={id=>setActive(id)}/>;
-  return<Dashboard propertyId={active} propertyData={ap} allProperties={allProps} onSwitchProperty={setActive} onLogout={()=>signOut(auth)} onAddProperty={()=>{setActive(null);setAllProps([])}} userEmail={user.email}/>;
+  if(!allProps.length||!ap||addingProp)return<Onboarding userId={user.uid} onComplete={id=>{setActive(id);setAddingProp(false)}} onBack={allProps.length>0?()=>{setAddingProp(false);if(!active&&allProps.length)setActive(allProps[0].id)}:null}/>;
+  return<Dashboard propertyId={active} propertyData={ap} allProperties={allProps} onSwitchProperty={setActive} onLogout={()=>signOut(auth)} onAddProperty={()=>setAddingProp(true)} userEmail={user.email}/>;
 }
