@@ -116,9 +116,43 @@ const detectors = [
   { name: 'Vacasa', test: t => /Vacasa/i.test(t), parse: parseVacasa },
   { name: 'Evolve', test: t => /Evolve/i.test(t) && (/Payout|Fee|Revenue/i.test(t)), parse: parseEvolve },
   { name: 'Guesty', test: t => /Guesty/i.test(t), parse: parseGuesty },
-  { name: 'Airbnb', test: t => /Airbnb/i.test(t) && (/Payout|Earnings|Transaction/i.test(t)), parse: parseAirbnb },
+  { name: 'AirbnbAnnual', test: t => /Airbnb/i.test(t) && /Informe de ganancias|Earnings Report|Período del informe|Report Period/i.test(t), parse: null },
+  { name: 'Airbnb', test: t => /Airbnb/i.test(t) && (/Payout|Earnings|Transaction|Ingresos|ganancias/i.test(t)), parse: parseAirbnb },
   { name: 'Vrbo', test: t => /(Vrbo|HomeAway|VRBO)/i.test(t), parse: parseVrbo },
 ];
+
+// Spanish month names for Airbnb annual reports
+const mesesES={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12};
+
+function parseAirbnbAnnual(t) {
+  // Extract year from "2025 Informe de ganancias" or "2025 Earnings"
+  const yrMatch = t.match(/(\d{4})\s*(?:Informe de ganancias|Earnings)/i);
+  const year = yrMatch ? parseInt(yrMatch[1]) : new Date().getFullYear() - 1;
+
+  // Extract monthly rows: "enero $3,795.59 USD $3,660.07 USD"
+  const results = [];
+  const monthRx = /(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+\$?([\d,]+\.\d{2})\s*USD\s+\$?([\d,]+\.\d{2})\s*USD/gi;
+  let m;
+  while ((m = monthRx.exec(t)) !== null) {
+    const month = mesesES[m[1].toLowerCase()];
+    const revenue = parseFloat(m[2].replace(/,/g, ''));
+    const net = parseFloat(m[3].replace(/,/g, ''));
+    const commission = Math.max(0, revenue - net);
+    if (month && revenue > 0) {
+      results.push(result({ year, month, revenue, commission, net, format: 'Airbnb Annual' }));
+    }
+  }
+
+  // Extract total nights
+  const totalNights = nights(t);
+  if (totalNights > 0 && results.length > 0) {
+    const avgPerMonth = Math.round(totalNights / results.length);
+    results.forEach(r => { r.nights = avgPerMonth; });
+  }
+
+  if (results.length === 0) return { error: 'Airbnb Annual: no se encontraron datos mensuales' };
+  return results; // Returns ARRAY
+}
 
 // ═══ MAIN EXPORT ═══
 export async function parsePDF(file) {
@@ -131,6 +165,13 @@ export async function parsePDF(file) {
     fullText += content.items.map(it => it.str).join(' ') + '\n';
   }
   if (fullText.trim().length < 30) return { error: 'PDF vacío o no se pudo leer' };
-  for (const d of detectors) { if (d.test(fullText)) { const r = d.parse(fullText); if (!r.error) return r; } }
+
+  // Check for annual reports first (return array)
+  if (/Airbnb/i.test(fullText) && /Informe de ganancias|Earnings Report|Período del informe/i.test(fullText)) {
+    const annual = parseAirbnbAnnual(fullText);
+    if (Array.isArray(annual) && annual.length > 0) return annual;
+  }
+
+  for (const d of detectors) { if (d.parse && d.test(fullText)) { const r = d.parse(fullText); if (!r.error) return r; } }
   return parseGeneric(fullText);
 }

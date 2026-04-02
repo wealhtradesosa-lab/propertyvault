@@ -135,41 +135,36 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       if(!f.name.toLowerCase().endsWith('.pdf')){log.push({file:f.name,status:'error',msg:'No es un archivo PDF'});setUploadLog([...log]);continue;}
       log.push({file:f.name,status:'processing',msg:`Procesando... (${fi+1}/${fileArr.length})`});setUploadLog([...log]);
       try{
-        const r=await parsePDF(f);
-        if(r.error){log[log.length-1]={file:f.name,status:'error',msg:r.error};setUploadLog([...log]);continue;}
+        const rawResult=await parsePDF(f);
+        if(rawResult.error){log[log.length-1]={file:f.name,status:'error',msg:rawResult.error};setUploadLog([...log]);continue;}
 
-        const key=r.year+'-'+r.month;
+        // Normalize: single result → array, annual report already returns array
+        const results=Array.isArray(rawResult)?rawResult:[rawResult];
+        let saved=0,skipped=0;
 
-        // Check 1: Already in database
-        if(existingPeriods.has(key)){
-          log[log.length-1]={file:f.name,status:'dup',msg:`${M[r.month-1]} ${r.year} ya existe en la base de datos — se omitió`};
-          setUploadLog([...log]);continue;
+        for(const r of results){
+          const key=r.year+'-'+r.month;
+          if(existingPeriods.has(key)||uploaded.has(key)){skipped++;continue;}
+          if(r.revenue<=0&&r.net<=0){skipped++;continue;}
+
+          const {_debug, ...stmtData} = r;
+          await addDoc(collection(db,'properties',propertyId,'statements'),{...stmtData,createdAt:serverTimestamp()});
+          uploaded.add(key);
+          existingPeriods.add(key);
+          saved++;
         }
 
-        // Check 2: Already uploaded in this batch
-        if(uploaded.has(key)){
-          log[log.length-1]={file:f.name,status:'dup',msg:`${M[r.month-1]} ${r.year} ya se cargó en este lote — se omitió`};
-          setUploadLog([...log]);continue;
+        const fmt=results[0]?.format||'Unknown';
+        if(results.length>1){
+          log[log.length-1]={file:f.name,status:saved>0?'ok':'dup',msg:`[${fmt}] ${saved} meses importados${skipped>0?' · '+skipped+' omitidos (duplicados)':''}`};
+        } else {
+          const r=results[0];
+          const missing=[];
+          if(!r.commission)missing.push('Comisión');if(!r.net)missing.push('Net');
+          let msg=`[${fmt}] ${M[r.month-1]} ${r.year} — Rev: ${fm(r.revenue)} | Net: ${fm(r.net)} | ${r.nights||0} noches`;
+          if(missing.length)msg+=` ⚠️ Sin: ${missing.join(', ')}`;
+          log[log.length-1]={file:f.name,status:missing.length?'warn':'ok',msg};
         }
-
-        // Check 3: Validate data makes sense
-        if(r.revenue<=0&&r.net<=0){
-          log[log.length-1]={file:f.name,status:'error',msg:`${M[r.month-1]} ${r.year} — Revenue y Net en $0, posible statement anual o vacío`};
-          setUploadLog([...log]);continue;
-        }
-
-        const {_debug, ...stmtData} = r;
-        await addDoc(collection(db,'properties',propertyId,'statements'),{...stmtData,createdAt:serverTimestamp()});
-        uploaded.add(key);
-        existingPeriods.add(key);
-        const fmt=r.format||'Unknown';
-        const missing=[];
-        if(fmt==='IHM'){if(!r.duke)missing.push('Electricidad');if(!r.maintenance)missing.push('Maint');}
-        if(!r.commission)missing.push('Comisión');if(!r.net)missing.push('Net');
-        let msg=`[${fmt}] ${M[r.month-1]} ${r.year} — Rev: ${fm(r.revenue)} | Net: ${fm(r.net)} | ${r.nights||0} noches`;
-        if(missing.length)msg+=` ⚠️ Sin: ${missing.join(', ')}`;
-        if(missing.length)msg+=` ⚠️ Sin: ${missing.join(', ')}`;
-        log[log.length-1]={file:f.name,status:missing.length?'warn':'ok',msg};
         setUploadLog([...log]);
       }catch(e){log[log.length-1]={file:f.name,status:'error',msg:'Error: '+(e.message||String(e))};setUploadLog([...log]);}
     }
