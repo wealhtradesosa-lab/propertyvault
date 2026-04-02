@@ -422,23 +422,37 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {/* ── Obligaciones Anuales — auto-detected from expenses ── */}
       {(()=>{
         const yr=dashYear==='all'?new Date().getFullYear():dashYear;
-        const obligations=[
-          {key:'insurance',label:'Seguro',icon:'🛡️',freq:'Anual'},
-          {key:'taxes',label:'Impuestos',icon:'🏛️',freq:'Anual'},
-          {key:'hoa',label:'HOA',icon:'🏢',freq:'Mensual'},
-        ];
         const yearExps=expenses.filter(e=>{const d=e.date||'';return d.startsWith(String(yr))});
+        const yearStmts=dashYear==='all'?stmts:stmts.filter(s=>s.year===yr);
+        const pmPaysHoa=yearStmts.some(s=>(s.hoa||0)>0);
+
+        const obligations=[
+          {key:'insurance',label:'Seguro',icon:'🛡️'},
+          {key:'taxes',label:'Impuestos',icon:'🏛️'},
+        ];
+        if(!pmPaysHoa) obligations.push({key:'hoa',label:'HOA',icon:'🏢'});
+
+        const taxKeywords=/tax|impuesto|property tax|county|irs/i;
+        const insKeywords=/insurance|seguro|póliza|hazard|homeowner/i;
+
         const items=obligations.map(o=>{
-          const paid=yearExps.filter(e=>e.category===o.key);
+          const paid=yearExps.filter(e=>{
+            if(e.category===o.key) return true;
+            const c=(e.concept||'').toLowerCase();
+            if(o.key==='taxes') return taxKeywords.test(c);
+            if(o.key==='insurance') return insKeywords.test(c);
+            return false;
+          });
           const total=paid.reduce((s,e)=>s+(e.amount||0),0);
           const lastDate=paid.length>0?paid.sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date:null;
           return {...o,paid:paid.length>0,total,count:paid.length,lastDate};
         });
-        const hasSome=expenses.some(e=>['insurance','taxes','hoa'].includes(e.category));
+        if(!items.length)return null;
+        const hasSome=expenses.some(e=>['insurance','taxes'].includes(e.category))||expenses.some(e=>taxKeywords.test(e.concept||'')||insKeywords.test(e.concept||''));
         if(!hasSome&&expenses.length<3)return null;
         return <div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm mb-4">
           <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Obligaciones {yr}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <div className={`grid grid-cols-1 ${items.length>1?'sm:grid-cols-'+items.length:''} gap-2`}>
             {items.map(o=><div key={o.key} className={`flex items-center gap-3 p-3 rounded-xl border ${o.paid?'bg-emerald-50/50 border-emerald-200':'bg-amber-50/50 border-amber-200'}`}>
               <span className="text-lg">{o.icon}</span>
               <div className="flex-1 min-w-0">
