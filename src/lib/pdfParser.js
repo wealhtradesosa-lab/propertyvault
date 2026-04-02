@@ -28,14 +28,31 @@ function grabAny(text, labels) {
 
 function nights(text) {
   let n = 0;
+  // English: "15 nights"
   const nm = text.match(/(\d+)\s*nights?/gi);
-  if (nm) nm.forEach(m => { const v = parseInt(m); if (v > 0 && v < 60) n += v; });
+  if (nm) nm.forEach(m => { const v = parseInt(m); if (v > 0 && v < 500) n += v; });
+  if (n > 0) return n;
+  // Spanish: "Noches reservadas" table — sum all numbers after this header
+  const nrMatch = text.match(/[Nn]oches\s*reservadas[\s\S]{0,300}/);
+  if (nrMatch) {
+    const nums = nrMatch[0].match(/\b(\d{1,3})\b/g);
+    if (nums) nums.forEach(x => { const v = parseInt(x); if (v > 0 && v < 500) n += v; });
+  }
+  // Spanish: "X noches"
+  if (n === 0) {
+    const sn = text.match(/(\d+)\s*noches?/gi);
+    if (sn) sn.forEach(m => { const v = parseInt(m); if (v > 0 && v < 500) n += v; });
+  }
   return n;
 }
 
 function reservations(text) {
   const rm = text.match(/(\d+)\s*reservations?/i);
   if (rm) return parseInt(rm[1]);
+  const rs = text.match(/(\d+)\s*reservas?/i);
+  if (rs) return parseInt(rs[1]);
+  const re = text.match(/(\d+)\s*reservaciones?/i);
+  if (re) return parseInt(re[1]);
   return (text.match(/Reservation\s*#/gi) || []).length || (text.match(/Booking\s*#/gi) || []).length;
 }
 
@@ -146,8 +163,20 @@ function parseAirbnbAnnual(t) {
   // Extract total nights
   const totalNights = nights(t);
   if (totalNights > 0 && results.length > 0) {
-    const avgPerMonth = Math.round(totalNights / results.length);
-    results.forEach(r => { r.nights = avgPerMonth; });
+    const totalRev = results.reduce((s, r) => s + r.revenue, 0);
+    if (totalRev > 0) {
+      results.forEach(r => { r.nights = Math.round(totalNights * (r.revenue / totalRev)); });
+    } else {
+      const avg = Math.round(totalNights / results.length);
+      results.forEach(r => { r.nights = avg; });
+    }
+  }
+
+  // Extract total reservations
+  const totalRes = reservations(t);
+  if (totalRes > 0 && results.length > 0) {
+    const totalRev = results.reduce((s, r) => s + r.revenue, 0);
+    results.forEach(r => { r.reservations = totalRev > 0 ? Math.round(totalRes * (r.revenue / totalRev)) : Math.round(totalRes / results.length); });
   }
 
   if (results.length === 0) return { error: 'Airbnb Annual: no se encontraron datos mensuales' };
