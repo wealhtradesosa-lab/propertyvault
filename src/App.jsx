@@ -369,10 +369,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const fNoi=isOwnerManaged?(fRev-ownerExpTotal):(fRev-fOpEx);
       const mMort=mort.monthlyPayment||0;
       const fMortP=mMort*n;
-      const insExp=isOwnerManaged?0:yearExpenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+((e.amount||0)),0);
-      const taxExp=isOwnerManaged?0:yearExpenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+((e.amount||0)),0);
-      const ownerCosts=fMortP+(isOwnerManaged?0:insExp+taxExp+ownerExpTotal);
-      const fCF=isOwnerManaged?(fNoi-fMortP):(fNoi-ownerCosts);
+
+      // Cash Flow = what you ACTUALLY keep
+      // PM-managed: Net deposited by PM - Mortgage - Extra owner costs
+      // Owner-managed: Revenue - All expenses - Mortgage
+      const insExp=isOwnerManaged?0:yearExpenses.filter(e=>e.category==='insurance').reduce((s,e)=>s+(toPropCur(e.amount||0,e.expCurrency)),0);
+      const taxExp=isOwnerManaged?0:yearExpenses.filter(e=>e.category==='taxes').reduce((s,e)=>s+(toPropCur(e.amount||0,e.expCurrency)),0);
+      const fCF=isOwnerManaged?(fRev-ownerExpTotal-fMortP):(fNet-fMortP-insExp-taxExp);
+      const ownerCosts=fMortP+insExp+taxExp;
       const fCFmo=n>0?fCF/n:0;
       const partial=n>0&&n<12;
       const proyAnual=partial&&n>0?(fCF/n)*12:fCF;
@@ -414,23 +418,23 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
 
       {fRev>0?<>
-      {/* ── ROW 1: Key Performance Indicators ── */}
+      {/* ── ROW 1: Key Performance Indicators — Linear P&L ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 mb-5">
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm">
-          <div className="text-[10px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Ingreso Bruto</div>
+          <div className="text-[10px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">{isOwnerManaged?'Ingreso Bruto':'Ingresó'}</div>
           <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{dFm(fRev)}</div>
           <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">{n} meses</div>
           {revChg!==null&&<div className={`text-[11px] md:text-[10px] font-bold mt-0.5 ${revChg>=0?'text-emerald-600':'text-rose-500'}`}>{revChg>=0?'▲':'▼'} {Math.abs(revChg).toFixed(0)}% YoY</div>}
         </div>
-        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-emerald-500 border border-slate-200 shadow-sm">
-          <div className="text-[10px] md:text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Ingreso Neto</div>
-          <div className="text-base md:text-[22px] font-extrabold text-emerald-700 mt-0.5">{dFm(fNet)}</div>
-          <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">Margen: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{fMargin.toFixed(0)}%</b></div>
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-rose-400 border border-slate-200 shadow-sm">
+          <div className="text-[10px] md:text-[9px] font-bold text-rose-500 uppercase tracking-widest">{isOwnerManaged?'Gastos':'Se fue en gastos'}</div>
+          <div className="text-base md:text-[22px] font-extrabold text-rose-600 mt-0.5">-{dFm(isOwnerManaged?ownerExpTotal:(fOpEx+fMortP))}</div>
+          <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">{isOwnerManaged?'Operativos':'PM + Hipoteca'}</div>
         </div>
         <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
-          <div className="text-[10px] md:text-[9px] font-bold text-slate-500 uppercase tracking-widest">Cash Flow</div>
+          <div className="text-[10px] md:text-[9px] font-bold uppercase tracking-widest {fCF>=0?'text-emerald-600':'text-rose-500'}">Te queda</div>
           <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{dFm(fCF)}</div>
-          <div className={`text-[11px] md:text-[10px] mt-0.5 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mo</div>
+          <div className={`text-[11px] md:text-[10px] mt-0.5 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mes</div>
         </div>
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-400 border border-slate-200 shadow-sm">
           <div className="text-[10px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Ocupación</div>
