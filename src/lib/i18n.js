@@ -161,6 +161,14 @@ const translations = {
     addExpenses: 'Add Expenses',
     
     // Language
+
+    // KPI subtitles (always visible)
+    subRevenue: 'Total guest income',
+    subNoi: 'After operating costs',
+    subCashFlow: 'After mortgage',
+    subCashFlowNoMort: 'After all costs',
+    subOccupancy: 'Booked vs available',
+    subCoC: 'Return on capital',
     language: 'Language',
   },
   es: {
@@ -309,6 +317,13 @@ const translations = {
     fixedExpComplete: 'Estos gastos fijos completan tu P&L.',
     addExpenses: 'Agregar Gastos',
     
+
+    subRevenue: 'Ingreso total de huéspedes',
+    subNoi: 'Después de gastos operativos',
+    subCashFlow: 'Después de hipoteca',
+    subCashFlowNoMort: 'Después de todos los gastos',
+    subOccupancy: 'Ocupadas vs disponibles',
+    subCoC: 'Retorno sobre capital',
     language: 'Idioma',
   }
 };

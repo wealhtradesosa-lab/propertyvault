@@ -430,7 +430,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="hidden md:block"><h1 className="text-lg md:text-xl font-extrabold text-slate-800">{prop.name}</h1><p className="text-xs text-slate-400 mt-0.5">{prop.address}, {prop.city} {prop.state}</p></div>
         <div className="flex gap-2">
           <button onClick={()=>window.print()} aria-label="Imprimir" className="hidden md:flex px-3 py-2 bg-slate-100 text-slate-500 text-xs rounded-xl font-bold hover:bg-slate-200 items-center gap-1.5"><Printer size={13}/></button>
-          <button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 active:bg-slate-900 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Expense</button>
+          <button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 active:bg-slate-900 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> {t('addExpense')}</button>
           <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-1.5 shadow-sm"><Upload size={14}/> Statements</button>
         </div>
       </div>
@@ -444,30 +444,35 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {fRev>0?<>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 mb-5">
-        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm cursor-help" title={t("tipRevenue")}>
-          <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">{t("grossRevenue")}</div>
-          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-1">{dFm(fRev)}</div>
-          <div className="text-[10px] text-slate-400">{n} months{revChg!==null?` · ${revChg>=0?'+':''}${revChg.toFixed(0)}% YoY`:''}</div>
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">{t('grossRevenue')}</div>
+          <div className="text-[9px] text-slate-400 -mt-0.5">{t('subRevenue')}</div>
+          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{dFm(fRev)}</div>
+          <div className="text-[10px] text-slate-400">{n} {t('months')}{revChg!==null?` · ${revChg>=0?'+':''}${revChg.toFixed(0)}% YoY`:''}</div>
         </div>
-        <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm cursor-help ${fNoi>=0?'border-l-amber-500':'border-l-rose-500'}`} title={t("tipNoi")}>
-          <div className={`text-[10px] font-bold uppercase tracking-widest ${fNoi>=0?'text-amber-600':'text-rose-500'}`}>{t("noi")}</div>
-          <div className={`text-base md:text-[22px] font-extrabold mt-1 ${fNoi>=0?'text-amber-700':'text-rose-600'}`}>{dFm(fNoi)}</div>
+        <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fNoi>=0?'border-l-amber-500':'border-l-rose-500'}`}>
+          <div className={`text-[10px] font-bold uppercase tracking-widest ${fNoi>=0?'text-amber-600':'text-rose-500'}`}>{t('noi')}</div>
+          <div className="text-[9px] text-slate-400 -mt-0.5">{t('subNoi')}</div>
+          <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fNoi>=0?'text-amber-700':'text-rose-600'}`}>{dFm(fNoi)}</div>
           <div className="text-[10px] text-slate-400">{t('margin')} {fMargin.toFixed(0)}%</div>
         </div>
-        <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm cursor-help ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`} title={t("tipCashFlow")}>
-          <div className={`text-[10px] font-bold uppercase tracking-widest ${fCF>=0?'text-emerald-600':'text-rose-500'}`}>{t("cashFlow")}</div>
-          <div className={`text-base md:text-[22px] font-extrabold mt-1 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{dFm(fCF)}</div>
-          <div className={`text-[10px] ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mo{!fMortP&&` · ${t('noMortgageNote')}`}</div>
+        <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
+          <div className={`text-[10px] font-bold uppercase tracking-widest ${fCF>=0?'text-emerald-600':'text-rose-500'}`}>{t('cashFlow')}</div>
+          <div className="text-[9px] text-slate-400 -mt-0.5">{fMortP?t('subCashFlow'):t('subCashFlowNoMort')}</div>
+          <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{dFm(fCF)}</div>
+          <div className={`text-[10px] ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/{t('mo')}{!fMortP&&` · = NOI`}</div>
         </div>
-        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-cyan-500 border border-slate-200 shadow-sm cursor-help" title="Percentage of available nights that were booked. ADR = Average Daily Rate per booked night.">
-          <div className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">{t("occupancy")}</div>
-          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-1">{fNights>0?occupancy.toFixed(0)+'%':'—'}</div>
-          <div className="text-[10px] text-slate-400">{fNights>0?`${fNights} nights · ADR ${dFm(adr)}`:t('noData')}</div>
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-cyan-500 border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">{t('occupancy')}</div>
+          <div className="text-[9px] text-slate-400 -mt-0.5">{t('subOccupancy')}</div>
+          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{fNights>0?occupancy.toFixed(0)+'%':'—'}</div>
+          <div className="text-[10px] text-slate-400">{fNights>0?`${fNights} ${t('nights')} · ADR ${dFm(adr)}`:t('noData')}</div>
         </div>
-        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm cursor-help" title={t("tipCoC")}>
-          <div className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">Cash-on-Cash{partial?' (ann.)':''}</div>
-          <div className={`text-base md:text-[22px] font-extrabold mt-1 ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
-          <div className="text-[10px] text-slate-400">Capital: {dFm(totCont)}</div>
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">{t('cashOnCash')}{partial?' (ann.)':''}</div>
+          <div className="text-[9px] text-slate-400 -mt-0.5">{t('subCoC')}</div>
+          <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
+          <div className="text-[10px] text-slate-400">{t('capital')}: {dFm(totCont)}</div>
         </div>
       </div>
 
@@ -475,7 +480,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {/* ── ROW 2: Visual P&L Cascade + Metrics ── */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
         <div className="col-span-1 md:col-span-7 bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden">
-          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-4">{t('plWaterfall')}{partial?` (${n} months)`:''} <span className="text-[9px] font-normal text-slate-400 normal-case cursor-help" title="Profit & Loss — Cascada de ingresos menos cada gasto hasta llegar al cash flow real">ⓘ</span></h3>
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-4">{t('plWaterfall')}{partial?` (${n} months)`:''} <span className="text-[9px] font-normal text-slate-400 normal-case cursor-help" title={t("tipNoi")}>ⓘ</span></h3>
           <div className="space-y-1.5">
             <div className="rounded-lg relative overflow-hidden" style={{height:"34px"}}><div className="absolute inset-0 bg-blue-500"/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[10px] md:text-[11px] font-bold text-white truncate">{t("grossRevenue")}</span><span className="text-[12px] font-extrabold text-white">{dFm(fRev)}</span></div></div>
 
@@ -520,7 +525,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
               <div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden">
                 <div><span className={`text-[12px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>{`= ${t('cashFlow')}`}</span>{fMortP>0&&<span className="text-[9px] text-slate-400 ml-2">{t('noiMinusDebt')}</span>}</div>
-                <div className="text-right"><span className={`text-[14px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)}</span><div className={`text-[10px] ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mo</div></div>
+                <div className="text-right"><span className={`text-[14px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)}</span><div className={`text-[10px] ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/{t('mo')}</div></div>
               </div>
             </div>
 
@@ -528,11 +533,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             {fMortP>0&&n>0&&<div className={`rounded-xl p-3 mt-3 border ${fCF>=0?'bg-emerald-50 border-emerald-200':'bg-rose-50 border-rose-200'}`}>
               <div className="space-y-1.5">
                 <div className="flex justify-between"><span className="text-[11px] text-slate-500">{t('propertyGenerates')}</span><span className="text-[11px] font-bold text-slate-700">{dFm(fNoi/n)}/mo <span className="text-slate-400">(NOI)</span></span></div>
-                <div className="flex justify-between"><span className="text-[11px] text-slate-500">{t('mortgageCosts')}</span><span className="text-[11px] font-bold text-red-500">-{dFm(mMort>0?mMort:fMortP/n)}/mo</span></div>
+                <div className="flex justify-between"><span className="text-[11px] text-slate-500">{t('mortgageCosts')}</span><span className="text-[11px] font-bold text-red-500">-{dFm(mMort>0?mMort:fMortP/n)}/{t('mo')}</span></div>
                 <div className="border-t border-slate-200 my-1"/>
                 <div className="flex justify-between items-center">
                   <span className={`text-[12px] font-extrabold ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{fCF>=0?t('surplus'):t('deficit')}</span>
-                  <span className={`text-[12px] font-extrabold ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCFmo)}/mo</span>
+                  <span className={`text-[12px] font-extrabold ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCFmo)}/{t('mo')}</span>
                 </div>
                 <div className={`text-[10px] ${fDscr>=1.25?'text-emerald-600':fDscr>=1?'text-amber-600':'text-rose-500'}`}>
                   DSCR: {fDscr.toFixed(2)}x — {fDscr>=1.25?t('coversComfortably'):fDscr>=1?t('coversTight'):t('doesNotCover')}
@@ -648,13 +653,13 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               // ADR vs market (Orlando STR avg ~$180-250)
               if(adr>0){
                 if(adr>300) insights.push({type:'good',icon:'💎',title:`ADR premium: ${dFm(adr)}/noche`,desc:'Tu tarifa está por encima del promedio del mercado de Orlando. Asegúrate de que las reseñas y amenities justifiquen el premium.'});
-                else if(adr<150) insights.push({type:'warn',icon:'💰',title:`ADR por debajo del mercado: ${dFm(adr)}/noche`,desc:'Considera mejorar amenities (hot tub, game room, tematización) para subir tarifa. Cada $25 de aumento = ~'+dFm(fNights/n*25*12)+'/año extra.'});
+                else if(adr<150) insights.push({type:'warn',icon:'💰',title:`ADR below market: ${dFm(adr)}/noche`,desc:'Consider improving amenities to raise rates. Each $25 increase = ~'+dFm(fNights/n*25*12)+'/year extra.'});
               }
 
               // Mortgage burden
               if(mMort>0&&fRev>0){
                 const mortPct=fMortP/fRev*100;
-                if(mortPct>60) insights.push({type:'danger',icon:'🏦',title:`Mortgage consumess ${mortPct.toFixed(0)}% of revenue`,desc:`Debt service is too high relative to revenue. DSCR de ${fDscr.toFixed(2)}x. ${fDscr<1.25?'Consider refinancing at a lower rate or extending the term.':'DSCR is acceptable but margin is tight.'}`});
+                if(mortPct>60) insights.push({type:'danger',icon:'🏦',title:`Mortgage consumes ${mortPct.toFixed(0)}% of revenue`,desc:`Debt service is too high relative to revenue. DSCR ${fDscr.toFixed(2)}x. ${fDscr<1.25?'Consider refinancing at a lower rate or extending the term.':'DSCR is acceptable but margin is tight.'}`});
               }
 
               // Expense efficiency
@@ -693,12 +698,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="bg-white rounded-2xl p-3 md:p-4 border border-slate-200 shadow-sm overflow-hidden">
             <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">{t('monthlyAverages')}</h3>
             <div className="space-y-2">
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">{t("grossRevenue")}</span><span className="text-[11px] font-bold text-blue-600">{dFm(n>0?fRev/n:0)}/mo</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">{t('operatingExpenses')}</span><span className="text-[11px] font-bold text-rose-500">-{dFm(n>0?totalOpEx/n:0)}/mo</span></div>
-              {fMortP>0&&<><div className="flex justify-between"><span className="text-[11px] text-slate-400">{t("noi")}</span><span className="text-[11px] font-bold text-amber-600">{dFm(n>0?fNoi/n:0)}/mo</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">{t('debtService')}</span><span className="text-[11px] font-bold text-red-500">-{dFm(mMort)}/mo</span></div></>}
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">{t("grossRevenue")}</span><span className="text-[11px] font-bold text-blue-600">{dFm(n>0?fRev/n:0)}/{t('mo')}</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">{t('operatingExpenses')}</span><span className="text-[11px] font-bold text-rose-500">-{dFm(n>0?totalOpEx/n:0)}/{t('mo')}</span></div>
+              {fMortP>0&&<><div className="flex justify-between"><span className="text-[11px] text-slate-400">{t("noi")}</span><span className="text-[11px] font-bold text-amber-600">{dFm(n>0?fNoi/n:0)}/{t('mo')}</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">{t('debtService')}</span><span className="text-[11px] font-bold text-red-500">-{dFm(mMort)}/{t('mo')}</span></div></>}
               <div className="border-t border-slate-100 my-0.5"/>
-              <div className="flex justify-between"><span className="text-[11px] font-bold text-slate-600">{t("cashFlow")}</span><span className={`text-[11px] font-extrabold ${fCFmo>=0?'text-emerald-600':'text-rose-600'}`}>{dFm(fCFmo)}/mo</span></div>
+              <div className="flex justify-between"><span className="text-[11px] font-bold text-slate-600">{t("cashFlow")}</span><span className={`text-[11px] font-extrabold ${fCFmo>=0?'text-emerald-600':'text-rose-600'}`}>{dFm(fCFmo)}/{t('mo')}</span></div>
             </div>
           </div>
           <div className="bg-white rounded-2xl p-3 md:p-4 border border-slate-200 shadow-sm overflow-hidden">
@@ -730,9 +735,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <XAxis dataKey="m" tick={{fontSize:9,fill:'#94a3b8'}} interval={mChart.length>18?2:0}/>
               <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={fm}/>
               <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
-              <Bar dataKey="rev" name="Gross Revenue" fill="#93C5FD" radius={[3,3,0,0]}/>
-              <Bar dataKey="exp" name="Expenses" fill="#FCA5A5" radius={[3,3,0,0]}/>
-              <Bar dataKey="cf" name="Cash Flow" fill="#6EE7B7" radius={[3,3,0,0]}/>
+              <Bar dataKey="rev" name={t("grossRevenue")} fill="#93C5FD" radius={[3,3,0,0]}/>
+              <Bar dataKey="exp" name={t("expenses")} fill="#FCA5A5" radius={[3,3,0,0]}/>
+              <Bar dataKey="cf" name={t("cashFlow")} fill="#6EE7B7" radius={[3,3,0,0]}/>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -764,7 +769,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               return <div className="space-y-2">
                 <div className="flex justify-between items-end">
                   <div><div className="text-lg font-extrabold text-slate-800">{dFm(mort.balance)}</div><div className="text-[10px] text-slate-400">Balance actual</div></div>
-                  <div className="text-right"><div className="text-sm font-bold text-emerald-600">{dFm(mMort)}/mo</div><div className="text-[10px] text-slate-400">{mort.rate}% · {mort.termYears} años</div></div>
+                  <div className="text-right"><div className="text-sm font-bold text-emerald-600">{dFm(mMort)}/{t('mo')}</div><div className="text-[10px] text-slate-400">{mort.rate}% · {mort.termYears} años</div></div>
                 </div>
                 {/* Progress bar */}
                 <div>
@@ -801,14 +806,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <XAxis dataKey="year" tick={{fontSize:11,fill:'#64748b'}}/>
               <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={fm}/>
               <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
-              <Bar dataKey="revenue" name="Gross Revenue" fill="#93C5FD" radius={[4,4,0,0]}/>
+              <Bar dataKey="revenue" name={t("grossRevenue")} fill="#93C5FD" radius={[4,4,0,0]}/>
               <Bar dataKey="net" name="Neto Depositado" fill="#6EE7B7" radius={[4,4,0,0]}/>
               <Line dataKey="hoa" name="HOA" stroke="#8B5CF6" strokeWidth={2} dot={{r:3}}/>
             </ComposedChart>
           </ResponsiveContainer>
         </div>}
         {partners.length>1&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden">
-          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Distribución entre Socios</h3>
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">{t('partnersCapital')}</h3>
           <div className="space-y-3">{partners.map(p=>{const t=pt[p.id]||{};return<div key={p.id} className="flex items-center gap-3 py-2 border-b border-slate-50 last:border-0">
             <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{background:p.color}}>{p.name.charAt(0)}</div>
             <div className="flex-1 min-w-0"><div className="text-sm font-bold text-slate-700 truncate">{p.name} <span className="text-xs text-slate-400 font-normal">{p.ownership}%</span></div>
@@ -861,7 +866,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       });
 
       return <>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">👥 Socios & Capital <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||''});setModal('contribution')}} className="px-4 py-2.5 bg-purple-600 text-white text-xs rounded-xl font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Aporte</button></div>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">👥 {t('partnersCapital')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||''});setModal('contribution')}} className="px-4 py-2.5 bg-purple-600 text-white text-xs rounded-xl font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {t('capital')}</button></div>
 
       {/* Partner cards */}
       <div className="grid gap-4 mb-5" style={{gridTemplateColumns:`repeat(${Math.min(partners.length,3)},1fr)`}}>{partnerBalances.map(p=>{
@@ -881,7 +886,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {/* Debts between partners */}
       {debts.length>0&&<div className="bg-white rounded-2xl border border-amber-200 p-5 shadow-sm mb-5">
-        <h3 className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle size={14}/> Cuentas Pendientes entre Socios</h3>
+        <h3 className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-3 flex items-center gap-2"><AlertTriangle size={14}/> Pending Balances</h3>
         <div className="space-y-2">{debts.map((d,i)=><div key={i} className="flex items-center gap-3 py-3 px-4 bg-amber-50 rounded-xl border border-amber-100">
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{background:d.fromColor}}>{d.from.charAt(0)}</div>
           <div className="flex-1"><span className="text-sm font-bold text-slate-700">{d.from}</span><span className="text-sm text-slate-400 mx-2">le debe a</span><span className="text-sm font-bold text-slate-700">{d.to}</span></div>
@@ -926,14 +931,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {paged.length>0?<>
         <Tbl cols={[
           {label:'Periodo',render:r=><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>},
-          {label:'Revenue',r:true,render:r=><span className="text-blue-600 font-semibold">{gFm(r.revenue)}</span>},
-          {label:'Noches',r:true,render:r=>r.nights?<span className="text-slate-600">{r.nights} <span className="text-[9px] text-slate-400">({r.reservations||'—'}res)</span></span>:<span className="text-slate-300">—</span>},
-          {label:'Commission',r:true,render:r=><span className="text-rose-400">{gFm(r.commission)}</span>},
+          {label:t('grossRevenue'),r:true,render:r=><span className="text-blue-600 font-semibold">{gFm(r.revenue)}</span>},
+          {label:t('nights'),r:true,render:r=>r.nights?<span className="text-slate-600">{r.nights} <span className="text-[9px] text-slate-400">({r.reservations||'—'}res)</span></span>:<span className="text-slate-300">—</span>},
+          {label:t('pmCommission'),r:true,render:r=><span className="text-rose-400">{gFm(r.commission)}</span>},
           {label:t('electricity'),r:true,render:r=><span className="text-slate-500">{gFm(r.duke)}</span>},
           {label:'HOA',r:true,render:r=><span className="text-slate-500">{gFm(r.hoa)}</span>},
-          {label:'Water',r:true,render:r=><span className="text-slate-500">{gFm(r.water)}</span>},
+          {label:t('water'),r:true,render:r=><span className="text-slate-500">{gFm(r.water)}</span>},
           {label:'Manten.',r:true,render:r=><span className="text-slate-500">{gFm(r.maintenance)}</span>},
-          {label:'OpEx',r:true,render:r=>{const tc=(r.commission||0)+(r.duke||0)+(r.water||0)+(r.hoa||0)+(r.maintenance||0)+(r.vendor||0);return<span className="font-semibold text-rose-500">{gFm(tc)}</span>}},
+          {label:t('operatingExpenses'),r:true,render:r=>{const tc=(r.commission||0)+(r.duke||0)+(r.water||0)+(r.hoa||0)+(r.maintenance||0)+(r.vendor||0);return<span className="font-semibold text-rose-500">{gFm(tc)}</span>}},
           {label:'Neto',r:true,render:r=><span className="font-extrabold text-emerald-700">{gFm(r.net)}</span>},
           {label:'Margen',r:true,render:r=>{const m=r.revenue?(r.net/r.revenue*100):0;return<span className={`font-bold text-xs ${m<40?'text-rose-500':m<50?'text-amber-500':'text-emerald-500'}`}>{m.toFixed(0)}%</span>}},
         ]} rows={paged} onDel={del} dc="statements" onEdit={r=>{setStmtForm({year:r.year,month:r.month,revenue:String(r.revenue||''),net:String(r.net||''),commission:String(r.commission||''),duke:String(r.duke||''),water:String(r.water||''),hoa:String(r.hoa||''),maintenance:String(r.maintenance||''),vendor:String(r.vendor||'')});setEditId(r.id);setModal('addStmt')}}/>
@@ -966,7 +971,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ EXPENSES ═══ */}
     {view==='expenses'&&<>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6"><div className="flex items-center gap-2"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🧾 Expenses</h1><span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span><CurToggle/></div><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 active:bg-rose-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Expense</button></div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6"><div className="flex items-center gap-2"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🧾 {t('expenses')}</h1><span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span><CurToggle/></div><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 active:bg-rose-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> {t('addExpense')}</button></div>
       {expenses.length>0&&(()=>{
         const monthlyRecurring=expenses.filter(e=>eFreq(e)==='monthly').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
         const annualRecurring=expenses.filter(e=>eFreq(e)==='annual').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
@@ -979,7 +984,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <KPI label="Compras" value={gFm(oneTime)} sub={expenses.filter(e=>!isRecurring(e)).length+' gastos'} color="red"/>
         </div>
       })()}
-      {expByCat.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4"><h3 className="text-sm font-bold text-slate-700 mb-3">Costo Mensual por Categoría <span className="text-[10px] text-slate-400 font-normal">(anuales ÷ 12)</span></h3><ResponsiveContainer width="100%" height={Math.max(150,expByCat.length*35)}><BarChart data={expByCat.map(c=>({...c,mensual:c.monthly||c.value}))} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis type="number" tickFormatter={v=>gFm(v)} tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#64748b'}} width={120}/><Tooltip content={<Tip/>}/><Bar dataKey="mensual" name="Mensual" fill="#DC2626" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer></div>}
+      {expByCat.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4"><h3 className="text-sm font-bold text-slate-700 mb-3">Costo Mensual por Categoría <span className="text-[10px] text-slate-400 font-normal">(anuales ÷ 12)</span></h3><ResponsiveContainer width="100%" height={Math.max(150,expByCat.length*35)}><BarChart data={expByCat.map(c=>({...c,mensual:c.monthly||c.value}))} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis type="number" tickFormatter={v=>gFm(v)} tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#64748b'}} width={120}/><Tooltip content={<Tip/>}/><Bar dataKey="mensual" name={t('monthly')} fill="#DC2626" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer></div>}
 
       {/* Grouped by month */}
       {expenses.length>0&&(()=>{
@@ -993,7 +998,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             {label:'Categoría',render:r=>{const c=propCats.find(x=>x.v===r.category);return<span className="text-xs">{c?c.i+' '+c.l:r.category}</span>}},
             {label:'Tipo',render:r=>{const ef=eFreq(r);return<div className="flex gap-1 flex-wrap"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.type==='fixed'?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}`}>{r.type==='fixed'?'Fijo':'Compra'}</span>{ef!=='once'&&<span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ef==='annual'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}`}>{ef==='annual'?'Anual':'Mensual'}</span>}</div>}},
             {label:'Pagó',render:r=><span style={{color:pCl(r.paidBy)}} className="text-xs font-semibold">{pN(r.paidBy)}</span>},
-            {label:'Monto',r:true,render:r=>{const cv=toPropCur(r.amount||0,r.expCurrency);return<div className="text-right"><span className="font-bold text-rose-500">{gFm(cv)}</span>{r.expCurrency&&r.expCurrency!==propCurrency&&<div className="text-[9px] text-slate-400">({fmCurrency(r.amount,r.expCurrency)} {r.expCurrency})</div>}{eFreq(r)==='annual'&&<div className="text-[9px] text-slate-400">{gFm(cv/12)}/mo</div>}</div>}}
+            {label:'Monto',r:true,render:r=>{const cv=toPropCur(r.amount||0,r.expCurrency);return<div className="text-right"><span className="font-bold text-rose-500">{gFm(cv)}</span>{r.expCurrency&&r.expCurrency!==propCurrency&&<div className="text-[9px] text-slate-400">({fmCurrency(r.amount,r.expCurrency)} {r.expCurrency})</div>}{eFreq(r)==='annual'&&<div className="text-[9px] text-slate-400">{gFm(cv/12)}/{t('mo')}</div>}</div>}}
           ]} rows={g.items} onDel={del} dc="expenses" onEdit={r=>{setExpenseForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'additional',frequency:r.frequency||'once',expCurrency:r.expCurrency||''});setEditId(r.id);setModal('expense')}}/>
         </div>)
       })()}
@@ -1002,7 +1007,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ INCOME (powered by statements) ═══ */}
     {view==='income'&&<>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">💰 Income <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><p className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full">From Statements</p></div>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">💰 {t('income')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><p className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full">{t('statements')}</p></div>
 
       {stmts.length>0?(()=>{
         const sorted=[...stmts].sort((a,b)=>b.year*100+b.month-a.year*100-a.month);
@@ -1036,9 +1041,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden"><h3 className="text-sm font-bold text-slate-700 mb-3">Detalle Mensual</h3>
           <Tbl cols={[
             {label:'Periodo',render:r=><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>},
-            {label:'Revenue',r:true,render:r=><span className="text-blue-600 font-semibold">{gFm(r.revenue)}</span>},
-            {label:'Commission',r:true,render:r=><span className="text-rose-500">{gFm(r.commission)}</span>},
-            {label:'OpEx',r:true,render:r=><span className="text-rose-400">{gFm((r.duke||0)+(r.water||0)+(r.hoa||0)+(r.maintenance||0)+(r.vendor||0))}</span>},
+            {label:t('grossRevenue'),r:true,render:r=><span className="text-blue-600 font-semibold">{gFm(r.revenue)}</span>},
+            {label:t('pmCommission'),r:true,render:r=><span className="text-rose-500">{gFm(r.commission)}</span>},
+            {label:t('operatingExpenses'),r:true,render:r=><span className="text-rose-400">{gFm((r.duke||0)+(r.water||0)+(r.hoa||0)+(r.maintenance||0)+(r.vendor||0))}</span>},
             {label:'Neto',r:true,render:r=><span className="font-bold text-emerald-600">{gFm(r.net)}</span>},
             {label:'Margen',r:true,render:r=>{const m=r.revenue?(r.net/r.revenue*100):0;return<span className={`font-bold ${m<40?'text-rose-500':m<50?'text-amber-600':'text-emerald-600'}`}>{m.toFixed(0)}%</span>}},
             ...(partners.length>1?partners.map(p=>({label:p.name.split(' ')[0]+' ('+p.ownership+'%)',r:true,render:r=><span className="text-sm" style={{color:p.color}}>{gFm((r.net||0)*(p.ownership/100))}</span>})):[]),
@@ -1049,7 +1054,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ MORTGAGE ═══ */}
     {view==='mortgage'&&<>
-      <h1 className="text-[22px] font-extrabold text-slate-800 mb-6">🏦 Mortgage <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1>
+      <h1 className="text-[22px] font-extrabold text-slate-800 mb-6">🏦 {t('mortgageNav')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1>
       {mort.balance>0?<>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6"><KPI label="Balance" value={gFm(mort.balance)} color="red"/><KPI label="Tasa" value={mort.rate+'%'} sub={mort.termYears+' años'} color="amber"/><KPI label="Pago Mensual" value={gFm(mort.monthlyPayment)} color="blue"/><KPI label="Total Intereses" value={sNE.length>0?fm(sNE[sNE.length-1].ti):'$0'} sub="sin pagos extra" color="purple"/><KPI label="Equity" value={gFm(equity)} sub={'LTV: '+ltv.toFixed(0)+'%'} color="green"/></div>
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-4"><h3 className="text-base font-extrabold text-slate-800 mb-1">💰 Simulador de Pagos Anticipados</h3><p className="text-xs text-slate-400 mb-5">¿Cuánto extra al principal cada mes?</p>
@@ -1261,7 +1266,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {/* Report tabs */}
       <div className="flex gap-1 bg-white rounded-2xl p-1.5 border border-slate-200 shadow-sm mb-5 overflow-x-auto no-print">
-        {[['performance','📊 Performance'],['pnl','📋 Detailed P&L'],['partners','👥 Partners'],['cashflow','💰 Cash Flow'],['mortgage_rpt','🏦 Mortgage'],['expenses_rpt','🧾 Expenses']].map(([k,l])=>
+        {[['performance','📊 Performance'],['pnl','📋 Detailed P&L'],['partners','👥 Partners'],['cashflow','💰 Cash Flow'],['mortgage_rpt','🏦 Mortgage'],['expenses_rpt',`🧾 ${t('expenses')}`]].map(([k,l])=>
           <button key={k} onClick={()=>setRptTab(k)} className={`px-4 py-2.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${rptTab===k?'bg-blue-600 text-white shadow-md':'text-slate-500 hover:bg-slate-50 hover:text-slate-700'}`}>{l}</button>
         )}
       </div>
@@ -1284,7 +1289,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="bg-slate-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-slate-500 font-semibold uppercase">Capital</div><div className="text-sm font-extrabold text-slate-800">{gFm(totCont)}</div></div>
         </div>
         {relAnnual.length>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Evolución Anual</h3>
-          <ResponsiveContainer width="100%" height={220}><ComposedChart data={relAnnual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name="Revenue" fill="#2563EB" radius={[4,4,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[4,4,0,0]}/><Line dataKey="commission" name="Commission" stroke="#DC2626" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
+          <ResponsiveContainer width="100%" height={220}><ComposedChart data={relAnnual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name={t("grossRevenue")} fill="#2563EB" radius={[4,4,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[4,4,0,0]}/><Line dataKey="commission" name={t("pmCommission")} stroke="#DC2626" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
         </>}
         {monthRank.length>0&&<><h3 className="text-sm font-bold text-slate-700 mt-5 mb-3">Estacionalidad — Mejores y Peores Meses</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">{monthRank.slice(0,4).map((r,i)=><div key={r.month} className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-100"><div className="text-[10px] text-emerald-600 font-bold">#{i+1} MEJOR</div><div className="text-base font-extrabold text-emerald-700">{r.month}</div><div className="text-xs text-emerald-500">{gFm(r.avg)} avg</div></div>)}
@@ -1423,7 +1428,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>
       {(expenseForm.expCurrency||propCurrency)!==propCurrency&&prop.exchangeRate>0&&expenseForm.amount&&<div className="text-[11px] text-blue-500 font-semibold bg-blue-50 px-3 py-2 rounded-xl">= {fmCurrency(parseFloat(expenseForm.amount)*((expenseForm.expCurrency||'USD')==='USD'?prop.exchangeRate:1/prop.exchangeRate),propCurrency)} {propCurrency}</div>}
       <div className="grid grid-cols-2 gap-3">
-        <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Frecuencia</label><div className="grid grid-cols-3 gap-1">{[['monthly','🔄 '+t('monthly')],['annual','📅 '+t('annual')],['once','🛒 '+t('purchase')]].map(([v,l])=><button key={v} type="button" onClick={()=>{ue('frequency',v);ue('type',v==='once'?'additional':'fixed')}} className={`py-2.5 rounded-xl border-2 text-[11px] font-medium transition ${(expenseForm.frequency||(expenseForm.type==='fixed'?'monthly':'once'))===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div><div className="text-[10px] text-slate-400 mt-1">{expenseForm.frequency==='monthly'||(!expenseForm.frequency&&expenseForm.type==='fixed')?'Se repite cada mes (Personal, Energía...)':expenseForm.frequency==='annual'?'Se paga una vez al año (Predial, Insurances...)':'Compra única (Mueble, Electrodoméstico, Reparación...)'}</div></div>
+        <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Frecuencia</label><div className="grid grid-cols-3 gap-1">{[['monthly','🔄 '+t('monthly')],['annual','📅 '+t('annual')],['once','🛒 '+t('purchase')]].map(([v,l])=><button key={v} type="button" onClick={()=>{ue('frequency',v);ue('type',v==='once'?'additional':'fixed')}} className={`py-2.5 rounded-xl border-2 text-[11px] font-medium transition ${(expenseForm.frequency||(expenseForm.type==='fixed'?'monthly':'once'))===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div><div className="text-[10px] text-slate-400 mt-1">{expenseForm.frequency==='monthly'||(!expenseForm.frequency&&expenseForm.type==='fixed')?t('freqMonthlyDesc'):expenseForm.frequency==='annual'?'Se paga una vez al año (Predial, Insurances...)':t('freqPurchaseDesc')}</div></div>
       </div>
       {expenseForm.frequency==='annual'&&expenseForm.amount&&<div className="text-[11px] text-blue-500 font-semibold bg-blue-50 px-3 py-2 rounded-xl">= {gFm(parseFloat(expenseForm.amount)/12)}/mo equivalente</div>}
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={expenseForm.paidBy} onChange={v=>ue('paidBy',v)}/></div>
