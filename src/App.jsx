@@ -178,7 +178,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   // ═══ CALCULATIONS ═══
   const pt=useMemo(()=>{const r={};partners.forEach(p=>{r[p.id]={name:p.name,color:p.color,own:p.ownership,cont:0,exp:0,inc:0}});contribs.forEach(c=>{if(r[c.paidBy])r[c.paidBy].cont+=c.amount||0});expenses.forEach(e=>{if(r[e.paidBy])r[e.paidBy].exp+=e.amount||0});const tn=income.reduce((s,i)=>s+(i.netAmount||0),0);partners.forEach(p=>{r[p.id].inc=tn*(p.ownership/100)});return r},[partners,contribs,expenses,income]);
 
-  const xr=prop.exchangeRate||1;const toPropCur=(amt,cur)=>{if(!cur||cur===propCurrency)return amt;if(cur==='USD'&&propCurrency!=='USD')return amt*xr;if(cur!=='USD'&&propCurrency==='USD')return amt/xr;return amt;};
+  const xr=prop.exchangeRate||(liveTRM&&liveTRM.COP?liveTRM.COP:1);const toPropCur=(amt,cur)=>{if(!cur||cur===propCurrency)return amt;if(cur==='USD'&&propCurrency!=='USD')return amt*xr;if(cur!=='USD'&&propCurrency==='USD')return amt/xr;return amt;};
   const totExp=expenses.reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
   const totGross=income.reduce((s,i)=>s+(i.grossAmount||0),0);
   const totNet=income.reduce((s,i)=>s+(i.netAmount||0),0);
@@ -291,9 +291,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     </div>
 
     <div className="flex-1 overflow-auto overflow-x-hidden" role="main"><div className="p-3 md:p-6 pt-[72px] md:pt-6 max-w-[1200px] lg:mx-auto">
-    {liveTRM&&propCurrency!=='USD'&&liveTRM[propCurrency]&&<div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/30 rounded-xl px-3 py-1.5 mb-3 border border-blue-100 dark:border-blue-800">
-      <div className="flex items-center gap-2 text-[11px]"><span className="font-bold text-blue-700 dark:text-blue-300">TRM Hoy</span><span className="text-blue-600 dark:text-blue-400">1 USD = <b>{liveTRM[propCurrency].toLocaleString('es',{maximumFractionDigits:2})}</b> {propCurrency}</span><span className="text-blue-300 dark:text-blue-500">· {liveTRM.updated}</span></div>
-      {Math.abs((liveTRM[propCurrency]||0)-(prop.exchangeRate||0))>10&&<button onClick={async()=>{try{await updateDoc(doc(db,'properties',propertyId),{exchangeRate:liveTRM[propCurrency]});notify(`Tasa actualizada: 1 USD = ${liveTRM[propCurrency].toLocaleString('es')} ${propCurrency}`)}catch(e){notify('Error: '+e.message,'error')}}} className="text-[10px] font-bold text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded-lg hover:bg-blue-200 transition shrink-0">Actualizar tasa ↗</button>}
+    {liveTRM&&liveTRM.COP&&<div className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/30 rounded-xl px-3 py-1.5 mb-3 border border-blue-100 dark:border-blue-800">
+      <div className="flex items-center gap-2 text-[11px]"><span className="font-bold text-blue-700 dark:text-blue-300">TRM</span><span className="text-blue-600 dark:text-blue-400">1 USD = <b>{liveTRM.COP.toLocaleString('es',{maximumFractionDigits:2})}</b> COP</span><span className="text-blue-300 dark:text-blue-500">· {liveTRM.updated}</span></div>
+      {propCurrency!=='USD'&&Math.abs((liveTRM[propCurrency]||0)-(prop.exchangeRate||0))>10&&<button onClick={async()=>{try{await updateDoc(doc(db,'properties',propertyId),{exchangeRate:liveTRM[propCurrency]});notify(`Tasa actualizada: 1 USD = ${liveTRM[propCurrency].toLocaleString('es')} ${propCurrency}`)}catch(e){notify('Error: '+e.message,'error')}}} className="text-[10px] font-bold text-blue-600 dark:text-blue-300 bg-blue-100 dark:bg-blue-800 px-2 py-1 rounded-lg hover:bg-blue-200 transition shrink-0">Actualizar tasa ↗</button>}
     </div>}
     <ViewGuard>
 
@@ -305,7 +305,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const n=fy?fy.n:(stmts.length||0);
 
       // Exchange rate and conversion helpers
-      const xRate=prop.exchangeRate||1;
+      const xRate=prop.exchangeRate||(liveTRM&&liveTRM.COP?liveTRM.COP:1);
 
       // Convert statement values (always USD) to property currency
       const stmtToPC=(v)=>propCurrency!=='USD'&&xRate>1?v*xRate:v;
@@ -397,7 +397,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {annual.length>0&&<div className="flex items-center gap-1.5 mb-4 no-print overflow-x-auto pb-1">
         <button onClick={()=>setDashYear('all')} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear==='all'?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>Acumulado</button>
         {annual.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear===y.year?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
-        {xRate>1&&<div className="ml-auto flex gap-1 shrink-0">{[propCurrency,'USD'].filter((v,i,a)=>a.indexOf(v)===i).map(c=><button key={c} onClick={()=>setViewCur(c===propCurrency?null:c)} className={`px-3 py-2 rounded-xl text-[10px] font-bold transition ${(viewCur||propCurrency)===c?'bg-blue-600 text-white':'bg-white border border-blue-200 text-blue-500 hover:bg-blue-50'}`}>{c}</button>)}</div>}
+        {(xRate>1||liveTRM)&&<div className="ml-auto flex gap-1 shrink-0">{[propCurrency,...(propCurrency==='USD'?['COP']:['USD'])].map(c=><button key={c} onClick={()=>setViewCur(c===propCurrency?null:c)} className={`px-3 py-2 rounded-xl text-[10px] font-bold transition ${(viewCur||propCurrency)===c?'bg-blue-600 text-white':'bg-white border border-blue-200 text-blue-500 hover:bg-blue-50'}`}>{c}</button>)}</div>}
       </div>}
 
       {fRev>0?<>
