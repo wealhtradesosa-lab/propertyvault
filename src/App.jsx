@@ -411,7 +411,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-emerald-500 border border-slate-200 shadow-sm">
           <div className="text-[10px] md:text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Ingreso Neto</div>
-          <div className="text-base md:text-[22px] font-extrabold text-emerald-700 mt-0.5">{fm(fNet)}</div>
+          <div className="text-base md:text-[22px] font-extrabold text-emerald-700 mt-0.5">{dFm(fNet)}</div>
           <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">Margen: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{fMargin.toFixed(0)}%</b></div>
         </div>
         <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
@@ -428,7 +428,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
           <div className="text-[10px] md:text-[9px] font-bold text-purple-600 uppercase tracking-widest">Retorno CoC{partial?' (ann.)':''}</div>
           <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
-          <div className="text-[11px] md:text-[10px] text-slate-500 mt-0.5">Capital: {fm(totCont)}</div>
+          <div className="text-[11px] md:text-[10px] text-slate-500 mt-0.5">Capital: {dFm(totCont)}</div>
         </div>
       </div>
 
@@ -472,7 +472,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                 <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)}</span>
               </div>
             </div>
-            {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded py-1.5 mt-1">Periodo parcial ({n} meses) · Proyección anualizada: <b>{fm(proyAnual)}</b></div>}
+            {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded py-1.5 mt-1">Periodo parcial ({n} meses) · Proyección anualizada: <b>{dFm(proyAnual)}</b></div>}
           </div>
         </div>
 
@@ -481,12 +481,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="bg-white rounded-2xl p-3 md:p-4 border border-slate-200 shadow-sm overflow-hidden">
             <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">Propiedad & Patrimonio</h3>
             <div className="space-y-2">
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Valor de Mercado</span><span className="text-[11px] font-extrabold text-slate-800">{fm(marketValue)}</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Precio de Compra</span><span className="text-[11px] font-bold text-slate-500">{fm(prop.purchasePrice)}</span></div>
-              {appreciation!==0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Valorización</span><span className={`text-[11px] font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{appreciation.toFixed(1)}% ({fm(marketValue-prop.purchasePrice)})</span></div>}
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Valor de Mercado</span><span className="text-[11px] font-extrabold text-slate-800">{dFm(marketValue)}</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Precio de Compra</span><span className="text-[11px] font-bold text-slate-500">{dFm(prop.purchasePrice)}</span></div>
+              {appreciation!==0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Valorización</span><span className={`text-[11px] font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{appreciation.toFixed(1)}% ({dFm(marketValue-prop.purchasePrice)})</span></div>}
               <div className="border-t border-slate-100 my-0.5"/>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Equity</span><span className="text-[11px] font-extrabold text-emerald-600">{fm(realEquity)}</span></div>
-              {mort.balance>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Deuda Hipoteca</span><span className="text-[11px] font-bold text-slate-500">{fm(mort.balance)} <span className="text-slate-400">· LTV {realLTV.toFixed(0)}%</span></span></div>}
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Equity</span><span className="text-[11px] font-extrabold text-emerald-600">{dFm(realEquity)}</span></div>
+              {mort.balance>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Deuda Hipoteca</span><span className="text-[11px] font-bold text-slate-500">{dFm(mort.balance)} <span className="text-slate-400">· LTV {realLTV.toFixed(0)}%</span></span></div>}
             </div>
           </div>
           <div className="bg-white rounded-2xl p-3 md:p-4 border border-slate-200 shadow-sm overflow-hidden">
@@ -501,7 +501,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Retorno CoC</span><span className={`text-[11px] font-bold ${fCoc>8?'text-emerald-600':fCoc>4?'text-amber-500':'text-rose-500'}`}>{fCoc.toFixed(1)}%</span></div>
               {fDscr>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">DSCR <span className="text-[9px] text-slate-300">(Cobertura de Deuda)</span></span><span className={`text-[11px] font-bold ${fDscr>1.25?'text-emerald-600':fDscr>1?'text-amber-500':'text-rose-500'}`}>{fDscr.toFixed(2)}x</span></div>}
               <div className="flex justify-between"><span className="text-[11px] text-slate-400">Ratio de Gastos</span><span className={`text-[11px] font-bold ${fOpEx/fRev<0.5?'text-emerald-600':fOpEx/fRev<0.6?'text-amber-500':'text-rose-500'}`}>{(fOpEx/fRev*100).toFixed(0)}%</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Capital Invertido</span><span className="text-[11px] font-bold text-slate-700">{fm(totCont)}</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Capital Invertido</span><span className="text-[11px] font-bold text-slate-700">{dFm(totCont)}</span></div>
             </div>
           </div>
           {/* Health indicator */}
@@ -536,7 +536,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         return <div className="space-y-2 mb-4">{alerts.map(a=><div key={a.id} onClick={()=>setView('pipeline')} className={`rounded-2xl p-3 border flex items-center gap-3 cursor-pointer transition ${a.level==='overdue'?'bg-rose-50 border-rose-200 hover:bg-rose-100':'bg-amber-50 border-amber-200 hover:bg-amber-100'}`}>
           <span className="text-lg shrink-0">{a.level==='overdue'?'🚨':'⏰'}</span>
           <div className="flex-1 min-w-0">
-            <div className={`text-xs font-bold ${a.level==='overdue'?'text-rose-700':'text-amber-700'}`}>{a.title}{a.amount?' · '+fm(parseFloat(a.amount)):''}</div>
+            <div className={`text-xs font-bold ${a.level==='overdue'?'text-rose-700':'text-amber-700'}`}>{a.title}{a.amount?' · '+dFm(parseFloat(a.amount)):''}</div>
             <div className={`text-[10px] ${a.level==='overdue'?'text-rose-500':'text-amber-500'}`}>{a.days<0?`Vencido hace ${Math.abs(a.days)} día${Math.abs(a.days)>1?'s':''}`:`Vence en ${a.days} día${a.days>1?'s':''}`} · {fmDate(a.dueDate)}</div>
           </div>
           <button onClick={e=>{e.stopPropagation();markPaid(a)}} className={`px-3 py-1.5 rounded-xl text-[11px] font-bold shrink-0 transition ${a.level==='overdue'?'bg-rose-200 text-rose-700 hover:bg-rose-300':'bg-amber-200 text-amber-700 hover:bg-amber-300'}`}>Pagado ✓</button>
@@ -573,15 +573,15 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
               // Occupancy
               if(fNights>0){
-                if(occupancy>=80) insights.push({type:'good',icon:'📈',title:`Ocupación excelente: ${occupancy.toFixed(0)}%`,desc:`Con ${occupancy.toFixed(0)}% de ocupación, puedes considerar subir tarifas. Un aumento de $20/noche generaría ~${fm(fNights/n*20*12)} adicionales al año.`});
-                else if(occupancy>=60) insights.push({type:'warn',icon:'📊',title:`Ocupación aceptable: ${occupancy.toFixed(0)}%`,desc:`Hay espacio para ${Math.round(availNights-fNights)} noches más. Si llenas ${Math.round((availNights-fNights)*0.5)} noches adicionales al ADR actual (${dFm(adr)}), generarías ${fm(Math.round((availNights-fNights)*0.5)*adr)} extra.`});
+                if(occupancy>=80) insights.push({type:'good',icon:'📈',title:`Ocupación excelente: ${occupancy.toFixed(0)}%`,desc:`Con ${occupancy.toFixed(0)}% de ocupación, puedes considerar subir tarifas. Un aumento de $20/noche generaría ~${dFm(fNights/n*20*12)} adicionales al año.`});
+                else if(occupancy>=60) insights.push({type:'warn',icon:'📊',title:`Ocupación aceptable: ${occupancy.toFixed(0)}%`,desc:`Hay espacio para ${Math.round(availNights-fNights)} noches más. Si llenas ${Math.round((availNights-fNights)*0.5)} noches adicionales al ADR actual (${dFm(adr)}), generarías ${dFm(Math.round((availNights-fNights)*0.5)*adr)} extra.`});
                 else insights.push({type:'danger',icon:'📉',title:`Ocupación baja: ${occupancy.toFixed(0)}%`,desc:`Solo ${fNights} de ${availNights} noches ocupadas. Revisa precios, fotos del listing, y la competencia en la zona.`});
               }
 
               // ADR vs market (Orlando STR avg ~$180-250)
               if(adr>0){
                 if(adr>300) insights.push({type:'good',icon:'💎',title:`ADR premium: ${dFm(adr)}/noche`,desc:'Tu tarifa está por encima del promedio del mercado de Orlando. Asegúrate de que las reseñas y amenities justifiquen el premium.'});
-                else if(adr<150) insights.push({type:'warn',icon:'💰',title:`ADR por debajo del mercado: ${dFm(adr)}/noche`,desc:'Considera mejorar amenities (hot tub, game room, tematización) para subir tarifa. Cada $25 de aumento = ~'+fm(fNights/n*25*12)+'/año extra.'});
+                else if(adr<150) insights.push({type:'warn',icon:'💰',title:`ADR por debajo del mercado: ${dFm(adr)}/noche`,desc:'Considera mejorar amenities (hot tub, game room, tematización) para subir tarifa. Cada $25 de aumento = ~'+dFm(fNights/n*25*12)+'/año extra.'});
               }
 
               // Mortgage burden
@@ -599,19 +599,19 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               // Duke Energy trend
               if(fDuke>0&&fRev>0){
                 const dukePct=fDuke/fRev*100;
-                if(dukePct>15) insights.push({type:'warn',icon:'⚡',title:`Electricidad alta: ${(dukePct).toFixed(0)}% del ingreso`,desc:`Duke Energy ${dFm(fDuke)} (${fm(fDuke/n)}/mes). Para una propiedad STR en Orlando, lo típico es 8-12%. Verifica termostato inteligente, pool heater timer, y eficiencia del A/C.`});
+                if(dukePct>15) insights.push({type:'warn',icon:'⚡',title:`Electricidad alta: ${(dukePct).toFixed(0)}% del ingreso`,desc:`Duke Energy ${dFm(fDuke)} (${dFm(fDuke/n)}/mes). Para una propiedad STR en Orlando, lo típico es 8-12%. Verifica termostato inteligente, pool heater timer, y eficiencia del A/C.`});
               }
 
               // YoY comparison
               if(prevYr&&prevYr.revenue>0&&dashYear!=='all'){
                 const revDiff=fRev-prevYr.revenue*(n/prevYr.n);
                 const netDiff=fNet-prevYr.net*(n/prevYr.n);
-                if(revDiff<0) insights.push({type:'warn',icon:'📉',title:`Ingreso ${((revDiff/(prevYr.revenue*(n/prevYr.n)))*100).toFixed(0)}% vs ${prevYr.year} (mismos meses)`,desc:`Ajustado por periodo, estás generando ${fm(Math.abs(revDiff))} menos que el año pasado. Revisa si la competencia aumentó o si tus tarifas necesitan ajuste.`});
-                else if(revDiff>0) insights.push({type:'good',icon:'📈',title:`Ingreso +${((revDiff/(prevYr.revenue*(n/prevYr.n)))*100).toFixed(0)}% vs ${prevYr.year}`,desc:`Crecimiento de ${fm(revDiff)} vs el mismo periodo del año anterior. Buen momentum.`});
+                if(revDiff<0) insights.push({type:'warn',icon:'📉',title:`Ingreso ${((revDiff/(prevYr.revenue*(n/prevYr.n)))*100).toFixed(0)}% vs ${prevYr.year} (mismos meses)`,desc:`Ajustado por periodo, estás generando ${dFm(Math.abs(revDiff))} menos que el año pasado. Revisa si la competencia aumentó o si tus tarifas necesitan ajuste.`});
+                else if(revDiff>0) insights.push({type:'good',icon:'📈',title:`Ingreso +${((revDiff/(prevYr.revenue*(n/prevYr.n)))*100).toFixed(0)}% vs ${prevYr.year}`,desc:`Crecimiento de ${dFm(revDiff)} vs el mismo periodo del año anterior. Buen momentum.`});
               }
 
               // Appreciation
-              if(appreciation>20) insights.push({type:'good',icon:'🏠',title:`Valorización +${appreciation.toFixed(0)}% (${fm(marketValue-prop.purchasePrice)})`,desc:'Excelente apreciación. Tu equity es '+fm(realEquity)+'. Podrías hacer un HELOC para adquirir otra propiedad.'});
+              if(appreciation>20) insights.push({type:'good',icon:'🏠',title:`Valorización +${appreciation.toFixed(0)}% (${dFm(marketValue-prop.purchasePrice)})`,desc:'Excelente apreciación. Tu equity es '+dFm(realEquity)+'. Podrías hacer un HELOC para adquirir otra propiedad.'});
 
               return insights.length>0?insights.map((ins,i)=><div key={i} className={`flex gap-3 p-3 rounded-xl border text-sm overflow-hidden overflow-hidden ${ins.type==='good'?'bg-emerald-50 border-emerald-100':ins.type==='warn'?'bg-amber-50 border-amber-100':'bg-rose-50 border-rose-100'}`}>
                 <span className="text-lg shrink-0">{ins.icon}</span>
@@ -644,7 +644,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               return <div className="text-center">
                 <div className="text-3xl font-black text-slate-800">{beNights}</div>
                 <div className="text-[10px] text-slate-400">noches/mes para cubrir todos los costos</div>
-                <div className="text-xs text-slate-500 mt-1">Costos mensuales totales: {fm(beMo)}</div>
+                <div className="text-xs text-slate-500 mt-1">Costos mensuales totales: {dFm(beMo)}</div>
                 <div className="text-xs text-slate-500">ADR actual: {dFm(adr)}/noche</div>
                 {avgNMo>0&&<div className={`text-xs font-bold mt-2 px-3 py-1 rounded-full inline-block ${surplus>=0?'bg-emerald-100 text-emerald-700':'bg-rose-100 text-rose-700'}`}>{surplus>=0?`+${surplus} noches de margen`:`${Math.abs(surplus)} noches de déficit`}</div>}
               </div>;
@@ -675,11 +675,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="bg-white rounded-2xl p-3 md:p-4 border border-slate-200 shadow-sm overflow-hidden">
             <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Propiedad & Patrimonio</h3>
             <div className="space-y-1.5">
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400 truncate">Valor de Mercado</span><span className="text-[11px] font-extrabold text-slate-800">{fm(marketValue)}</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400 truncate">Precio de Compra</span><span className="text-[11px] font-bold text-slate-500">{fm(prop.purchasePrice)}</span></div>
-              {appreciation!==0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Valorización</span><span className={`text-[11px] font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{appreciation.toFixed(1)}% ({fm(marketValue-prop.purchasePrice)})</span></div>}
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400 truncate">Valor de Mercado</span><span className="text-[11px] font-extrabold text-slate-800">{dFm(marketValue)}</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400 truncate">Precio de Compra</span><span className="text-[11px] font-bold text-slate-500">{dFm(prop.purchasePrice)}</span></div>
+              {appreciation!==0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Valorización</span><span className={`text-[11px] font-bold ${appreciation>0?'text-emerald-600':'text-rose-500'}`}>{appreciation>0?'+':''}{appreciation.toFixed(1)}% ({dFm(marketValue-prop.purchasePrice)})</span></div>}
               <div className="border-t border-slate-100 my-0.5"/>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Equity</span><span className="text-[11px] font-extrabold text-emerald-600">{fm(realEquity)}</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Equity</span><span className="text-[11px] font-extrabold text-emerald-600">{dFm(realEquity)}</span></div>
               {realLTV>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">LTV</span><span className={`text-[11px] font-bold ${realLTV>80?'text-rose-500':realLTV>60?'text-amber-500':'text-emerald-500'}`}>{realLTV.toFixed(0)}%</span></div>}
             </div>
           </div>
@@ -696,7 +696,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               const totalInterest=mort.monthlyPayment>0?(mort.monthlyPayment*monthsLeft)-mort.balance:0;
               return <div className="space-y-2">
                 <div className="flex justify-between items-end">
-                  <div><div className="text-lg font-extrabold text-slate-800">{fm(mort.balance)}</div><div className="text-[10px] text-slate-400">Balance actual</div></div>
+                  <div><div className="text-lg font-extrabold text-slate-800">{dFm(mort.balance)}</div><div className="text-[10px] text-slate-400">Balance actual</div></div>
                   <div className="text-right"><div className="text-sm font-bold text-emerald-600">{dFm(mMort)}/mes</div><div className="text-[10px] text-slate-400">{mort.rate}% · {mort.termYears} años</div></div>
                 </div>
                 {/* Progress bar */}
@@ -705,8 +705,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                   <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden"><div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all" style={{width:Math.max(2,pctPaid)+'%'}}/></div>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-center mt-1">
-                  <div className="bg-emerald-50 rounded-lg p-1.5"><div className="text-[9px] text-emerald-600 font-bold">PAGADO</div><div className="text-xs font-extrabold text-emerald-700">{fm(paidPrincipal)}</div></div>
-                  <div className="bg-slate-50 rounded-lg p-1.5"><div className="text-[9px] text-slate-500 font-bold">RESTANTE</div><div className="text-xs font-extrabold text-slate-700">{fm(mort.balance)}</div></div>
+                  <div className="bg-emerald-50 rounded-lg p-1.5"><div className="text-[9px] text-emerald-600 font-bold">PAGADO</div><div className="text-xs font-extrabold text-emerald-700">{dFm(paidPrincipal)}</div></div>
+                  <div className="bg-slate-50 rounded-lg p-1.5"><div className="text-[9px] text-slate-500 font-bold">RESTANTE</div><div className="text-xs font-extrabold text-slate-700">{dFm(mort.balance)}</div></div>
                   <div className="bg-blue-50 rounded-lg p-1.5"><div className="text-[9px] text-blue-500 font-bold">AÑOS REST.</div><div className="text-xs font-extrabold text-blue-700">~{yearsLeft}</div></div>
                 </div>
                 {monthsStart>0&&<div className="text-[10px] text-slate-400 text-center">{Math.round(monthsStart/12)} años de {mort.termYears} transcurridos{mort.startDate?` · Desde ${mort.startDate.split('-')[0]}`:''}</div>}
@@ -717,8 +717,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           {monthRank.length>=6&&<div className="bg-white rounded-2xl p-3 md:p-4 border border-slate-200 shadow-sm overflow-hidden">
             <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Estacionalidad (histórico)</h3>
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-emerald-50 rounded-xl p-2 text-center"><div className="text-[8px] text-emerald-600 font-bold">MEJOR MES</div><div className="text-sm font-extrabold text-emerald-700">{monthRank[0].month}</div><div className="text-[10px] text-emerald-500">{fm(monthRank[0].avg)} prom</div></div>
-              <div className="bg-rose-50 rounded-xl p-2 text-center"><div className="text-[8px] text-rose-600 font-bold">PEOR MES</div><div className="text-sm font-extrabold text-rose-700">{monthRank[monthRank.length-1].month}</div><div className="text-[10px] text-rose-500">{fm(monthRank[monthRank.length-1].avg)} prom</div></div>
+              <div className="bg-emerald-50 rounded-xl p-2 text-center"><div className="text-[8px] text-emerald-600 font-bold">MEJOR MES</div><div className="text-sm font-extrabold text-emerald-700">{monthRank[0].month}</div><div className="text-[10px] text-emerald-500">{dFm(monthRank[0].avg)} prom</div></div>
+              <div className="bg-rose-50 rounded-xl p-2 text-center"><div className="text-[8px] text-rose-600 font-bold">PEOR MES</div><div className="text-sm font-extrabold text-rose-700">{monthRank[monthRank.length-1].month}</div><div className="text-[10px] text-rose-500">{dFm(monthRank[monthRank.length-1].avg)} prom</div></div>
             </div>
           </div>}
         </div>
