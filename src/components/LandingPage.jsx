@@ -67,7 +67,7 @@ export function LandingPage({onLogin}) {
         </div>
         <div className="grid md:grid-cols-3 gap-6">
           {[
-            ['📄','Sube el PDF. Listo.','Arrastra el statement de tu property manager — IHM, Host U, Vacasa, Evolve, cualquiera. En segundos extrae ingresos, comisiones, utilities, noches, y reservaciones.'],
+            ['📄','Sube el PDF. Listo.','Arrastra el statement de tu property manager — IHM, Vacasa, Evolve, Guesty, Host U, Airbnb, Vrbo — y más. En segundos extrae ingresos, comisiones, utilities, noches, y reservaciones.'],
             ['📊','Ve lo que tu PM no te muestra','Dashboard profesional con los KPIs que importan: Cash Flow real (no solo revenue), ocupación vs break-even, margen operativo, y tu retorno real sobre el capital invertido.'],
             ['💡','Te dice qué hacer, no solo qué pasó','Insights accionables: "Necesitas 24 noches para cubrir costos pero promedias 21." "Tu electricidad consume 15% del ingreso — revisa el termostato." "Tienes $239K en equity — considera un HELOC."'],
             ['🏦','Sabe cuánto le debes al banco','Tracker de hipoteca visual: cuánto has pagado, cuánto falta, cuándo terminas, LTV, y si el ingreso cubre el debt service.'],

@@ -1291,6 +1291,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {modal==='upload'&&<Mdl title="📤 Subir Statements (PDF)" grad="from-blue-600 to-cyan-600" onClose={()=>setModal(null)}>
       <p className="text-sm text-slate-500 mb-3">Sube los PDFs de los owner statements de tu property manager.</p>
+      <div className="flex flex-wrap gap-1.5 mb-3">{['IHM','Vacasa','Evolve','Guesty','Host U','Airbnb','Vrbo'].map(pm=><span key={pm} className="text-[10px] font-semibold bg-blue-50 text-blue-600 px-2 py-1 rounded-lg">{pm}</span>)}<span className="text-[10px] font-semibold bg-slate-100 text-slate-500 px-2 py-1 rounded-lg">+ otros</span></div>
       <label className="block border-2 border-dashed border-blue-300 rounded-2xl p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
         <Upload size={32} className="text-blue-400 mx-auto mb-2"/>
         <div className="text-sm font-semibold text-blue-600">Haz clic aquí para seleccionar PDFs</div>
