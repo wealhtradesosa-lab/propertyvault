@@ -23,19 +23,19 @@ html.dark .border-b.border-slate-200 { border-color: #334155 !important; }
 html.dark .border-dashed.border-slate-200 { border-color: #475569 !important; }
 html.dark .hover\:bg-slate-50:hover { background: #334155 !important; }
 html.dark .hover\:bg-blue-50\/30:hover { background: rgba(37,99,235,0.1) !important; }
-html.dark .bg-blue-50 { background: rgba(37,99,235,0.15) !important; }
-html.dark .bg-emerald-50 { background: rgba(16,185,129,0.15) !important; }
-html.dark .bg-rose-50 { background: rgba(159,18,57,0.3) !important; }
-html.dark .bg-amber-50 { background: rgba(120,53,15,0.3) !important; }
-html.dark .bg-rose-50\/30 { background: rgba(159,18,57,0.25) !important; }
-html.dark .bg-amber-50\/30 { background: rgba(120,53,15,0.25) !important; }
-html.dark .bg-rose-100 { background: rgba(159,18,57,0.4) !important; }
-html.dark .bg-amber-100 { background: rgba(120,53,15,0.4) !important; }
-html.dark .bg-rose-200 { background: rgba(159,18,57,0.5) !important; }
-html.dark .bg-amber-200 { background: rgba(120,53,15,0.5) !important; }
-html.dark .bg-emerald-50 { background: rgba(6,78,59,0.3) !important; }
-html.dark .bg-emerald-50\/50 { background: rgba(6,78,59,0.2) !important; }
-html.dark .bg-emerald-100 { background: rgba(6,78,59,0.4) !important; }
+html.dark .bg-blue-50 { background: #172554 !important; }
+html.dark .bg-emerald-50 { background: #052e16 !important; }
+html.dark .bg-rose-50 { background: #4c0519 !important; }
+html.dark .bg-amber-50 { background: #451a03 !important; }
+html.dark .bg-rose-50\/30 { background: #3d0415 !important; }
+html.dark .bg-amber-50\/30 { background: #381503 !important; }
+html.dark .bg-rose-100 { background: #5c0a1e !important; }
+html.dark .bg-amber-100 { background: #5c2508 !important; }
+html.dark .bg-rose-200 { background: #6e1025 !important; }
+html.dark .bg-amber-200 { background: #6e3010 !important; }
+html.dark .bg-emerald-50 { background: #052e16 !important; }
+html.dark .bg-emerald-50\/50 { background: #052e16 !important; }
+html.dark .bg-emerald-100 { background: #064e3b !important; }
 html.dark .text-rose-700 { color: #FDA4AF !important; }
 html.dark .text-rose-600 { color: #FB7185 !important; }
 html.dark .text-rose-500 { color: #F43F5E !important; }
@@ -50,12 +50,12 @@ html.dark .text-blue-600 { color: #60A5FA !important; }
 html.dark .text-blue-500 { color: #3B82F6 !important; }
 html.dark .text-purple-700 { color: #C4B5FD !important; }
 html.dark .text-purple-600 { color: #A78BFA !important; }
-html.dark .border-rose-200, html.dark .border-rose-300 { border-color: rgba(244,63,94,0.3) !important; }
-html.dark .border-amber-200, html.dark .border-amber-300 { border-color: rgba(245,158,11,0.3) !important; }
-html.dark .border-emerald-200 { border-color: rgba(16,185,129,0.3) !important; }
-html.dark .border-blue-200 { border-color: rgba(59,130,246,0.3) !important; }
-html.dark .border-purple-200 { border-color: rgba(139,92,246,0.3) !important; }
-html.dark .bg-purple-50 { background: rgba(139,92,246,0.15) !important; }
+html.dark .border-rose-200, html.dark .border-rose-300 { border-color: #6e1025 !important; }
+html.dark .border-amber-200, html.dark .border-amber-300 { border-color: #6e3010 !important; }
+html.dark .border-emerald-200 { border-color: #064e3b !important; }
+html.dark .border-blue-200 { border-color: #1e3a5f !important; }
+html.dark .border-purple-200 { border-color: #3b0f70 !important; }
+html.dark .bg-purple-50 { background: #2e1065 !important; }
 html.dark .shadow-sm { box-shadow: 0 1px 3px rgba(0,0,0,0.3) !important; }
 html.dark input, html.dark select, html.dark textarea { background: #0F172A !important; color: #E2E8F0 !important; border-color: #475569 !important; }
 html.dark input::placeholder { color: #64748B !important; }
