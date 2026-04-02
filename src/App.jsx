@@ -187,41 +187,37 @@ function LandingPage({onLogin}) {
       </div>
     </nav>
 
-    {/* ═══ A — ATTENTION: Hero with Banner ═══ */}
-    <section className="relative pt-24 pb-0 overflow-hidden" style={{minHeight:'92vh'}}>
-      {/* Banner background */}
-      <div className="absolute inset-0 z-0">
-        <img src="/hero-banner.png" alt="" className="w-full h-full object-cover object-center" style={{filter:'brightness(0.35) saturate(1.2)'}}/>
-        <div className="absolute inset-0" style={{background:'linear-gradient(to bottom, rgba(8,14,26,0.7) 0%, rgba(8,14,26,0.4) 40%, rgba(8,14,26,0.6) 70%, rgba(8,14,26,1) 100%)'}}/>
-        <div className="absolute inset-0" style={{background:'radial-gradient(ellipse at 30% 20%, rgba(37,99,235,0.12) 0%, transparent 60%)'}}/>
-      </div>
-      {/* Hero content */}
-      <div className="relative z-10 px-6 pt-12 md:pt-20 pb-16">
-        <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-black/30 backdrop-blur-md border border-white/15 rounded-full px-5 py-2 mb-8"><div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/><span className="text-sm font-semibold text-white/60">El copiloto financiero de tu propiedad de inversión</span></div>
-          <h1 className="text-3xl md:text-6xl font-black tracking-tight leading-[1.1] mb-6 drop-shadow-2xl">
-            Tu statement cuenta una parte.<br/>
-            <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent">Nosotros te contamos toda la historia.</span>
-          </h1>
-          <p className="text-sm md:text-lg text-white/55 max-w-2xl mx-auto leading-relaxed mb-10 drop-shadow-lg">
-            Convertimos los datos de tu property manager en información real para tomar decisiones: dónde ganas, dónde pierdes, cuánto se lleva la hipoteca, y qué ajustar hoy para que tu inversión sea más rentable.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button onClick={()=>onLogin('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl hover:from-blue-700 hover:to-blue-600 transition-all shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5 backdrop-blur-sm">Analiza tu propiedad gratis</button>
-            <button onClick={()=>scroll('features')} className="px-8 py-4 bg-black/30 backdrop-blur-md border border-white/15 text-white/80 text-base font-semibold rounded-2xl hover:bg-black/40 transition">Cómo funciona ↓</button>
-          </div>
-          <p className="text-xs text-white/30 mt-4 drop-shadow">Gratis para siempre · 1 propiedad · Sin tarjeta de crédito</p>
+    {/* ═══ A — ATTENTION: Hero ═══ */}
+    <section className="pt-32 pb-20 px-6">
+      <div className="max-w-4xl mx-auto text-center">
+        <div className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-5 py-2 mb-8"><div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/><span className="text-sm font-semibold text-white/50">El copiloto financiero de tu propiedad de inversión</span></div>
+        <h1 className="text-3xl md:text-6xl font-black tracking-tight leading-[1.1] mb-6">
+          Tu statement cuenta una parte.<br/>
+          <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent">Nosotros te contamos toda la historia.</span>
+        </h1>
+        <p className="text-sm md:text-lg text-white/40 max-w-2xl mx-auto leading-relaxed mb-10">
+          Convertimos los datos de tu property manager en información real para tomar decisiones: dónde ganas, dónde pierdes, cuánto se lleva la hipoteca, y qué ajustar hoy para que tu inversión sea más rentable.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <button onClick={()=>onLogin('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl hover:from-blue-700 hover:to-blue-600 transition-all shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5">Analiza tu propiedad gratis</button>
+          <button onClick={()=>scroll('features')} className="px-8 py-4 bg-white/5 border border-white/10 text-white/70 text-base font-semibold rounded-2xl hover:bg-white/10 transition">Cómo funciona ↓</button>
         </div>
+        <p className="text-xs text-white/20 mt-4">Gratis para siempre · 1 propiedad · Sin tarjeta de crédito</p>
       </div>
-      {/* Floating KPI bar */}
-      <div className="relative z-10 px-6 pb-12 -mt-2">
-        <div className="max-w-5xl mx-auto">
-          <div className="bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4 shadow-2xl">
-            <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
-              {[['Gross Revenue','$188,991','text-blue-400','↑ 12%'],['Net Income','$99,338','text-emerald-400','↑ 8%'],['Cash Flow','-$31,565','text-rose-400','↓ debt'],['Occupancy','70%','text-cyan-400','24 nights'],['CoC Return','-12.6%','text-purple-400','equity +28%']].map(([l,v,c,sub])=>
-                <div key={l} className="text-center md:text-left px-2 py-1"><div className="text-[9px] md:text-[10px] font-bold text-white/30 uppercase tracking-wider">{l}</div><div className={`text-base md:text-xl font-extrabold ${c} mt-0.5`}>{v}</div><div className="text-[8px] md:text-[9px] text-white/25 font-medium mt-0.5">{sub}</div></div>
-              )}
-            </div>
+    </section>
+
+    {/* Dashboard preview */}
+    <section className="px-6 pb-20">
+      <div className="max-w-5xl mx-auto bg-gradient-to-b from-white/[0.04] to-transparent border border-white/8 rounded-3xl p-1.5 shadow-2xl">
+        <div className="bg-[#0F172A] rounded-2xl p-6 border border-white/5">
+          <div className="hidden md:grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+            {[['Gross Revenue','$188,991','text-blue-400'],['Net Income','$99,338','text-emerald-400'],['Cash Flow','-$31,565','text-rose-400'],['Occupancy','70%','text-cyan-400'],['CoC Return','-12.6%','text-purple-400']].map(([l,v,c])=>
+              <div key={l} className="bg-white/[0.03] rounded-xl p-3 border border-white/5"><div className="text-[8px] font-bold text-white/30 uppercase tracking-wider">{l}</div><div className={`text-lg font-extrabold ${c} mt-1`}>{v}</div></div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/5 h-32 flex items-end"><div className="flex items-end gap-1 w-full">{[40,65,55,80,70,90,60,75,85,50,45,70].map((h,i)=><div key={i} className="flex-1 rounded-t" style={{height:h+'%',background:`linear-gradient(to top,rgba(37,99,235,${h/100}),rgba(37,99,235,${h/200}))`}}/>)}</div></div>
+            <div className="bg-white/[0.03] rounded-xl p-4 border border-white/5 h-32"><div className="text-[8px] text-white/30 font-bold uppercase mb-2">Insights</div><div className="space-y-1.5">{['🔴 Cash flow negativo: la hipoteca consume 70% del ingreso','📊 Ocupación 70% — espacio para mejorar','🏠 Valorización +28% ($130K en equity)'].map((t,i)=><div key={i} className="text-[9px] text-white/40 bg-white/[0.03] rounded-lg px-2 py-1.5">{t}</div>)}</div></div>
           </div>
         </div>
       </div>
