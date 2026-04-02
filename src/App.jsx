@@ -429,40 +429,42 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
 
       {fRev>0?<>
-      {/* ── ROW 1: Real Estate KPIs ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 mb-5">
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm">
-          <div className="text-[10px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Gross Revenue</div>
-          
-          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{dFm(fRev)}</div>
-          <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">{n} meses</div>
-          {revChg!==null&&<div className={`text-[11px] md:text-[10px] font-bold mt-0.5 ${revChg>=0?'text-emerald-600':'text-rose-500'}`}>{revChg>=0?'▲':'▼'} {Math.abs(revChg).toFixed(0)}% YoY</div>}
+          <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">Gross Revenue</div>
+          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-1">{dFm(fRev)}</div>
+          <div className="text-[10px] text-slate-400">{n} meses{revChg!==null?` · ${revChg>=0?'+':''}${revChg.toFixed(0)}% YoY`:''}</div>
         </div>
-        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-amber-400 border border-slate-200 shadow-sm">
-          <div className="text-[10px] md:text-[9px] font-bold text-amber-600 uppercase tracking-widest">NOI</div>
-          <div className="text-[9px] text-slate-400 -mt-0.5">Net Operating Income</div>
-          <div className="text-base md:text-[22px] font-extrabold text-amber-700 mt-0.5">{dFm(fNoi)}</div>
-          <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">Margen: <b className={fMargin>50?'text-emerald-600':fMargin>40?'text-amber-500':'text-rose-500'}>{fMargin.toFixed(0)}%</b></div>
-        </div>
+        {fMortP>0?
+          <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-amber-500 border border-slate-200 shadow-sm">
+            <div className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">NOI</div>
+            <div className="text-base md:text-[22px] font-extrabold text-amber-700 mt-1">{dFm(fNoi)}</div>
+            <div className="text-[10px] text-slate-400">Margen {fMargin.toFixed(0)}%</div>
+          </div>
+        :
+          <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-rose-400 border border-slate-200 shadow-sm">
+            <div className="text-[10px] font-bold text-rose-500 uppercase tracking-widest">Operating Expenses</div>
+            <div className="text-base md:text-[22px] font-extrabold text-rose-600 mt-1">-{dFm(totalOpEx)}</div>
+            <div className="text-[10px] text-slate-400">{(fRev>0?(totalOpEx/fRev*100):0).toFixed(0)}% del revenue</div>
+          </div>
+        }
         <div className={`bg-white rounded-2xl p-3 md:p-4 border-l-4 border border-slate-200 shadow-sm ${fCF>=0?'border-l-emerald-500':'border-l-rose-500'}`}>
-          <div className={`text-[10px] md:text-[9px] font-bold uppercase tracking-widest ${fCF>=0?'text-emerald-600':'text-rose-500'}`}>Cash Flow</div>
-          <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{dFm(fCF)}</div>
-          <div className={`text-[11px] md:text-[10px] mt-0.5 ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mes</div>
+          <div className={`text-[10px] font-bold uppercase tracking-widest ${fCF>=0?'text-emerald-600':'text-rose-500'}`}>Cash Flow</div>
+          <div className={`text-base md:text-[22px] font-extrabold mt-1 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{dFm(fCF)}</div>
+          <div className={`text-[10px] ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/mes</div>
         </div>
-        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-400 border border-slate-200 shadow-sm">
-          <div className="text-[10px] md:text-[9px] font-bold text-blue-500 uppercase tracking-widest">Occupancy</div>
-          
-          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{fNights>0?occupancy.toFixed(0)+'%':'—'}</div>
-          <div className="text-[11px] md:text-[10px] text-slate-400 mt-0.5">{fNights>0?`${fNights} de ${availNights} noches`:'Sin datos'}</div>
-          {fNights>0&&<div className="text-[11px] md:text-[10px] text-slate-500 mt-0.5">ADR: <b className="text-blue-600">{dFm(adr)}</b></div>}
+        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-cyan-500 border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">Occupancy</div>
+          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-1">{fNights>0?occupancy.toFixed(0)+'%':'—'}</div>
+          <div className="text-[10px] text-slate-400">{fNights>0?`${fNights} noches · ADR ${dFm(adr)}`:'Sin datos'}</div>
         </div>
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
-          <div className="text-[10px] md:text-[9px] font-bold text-purple-600 uppercase tracking-widest">Cash-on-Cash{partial?' (ann.)':''}</div>
-          
-          <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
-          <div className="text-[11px] md:text-[10px] text-slate-500 mt-0.5">Capital: {dFm(totCont)}</div>
+          <div className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">Cash-on-Cash{partial?' (ann.)':''}</div>
+          <div className={`text-base md:text-[22px] font-extrabold mt-1 ${fCoc>8?'text-emerald-700':fCoc>4?'text-amber-600':'text-rose-600'}`}>{fCoc.toFixed(1)}%</div>
+          <div className="text-[10px] text-slate-400">Capital: {dFm(totCont)}</div>
         </div>
       </div>
+
 
       {/* ── ROW 2: Visual P&L Cascade + Metrics ── */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
@@ -492,10 +494,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               {[[`Comisión PM (${prop.managerCommission||15}%)`,fComm,'bg-rose-400'],['Electricidad',fDuke,'bg-amber-400'],['Agua',fWater,'bg-cyan-400'],[propTerms.hoa,fHoa,'bg-purple-400'],['Mantenimiento',fMaint,'bg-teal-400'],['Vendor / Otros',fVendor,'bg-slate-400']].filter(([_,v])=>v>0).map(([l,v,bg])=>
                 <div key={l} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className={`absolute inset-y-0 left-0 ${bg} opacity-75`} style={{width:Math.max(2,v/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{l}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(v)} <span className="text-slate-400">({(v/fRev*100).toFixed(0)}%)</span></span></div></div>
               )}
+              {ownerExpTotal>0&&<>
+                <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">Owner Expenses</div>
+                {expByCat.filter(c=>c.monthly>0||c.value>0).map(c=><div key={c.name} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,(c.monthly||c.value)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{c.name}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(c.monthly||c.value)} <span className="text-slate-400">({((c.monthly||c.value)/fRev*100).toFixed(0)}%)</span></span></div></div>)}
+              </>}
             </>}
 
-            {/* NOI */}
-            <div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi>0?fNoi/fRev*100:0)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden bg-emerald-50"><span className="text-[9px] md:text-[11px] font-bold text-emerald-800 truncate">= NOI <span className="text-[9px] font-normal">(Net Operating Income)</span></span><span className="text-[12px] font-extrabold text-emerald-800">{dFm(fNoi)} <span className="text-emerald-600 text-[10px]">{(fRev>0?(fNoi/fRev*100):0).toFixed(0)}%</span></span></div></div>
+            {/* NOI — only show as intermediate step when there's mortgage */}
+            {fMortP>0&&<div className="rounded-lg relative overflow-hidden mt-1" style={{height:'34px'}}><div className="absolute inset-y-0 left-0 bg-emerald-500" style={{width:Math.max(2,fNoi>0?fNoi/fRev*100:0)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden bg-emerald-50"><span className="text-[9px] md:text-[11px] font-bold text-emerald-800 truncate">= NOI</span><span className="text-[12px] font-extrabold text-emerald-800">{dFm(fNoi)} <span className="text-emerald-600 text-[10px]">{fMargin.toFixed(0)}%</span></span></div></div>}
 
             {/* Debt Service */}
             {fMortP>0&&<>
@@ -503,12 +509,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,fMortP/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">Mortgage ({dFm(mMort)}/mo × {n}m)</span><span className="text-[10px] font-bold text-slate-700">{dFm(fMortP)} <span className="text-slate-400">({(fMortP/fRev*100).toFixed(0)}%)</span></span></div></div>
             </>}
 
-            {/* Cash Flow = NOI - Debt Service */}
+            {/* Cash Flow */}
             <div className={`rounded-lg relative overflow-hidden border-2 mt-1 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'40px'}}>
               <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
               <div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden">
-                <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Cash Flow {!fMortP&&<span className="text-[9px] font-normal">(= NOI, sin hipoteca)</span>}</span>
-                <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)} <span className="text-[10px]">{dFm(fCFmo)}/mes</span></span>
+                <span className={`text-[11px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>= Cash Flow</span>
+                <span className={`text-[13px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)} <span className="text-[10px]">{(fRev>0?(fCF/fRev*100):0).toFixed(0)}% · {dFm(fCFmo)}/mes</span></span>
               </div>
             </div>
             {partial&&<div className="text-center text-[10px] text-slate-400 bg-slate-50 rounded py-1.5 mt-1">Periodo parcial ({n} meses) · Proyección anualizada: <b>{dFm(proyAnual)}</b></div>}
@@ -665,10 +671,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="bg-white rounded-2xl p-3 md:p-4 border border-slate-200 shadow-sm overflow-hidden">
             <h3 className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-2">Monthly Averages</h3>
             <div className="space-y-2">
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Ingreso Bruto</span><span className="text-[11px] font-bold text-blue-600">{dFm(n>0?fRev/n:0)}/mes</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">'Operating Expenses'</span><span className="text-[11px] font-bold text-rose-500">{dFm(n>0?(isOwnerManaged?ownerExpTotal:fOpEx)/n:0)}/mes</span></div>
-              <div className="flex justify-between"><span className="text-[11px] text-slate-400">'NOI'</span><span className="text-[11px] font-bold text-emerald-600">{dFm(n>0?fNoi/n:0)}/mes</span></div>
-              {mMort>0&&<div className="flex justify-between"><span className="text-[11px] text-slate-400">Hipoteca</span><span className="text-[11px] font-bold text-red-500">{dFm(mMort)}/mes</span></div>}
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Gross Revenue</span><span className="text-[11px] font-bold text-blue-600">{dFm(n>0?fRev/n:0)}/mes</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Operating Expenses</span><span className="text-[11px] font-bold text-rose-500">-{dFm(n>0?totalOpEx/n:0)}/mes</span></div>
+              {fMortP>0&&<><div className="flex justify-between"><span className="text-[11px] text-slate-400">NOI</span><span className="text-[11px] font-bold text-amber-600">{dFm(n>0?fNoi/n:0)}/mes</span></div>
+              <div className="flex justify-between"><span className="text-[11px] text-slate-400">Debt Service</span><span className="text-[11px] font-bold text-red-500">-{dFm(mMort)}/mes</span></div></>}
               <div className="border-t border-slate-100 my-0.5"/>
               <div className="flex justify-between"><span className="text-[11px] font-bold text-slate-600">Cash Flow</span><span className={`text-[11px] font-extrabold ${fCFmo>=0?'text-emerald-600':'text-rose-600'}`}>{dFm(fCFmo)}/mes</span></div>
             </div>
