@@ -999,6 +999,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {/* Smart suggestions based on statements */}
       {(()=>{
         const pmCovers={commission:stmts.some(s=>(s.commission||0)>0),electricity:stmts.some(s=>(s.duke||0)>0),water:stmts.some(s=>(s.water||0)>0),hoa:stmts.some(s=>(s.hoa||0)>0),maintenance:stmts.some(s=>(s.maintenance||0)>0)};
+        const pmTasks=tasks.filter(t=>t.payer==='pm');
         const allObligations=[
           {title:'Hipoteca',icon:'🏦',freq:'monthly',likely:'owner'},
           {title:'Impuestos',icon:'🏛️',freq:'annual',likely:'owner'},
@@ -1014,9 +1015,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <h3 className="text-sm font-bold text-slate-700 mb-1">{stmts.length>0?'Sugerencias basadas en tus statements':'Obligaciones comunes'}</h3>
           <p className="text-xs text-slate-400 mb-4">{stmts.length>0?'Estos pagos no aparecen en lo que cubre tu PM:':'Agrega las que apliquen a tu propiedad:'}</p>
 
-          {stmts.length>0&&Object.entries(pmCovers).some(([,v])=>v)&&<div className="mb-4 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-            <div className="text-[10px] font-bold text-emerald-700 uppercase mb-1.5">Tu PM ya cubre:</div>
-            <div className="flex flex-wrap gap-1.5">{pmCovers.commission&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">💼 Comisión</span>}{pmCovers.electricity&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">⚡ Electricidad</span>}{pmCovers.water&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">💧 Agua</span>}{pmCovers.hoa&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">🏢 HOA</span>}{pmCovers.maintenance&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">🔧 Mantenimiento</span>}</div>
+          {(stmts.length>0&&Object.entries(pmCovers).some(([,v])=>v)||pmTasks.length>0)&&<div className="mb-4 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+            <div className="text-[10px] font-bold text-emerald-700 uppercase mb-1.5">Tu PM cubre:</div>
+            <div className="flex flex-wrap gap-1.5">{pmCovers.commission&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">💼 Comisión</span>}{pmCovers.electricity&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">⚡ Electricidad</span>}{pmCovers.water&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">💧 Agua</span>}{pmCovers.hoa&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">🏢 HOA</span>}{pmCovers.maintenance&&<span className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">🔧 Mantenimiento</span>}{pmTasks.map(t=><span key={t.id} className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-semibold">{t.title}</span>)}</div>
           </div>}
 
           <div className="text-[10px] font-bold text-amber-700 uppercase mb-2">Probablemente debes pagar tú:</div>
@@ -1049,42 +1050,43 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       })()}
 
       {/* Obligations list */}
-      {tasks.length>0&&<div className="space-y-2">
-        {[...tasks].sort((a,b)=>{const pa=a.payer==='pm'?1:0,pb=b.payer==='pm'?1:0;if(pa!==pb)return pa-pb;return(a.dueDate||'9').localeCompare(b.dueDate||'9')}).map(t=>{
+      {/* Obligations list — owner-paid only (PM-paid show in green card above) */}
+      {(()=>{
+        const ownerOnly=tasks.filter(t=>t.payer!=='pm');
+        if(!ownerOnly.length)return null;
+        return <div className="space-y-2">
+        {[...ownerOnly].sort((a,b)=>(a.dueDate||'9').localeCompare(b.dueDate||'9')).map(t=>{
           const icons={'Hipoteca':'🏦','Impuestos':'🏛️','Seguro':'🛡️','Contabilidad':'📊','HOA':'🏢'};
           const ic=icons[t.title]||'📄';
-          const isPM=t.payer==='pm';
           const today=new Date();today.setHours(0,0,0,0);
           const days=t.dueDate?Math.ceil((new Date(t.dueDate+'T00:00:00')-today)/(1000*60*60*24)):null;
-          const threshold=parseInt(t.reminderDays)||( t.frequency==='monthly'?5:30);
-          const isOverdue=!isPM&&days!==null&&days<0;
-          const isSoon=!isPM&&days!==null&&days>=0&&days<=threshold;
-          return <div key={t.id} className={`bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-3 md:gap-4 ${isPM?'border-slate-200 opacity-70':isOverdue?'border-rose-300 bg-rose-50/30':isSoon?'border-amber-300 bg-amber-50/30':'border-slate-200'}`}>
+          const threshold=parseInt(t.reminderDays)||(t.frequency==='monthly'?5:30);
+          const isOverdue=days!==null&&days<0;
+          const isSoon=days!==null&&days>=0&&days<=threshold;
+          return <div key={t.id} className={`bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-3 md:gap-4 ${isOverdue?'border-rose-300 bg-rose-50/30':isSoon?'border-amber-300 bg-amber-50/30':'border-slate-200'}`}>
             <span className="text-xl shrink-0">{ic}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className={`text-sm font-bold ${isPM?'text-slate-500':'text-slate-800'}`}>{t.title}</span>
+                <span className="text-sm font-bold text-slate-800">{t.title}</span>
                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${t.frequency==='monthly'?'bg-blue-100 text-blue-700':'bg-purple-100 text-purple-700'}`}>{t.frequency==='monthly'?'Mensual':'Anual'}</span>
-                {isPM&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">PM paga</span>}
-                {!isPM&&isOverdue&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">Vencido hace {Math.abs(days)}d</span>}
-                {!isPM&&isSoon&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Vence en {days}d</span>}
+                {isOverdue&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">Vencido hace {Math.abs(days)}d</span>}
+                {isSoon&&<span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Vence en {days}d</span>}
               </div>
               <div className="flex items-center gap-3 mt-1 text-[11px] text-slate-400 flex-wrap">
                 {t.amount&&<span className="font-semibold text-slate-600">{fm(parseFloat(t.amount)||0)}{t.frequency==='monthly'?'/mes':'/año'}</span>}
-                {!isPM&&t.dueDate&&<span className="flex items-center gap-1"><Calendar size={10}/>Próximo: {fmDate(t.dueDate)}</span>}
-                {!isPM&&t.reminderDays&&<span className="text-blue-400">⏰ Alerta {t.reminderDays}d antes</span>}
+                {t.dueDate&&<span className="flex items-center gap-1"><Calendar size={10}/>Próximo: {fmDate(t.dueDate)}</span>}
+                {t.reminderDays&&<span className="text-blue-400">⏰ {t.reminderDays}d antes</span>}
                 {t.lastPaid&&<span className="text-emerald-500 font-semibold">✓ Pagado: {fmDate(t.lastPaid)}</span>}
-                {isPM&&<span className="text-slate-400">Incluido en statements</span>}
                 {t.notes&&<span className="truncate">{t.notes}</span>}
               </div>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              {!isPM&&<button onClick={()=>markPaid(t)} className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${isOverdue?'bg-rose-500 text-white hover:bg-rose-600':isSoon?'bg-amber-500 text-white hover:bg-amber-600':'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'}`}>Pagar ✓</button>}
+              <button onClick={()=>markPaid(t)} className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${isOverdue?'bg-rose-500 text-white hover:bg-rose-600':isSoon?'bg-amber-500 text-white hover:bg-amber-600':'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'}`}>Pagar ✓</button>
               <button onClick={()=>{setTaskForm({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||'',amount:String(t.amount||''),frequency:t.frequency||'annual',payer:t.payer||'owner',reminderDays:String(t.reminderDays||'30')});setEditId(t.id);setModal('task')}} className="p-2 text-slate-300 hover:text-blue-500 rounded-xl hover:bg-blue-50 transition"><Pencil size={14}/></button>
               <button onClick={()=>del('tasks',t.id)} className="p-2 text-slate-300 hover:text-red-500 rounded-xl hover:bg-red-50 transition"><Trash2 size={14}/></button>
             </div>
           </div>})}
-      </div>}
+      </div>})()}
     </>}
 
     {/* ═══ SUPPORT / TICKETS ═══ */}
