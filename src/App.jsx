@@ -28,20 +28,22 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);
   const [tickets,setTickets]=useState([]);const [ticketForm,setTicketForm]=useState({type:'bug',subject:'',message:'',priority:'medium'});
-  const [vf,setVf]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setVf(x=>({...x,[k]:v})),[]);
-  const [rf,setRf]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRf(x=>({...x,[k]:v})),[]);
-  const [tf,setTf]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});const ut=useCallback((k,v)=>setTf(x=>({...x,[k]:v})),[]);
+  const [toast,setToast]=useState(null);
+  const notify=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),4000)};
+  const [valForm,setValForm]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setValForm(x=>({...x,[k]:v})),[]);
+  const [repairForm,setRepairForm]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRepairForm(x=>({...x,[k]:v})),[]);
+  const [taskForm,setTaskForm]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});const ut=useCallback((k,v)=>setTaskForm(x=>({...x,[k]:v})),[]);
   const [settingsForm,setSettingsForm]=useState(null);
   const [editPartners,setEditPartners]=useState(null);
-  const [mc,setMc]=useState({bal:'',rate:'',term:'30',pay:'',start:''});const [savingMort,setSavingMort]=useState(false);
-  const umc=useCallback((k,v)=>setMc(x=>({...x,[k]:v})),[]);
+  const [mortConfig,setMortConfig]=useState({bal:'',rate:'',term:'30',pay:'',start:''});const [savingMort,setSavingMort]=useState(false);
+  const umc=useCallback((k,v)=>setMortConfig(x=>({...x,[k]:v})),[]);
   const partners=prop.partners||[];const mort=prop.mortgage||{};
-  const [ef,setEf]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});const [editId,setEditId]=useState(null);
+  const [expenseForm,setExpenseForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});const [editId,setEditId]=useState(null);
   const [nf,setNf]=useState({date:'',month:'',grossAmount:''});
-  const [cf,setCf]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||''});
-  const [sf,setSf]=useState({year:new Date().getFullYear(),month:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''});
-  const ue=useCallback((k,v)=>setEf(x=>({...x,[k]:v})),[]);const un=useCallback((k,v)=>setNf(x=>({...x,[k]:v})),[]);
-  const uc=useCallback((k,v)=>setCf(x=>({...x,[k]:v})),[]);const us=useCallback((k,v)=>setSf(x=>({...x,[k]:v})),[]);
+  const [contribForm,setContribForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||''});
+  const [stmtForm,setStmtForm]=useState({year:new Date().getFullYear(),month:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''});
+  const ue=useCallback((k,v)=>setExpenseForm(x=>({...x,[k]:v})),[]);const un=useCallback((k,v)=>setNf(x=>({...x,[k]:v})),[]);
+  const uc=useCallback((k,v)=>setContribForm(x=>({...x,[k]:v})),[]);const us=useCallback((k,v)=>setStmtForm(x=>({...x,[k]:v})),[]);
 
   useEffect(()=>{const b=`properties/${propertyId}`,u=[];const L=(s,fn)=>{u.push(onSnapshot(query(collection(db,b,s),orderBy('createdAt','desc')),snap=>fn(snap.docs.map(d=>({id:d.id,...d.data()})))))};L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
 
@@ -55,12 +57,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const save=async(sub,data)=>{await addDoc(collection(db,'properties',propertyId,sub),{...data,createdAt:serverTimestamp()});setModal(null);setEditId(null)};
   const update=async(sub,id,data)=>{await updateDoc(doc(db,'properties',propertyId,sub,id),data);setModal(null);setEditId(null)};
   const del=async(sub,id)=>{if(!confirm('¿Eliminar?'))return;await deleteDoc(doc(db,'properties',propertyId,sub,id))};
-  const saveMortgage=async()=>{setSavingMort(true);try{await updateDoc(doc(db,'properties',propertyId),{mortgage:{balance:parseFloat(mc.bal)||0,rate:parseFloat(mc.rate)||0,termYears:parseInt(mc.term)||30,monthlyPayment:parseFloat(mc.pay)||0,startDate:mc.start||''}})}catch(e){alert('Error: '+e.message)}setSavingMort(false)};
+  const saveMortgage=async()=>{setSavingMort(true);try{await updateDoc(doc(db,'properties',propertyId),{mortgage:{balance:parseFloat(mortConfig.bal)||0,rate:parseFloat(mortConfig.rate)||0,termYears:parseInt(mortConfig.term)||30,monthlyPayment:parseFloat(mortConfig.pay)||0,startDate:mortConfig.start||''}})}catch(e){notify('Error: '+e.message,'error')}setSavingMort(false)};
 
   // PDF Upload handler — with robust duplicate detection
   const handlePDFs=async(files)=>{
     const fileArr=Array.from(files);
-    if(fileArr.length>15){alert(`Máximo 15 PDFs a la vez. Seleccionaste ${fileArr.length}.`);return;}
+    if(fileArr.length>15){notify(`Máximo 15 PDFs. Seleccionaste ${fileArr.length}`,'error');return;}
     const log=[];
     const uploaded=new Set();
     let existingPeriods=new Set();
@@ -215,11 +217,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     <div className="flex-1 overflow-auto overflow-x-hidden" role="main"><div className="p-3 md:p-6 pt-[72px] md:pt-6 max-w-[1200px] lg:mx-auto">
 
-    {/* ═══ DASHBOARD ═══ */}
-    {/* ═══ DASHBOARD ═══ */}
-    {/* ═══ DASHBOARD ═══ */}
-    {/* ═══ DASHBOARD ═══ */}
-    {/* ═══ DASHBOARD ═══ */}
+    {/* ═══ DASHBOARD VIEW ═══ */}
     {view==='dashboard'&&(()=>{try{
       const fy=dashYear==='all'?null:annual.find(y=>y.year===dashYear);
       const fStmts=dashYear==='all'?stmts:stmts.filter(s=>s.year===dashYear);
@@ -266,7 +264,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="hidden md:block"><h1 className="text-lg md:text-xl font-extrabold text-slate-800">{prop.name}</h1><p className="text-xs text-slate-400 mt-0.5">{prop.address}, {prop.city} {prop.state}</p></div>
         <div className="flex gap-2">
           <button onClick={()=>window.print()} aria-label="Imprimir" className="hidden md:flex px-3 py-2 bg-slate-100 text-slate-500 text-xs rounded-xl font-bold hover:bg-slate-200 items-center gap-1.5"><Printer size={13}/></button>
-          <button onClick={()=>{setEf({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 active:bg-slate-900 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button>
+          <button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 active:bg-slate-900 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button>
           <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-1.5 shadow-sm"><Upload size={14}/> Statements</button>
         </div>
       </div>
@@ -602,7 +600,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           {[
             {done:stmts.length>0, step:'1', title:'Sube tus statements', desc:'Arrastra los PDFs de tu property manager (IHM, Host U, etc.)', action:'Subir PDFs', onClick:()=>{setUploadLog([]);setModal('upload')}, color:'blue'},
             {done:!!(mort.balance||mort.monthlyPayment), step:'2', title:'Configura tu hipoteca', desc:'Registra el balance, tasa y pago mensual para calcular cash flow real.', action:'Configurar', onClick:()=>setView('mortgage'), color:'indigo'},
-            {done:expenses.filter(e=>e.category==='insurance'||e.category==='taxes').length>0, step:'3', title:'Agrega seguro e impuestos', desc:'Estos gastos fijos completan tu P&L y radiografía de costos.', action:'Agregar Gastos', onClick:()=>{setEf({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'insurance',type:'fixed'});setModal('expense')}, color:'emerald'},
+            {done:expenses.filter(e=>e.category==='insurance'||e.category==='taxes').length>0, step:'3', title:'Agrega seguro e impuestos', desc:'Estos gastos fijos completan tu P&L y radiografía de costos.', action:'Agregar Gastos', onClick:()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'insurance',type:'fixed'});setModal('expense')}, color:'emerald'},
             {done:valuations.length>0, step:'4', title:'Registra el valor de mercado', desc:'Con esto calculas equity real, apreciación y Cap Rate correcto.', action:'Registrar Valor', onClick:()=>setView('valuation'), color:'purple'},
           ].map(s=><button key={s.step} onClick={s.onClick} className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${s.done?'bg-slate-50 border-slate-100':'bg-white border-slate-200 hover:border-blue-300 hover:shadow-sm'}`}>
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${s.done?'bg-emerald-100':'bg-'+s.color+'-50'}`}>{s.done?<CheckCircle size={18} className="text-emerald-500"/>:<span className={`text-sm font-extrabold text-${s.color}-500`}>{s.step}</span>}</div>
@@ -639,7 +637,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       });
 
       return <>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">👥 Socios & Capital</h1><button onClick={()=>{setCf({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||''});setModal('contribution')}} className="px-4 py-2.5 bg-purple-600 text-white text-xs rounded-xl font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Aporte</button></div>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">👥 Socios & Capital</h1><button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||''});setModal('contribution')}} className="px-4 py-2.5 bg-purple-600 text-white text-xs rounded-xl font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Aporte</button></div>
 
       {/* Partner cards */}
       <div className="grid gap-4 mb-5" style={{gridTemplateColumns:`repeat(${Math.min(partners.length,3)},1fr)`}}>{partnerBalances.map(p=>{
@@ -675,7 +673,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {/* Contribution history */}
       {contribs.length>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Historial de Movimientos</h3>
-        <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},{label:'Socio',render:r=><span className="font-semibold" style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>},{label:'Concepto',key:'concept',cls:'text-slate-600'},{label:'Monto',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.amount)}</span>}]} rows={contribs} onDel={del} dc="contributions" onEdit={r=>{setCf({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||''});setEditId(r.id);setModal('contribution')}}/>
+        <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},{label:'Socio',render:r=><span className="font-semibold" style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>},{label:'Concepto',key:'concept',cls:'text-slate-600'},{label:'Monto',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.amount)}</span>}]} rows={contribs} onDel={del} dc="contributions" onEdit={r=>{setContribForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||''});setEditId(r.id);setModal('contribution')}}/>
       </>}
     </>})()}
 
@@ -714,7 +712,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           {label:'Gastos Op.',r:true,render:r=>{const tc=(r.commission||0)+(r.duke||0)+(r.water||0)+(r.hoa||0)+(r.maintenance||0)+(r.vendor||0);return<span className="font-semibold text-rose-500">{fm(tc)}</span>}},
           {label:'Neto',r:true,render:r=><span className="font-extrabold text-emerald-700">{fm(r.net)}</span>},
           {label:'Margen',r:true,render:r=>{const m=r.revenue?(r.net/r.revenue*100):0;return<span className={`font-bold text-xs ${m<40?'text-rose-500':m<50?'text-amber-500':'text-emerald-500'}`}>{m.toFixed(0)}%</span>}},
-        ]} rows={paged} onDel={del} dc="statements" onEdit={r=>{setSf({year:r.year,month:r.month,revenue:String(r.revenue||''),net:String(r.net||''),commission:String(r.commission||''),duke:String(r.duke||''),water:String(r.water||''),hoa:String(r.hoa||''),maintenance:String(r.maintenance||''),vendor:String(r.vendor||'')});setEditId(r.id);setModal('addStmt')}}/>
+        ]} rows={paged} onDel={del} dc="statements" onEdit={r=>{setStmtForm({year:r.year,month:r.month,revenue:String(r.revenue||''),net:String(r.net||''),commission:String(r.commission||''),duke:String(r.duke||''),water:String(r.water||''),hoa:String(r.hoa||''),maintenance:String(r.maintenance||''),vendor:String(r.vendor||'')});setEditId(r.id);setModal('addStmt')}}/>
 
         {/* Pagination */}
         {totalPages>1&&<div className="flex items-center justify-between mt-4">
@@ -744,12 +742,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ EXPENSES ═══ */}
     {view==='expenses'&&<>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">🧾 Gastos</h1><button onClick={()=>{setEf({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button></div>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">🧾 Gastos</h1><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button></div>
       {expenses.length>0&&<div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5"><KPI label="Gastos Fijos" value={fm(fixedExp.reduce((s,e)=>s+(e.amount||0),0))} sub={fixedExp.length+' registros'} color="amber"/><KPI label="Gastos Adicionales" value={fm(additionalExp.reduce((s,e)=>s+(e.amount||0),0))} sub={additionalExp.length+' registros'} color="red"/><KPI label="Total" value={fm(totExp)} color="purple"/></div>}
       {expByCat.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4"><h3 className="text-sm font-bold text-slate-700 mb-3">Por Categoría</h3><ResponsiveContainer width="100%" height={Math.max(150,expByCat.length*35)}><BarChart data={expByCat} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis type="number" tickFormatter={fm} tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#64748b'}} width={120}/><Tooltip content={<Tip/>}/><Bar dataKey="value" name="Monto" fill="#DC2626" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer></div>}
-      {fixedExp.length>0&&<div className="mb-4"><h3 className="text-sm font-bold text-slate-600 mb-2 flex items-center gap-2"><Calendar size={15} className="text-amber-500"/> Fijos / Recurrentes</h3><Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},{label:'Concepto',key:'concept',cls:'text-slate-700 font-medium'},{label:'Categoría',render:r=>{const c=CATS.find(x=>x.v===r.category);return c?c.i+' '+c.l:r.category}},{label:'Pagó',render:r=><span style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>},{label:'Monto',r:true,render:r=><span className="font-bold text-rose-500">{fm(r.amount)}</span>}]} rows={fixedExp} onDel={del} dc="expenses" onEdit={r=>{setEf({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'fixed'});setEditId(r.id);setModal('expense')}}/></div>}
-      {additionalExp.length>0&&<div className="mb-4"><h3 className="text-sm font-bold text-slate-600 mb-2 flex items-center gap-2"><Layers size={15} className="text-red-500"/> Adicionales / Únicos</h3><Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},{label:'Concepto',key:'concept',cls:'text-slate-700 font-medium'},{label:'Categoría',render:r=>{const c=CATS.find(x=>x.v===r.category);return c?c.i+' '+c.l:r.category}},{label:'Pagó',render:r=><span style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>},{label:'Monto',r:true,render:r=><span className="font-bold text-rose-500">{fm(r.amount)}</span>}]} rows={additionalExp} onDel={del} dc="expenses" onEdit={r=>{setEf({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'additional'});setEditId(r.id);setModal('expense')}}/></div>}
-      {!expenses.length&&<Empty icon={Receipt} title="Sin gastos" desc="Registra gastos fijos y adicionales." action="Registrar" onAction={()=>{setEf({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}}/>}
+      {fixedExp.length>0&&<div className="mb-4"><h3 className="text-sm font-bold text-slate-600 mb-2 flex items-center gap-2"><Calendar size={15} className="text-amber-500"/> Fijos / Recurrentes</h3><Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},{label:'Concepto',key:'concept',cls:'text-slate-700 font-medium'},{label:'Categoría',render:r=>{const c=CATS.find(x=>x.v===r.category);return c?c.i+' '+c.l:r.category}},{label:'Pagó',render:r=><span style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>},{label:'Monto',r:true,render:r=><span className="font-bold text-rose-500">{fm(r.amount)}</span>}]} rows={fixedExp} onDel={del} dc="expenses" onEdit={r=>{setExpenseForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'fixed'});setEditId(r.id);setModal('expense')}}/></div>}
+      {additionalExp.length>0&&<div className="mb-4"><h3 className="text-sm font-bold text-slate-600 mb-2 flex items-center gap-2"><Layers size={15} className="text-red-500"/> Adicionales / Únicos</h3><Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},{label:'Concepto',key:'concept',cls:'text-slate-700 font-medium'},{label:'Categoría',render:r=>{const c=CATS.find(x=>x.v===r.category);return c?c.i+' '+c.l:r.category}},{label:'Pagó',render:r=><span style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>},{label:'Monto',r:true,render:r=><span className="font-bold text-rose-500">{fm(r.amount)}</span>}]} rows={additionalExp} onDel={del} dc="expenses" onEdit={r=>{setExpenseForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'additional'});setEditId(r.id);setModal('expense')}}/></div>}
+      {!expenses.length&&<Empty icon={Receipt} title="Sin gastos" desc="Registra gastos fijos y adicionales." action="Registrar" onAction={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional'});setModal('expense')}}/>}
     </>}
 
     {/* ═══ INCOME (powered by statements) ═══ */}
@@ -812,18 +810,18 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <div className="bg-amber-50 rounded-2xl p-5 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Meses Menos</div><div className="text-3xl font-extrabold text-amber-700 mt-1">{sNE[sNE.length-1].mo-sE[sE.length-1].mo}</div></div>
           </div><ResponsiveContainer width="100%" height={260}><AreaChart data={sNE.map((d,i)=>({yr:'Año '+d.yr,sin:d.bal,con:sE[i]?.bal||0}))}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="yr" tick={{fontSize:9,fill:'#94a3b8'}} interval={4}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Area dataKey="sin" name="Sin extra" stroke="#DC2626" fill="rgba(220,38,38,.05)"/><Area dataKey="con" name={`$${extraP||0}/mes${extraPA?` + $${extraPA}/año`:''} extra`} stroke="#059669" fill="rgba(5,150,105,.05)"/></AreaChart></ResponsiveContainer></>}
         </div>
-        <button onClick={()=>{setMc({bal:String(mort.balance||''),rate:String(mort.rate||''),term:String(mort.termYears||30),pay:String(mort.monthlyPayment||''),start:mort.startDate||''});setModal('editMort')}} className="text-sm text-blue-600 font-semibold hover:text-blue-800 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-50 transition"><Settings size={15}/> Editar datos de hipoteca</button>
+        <button onClick={()=>{setMortConfig({bal:String(mort.balance||''),rate:String(mort.rate||''),term:String(mort.termYears||30),pay:String(mort.monthlyPayment||''),start:mort.startDate||''});setModal('editMort')}} className="text-sm text-blue-600 font-semibold hover:text-blue-800 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-50 transition"><Settings size={15}/> Editar datos de hipoteca</button>
       </>:<div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm max-w-lg">
         <div className="flex items-center gap-3 mb-5"><div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center"><Landmark size={24} className="text-blue-600"/></div><div><h3 className="text-base font-extrabold text-slate-800">Configurar Hipoteca</h3><p className="text-xs text-slate-400">Ingresa los datos de tu mortgage.</p></div></div>
-        <div className="space-y-3"><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mc.bal} onChange={v=>umc('bal',v)} prefix="$" type="number" placeholder="285,000"/><Inp label="Tasa (%)" value={mc.rate} onChange={v=>umc('rate',v)} type="number" placeholder="7.25"/></div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mc.term} onChange={v=>umc('term',v)} type="number" placeholder="30"/><Inp label="Pago Mensual" value={mc.pay} onChange={v=>umc('pay',v)} prefix="$" type="number" placeholder="1,945"/><Inp label="Inicio" value={mc.start} onChange={v=>umc('start',v)} type="date"/></div></div>
-        <button onClick={saveMortgage} disabled={!mc.bal||!mc.rate||!mc.pay||savingMort} className="w-full mt-5 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-30 transition shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={16} className="animate-spin"/>}💾 Guardar Hipoteca</button>
+        <div className="space-y-3"><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mortConfig.bal} onChange={v=>updateMort('bal',v)} prefix="$" type="number" placeholder="285,000"/><Inp label="Tasa (%)" value={mortConfig.rate} onChange={v=>updateMort('rate',v)} type="number" placeholder="7.25"/></div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mortConfig.term} onChange={v=>updateMort('term',v)} type="number" placeholder="30"/><Inp label="Pago Mensual" value={mortConfig.pay} onChange={v=>updateMort('pay',v)} prefix="$" type="number" placeholder="1,945"/><Inp label="Inicio" value={mortConfig.start} onChange={v=>updateMort('start',v)} type="date"/></div></div>
+        <button onClick={saveMortgage} disabled={!mortConfig.bal||!mortConfig.rate||!mortConfig.pay||savingMort} className="w-full mt-5 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-30 transition shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={16} className="animate-spin"/>}💾 Guardar Hipoteca</button>
       </div>}
     </>}
 
     {/* ═══ REPAIRS & CAPEX ═══ */}
     {view==='repairs'&&<>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">🔧 Reparaciones & CapEx</h1><button onClick={()=>{setRf({date:new Date().toISOString().split('T')[0],title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:partners[0]?.id||''});setEditId(null);setModal('repair')}} className="px-4 py-2.5 bg-amber-600 text-white text-xs rounded-xl font-bold hover:bg-amber-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Nuevo Ticket</button></div>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">🔧 Reparaciones & CapEx</h1><button onClick={()=>{setRepairForm({date:new Date().toISOString().split('T')[0],title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:partners[0]?.id||''});setEditId(null);setModal('repair')}} className="px-4 py-2.5 bg-amber-600 text-white text-xs rounded-xl font-bold hover:bg-amber-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Nuevo Ticket</button></div>
 
       {repairs.length>0&&<div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <KPI label="Total Reparaciones" value={fm(repairs.reduce((s,r)=>s+(parseFloat(r.amount)||0),0))} sub={repairs.length+' tickets'} color="amber"/>
@@ -840,13 +838,13 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         {label:'Vendor',key:'vendor',cls:'text-xs text-slate-500'},
         {label:'Pagó',render:r=>r.paidBy?<span className="font-medium" style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>:<span className="text-slate-300">—</span>},
         {label:'Monto',r:true,render:r=><span className="font-bold text-amber-600">{fm(r.amount)}</span>},
-      ]} rows={repairs} onDel={del} dc="repairs" onEdit={r=>{setRf({date:r.date||'',title:r.title||'',description:r.description||'',amount:String(r.amount||''),vendor:r.vendor||'',category:r.category||'repair',status:r.status||'pending',paidBy:r.paidBy||''});setEditId(r.id);setModal('repair')}}/>
-      :<Empty icon={Wrench} title="Sin reparaciones" desc="Registra mantenimientos, reparaciones y mejoras de capital (CapEx) de tu propiedad." action="Crear Ticket" onAction={()=>{setRf({date:new Date().toISOString().split('T')[0],title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:partners[0]?.id||''});setModal('repair')}}/>}
+      ]} rows={repairs} onDel={del} dc="repairs" onEdit={r=>{setRepairForm({date:r.date||'',title:r.title||'',description:r.description||'',amount:String(r.amount||''),vendor:r.vendor||'',category:r.category||'repair',status:r.status||'pending',paidBy:r.paidBy||''});setEditId(r.id);setModal('repair')}}/>
+      :<Empty icon={Wrench} title="Sin reparaciones" desc="Registra mantenimientos, reparaciones y mejoras de capital (CapEx) de tu propiedad." action="Crear Ticket" onAction={()=>{setRepairForm({date:new Date().toISOString().split('T')[0],title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:partners[0]?.id||''});setModal('repair')}}/>}
     </>}
 
     {/* ═══ VALUATION & EQUITY ═══ */}
     {view==='valuation'&&<>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">📈 Valorización & Equity</h1><button onClick={()=>{setVf({date:new Date().toISOString().split('T')[0],value:'',source:'manual',notes:''});setEditId(null);setModal('valuation')}} className="px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Registrar Valor</button></div>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">📈 Valorización & Equity</h1><button onClick={()=>{setValForm({date:new Date().toISOString().split('T')[0],value:'',source:'manual',notes:''});setEditId(null);setModal('valuation')}} className="px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Registrar Valor</button></div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <KPI label="Precio de Precio de Compra" value={fm(prop.purchasePrice)} color="blue"/>
@@ -881,14 +879,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4"><h3 className="text-sm font-bold text-slate-700 mb-4">Historial de Valorización</h3>
           <ResponsiveContainer width="100%" height={160}><AreaChart data={[{date:fmDate(prop.purchaseDate),value:prop.purchasePrice},...[...valuations].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(v=>({date:fmDate(v.date),value:parseFloat(v.value)||0}))]}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="date" tick={{fontSize:9,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Area dataKey="value" name="Valor" stroke="#059669" fill="rgba(5,150,105,.1)" strokeWidth={2.5}/></AreaChart></ResponsiveContainer>
         </div>
-        <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500 font-medium">{fmDate(r.date)}</span>},{label:'Valor Estimado',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.value)}</span>},{label:'Fuente',render:r=><span className="text-xs text-slate-400">{r.source==='zillow'?'Zillow':r.source==='redfin'?'Redfin':r.source==='appraisal'?'Avalúo':r.source==='broker'?'Broker':'Manual'}</span>},{label:'Notas',key:'notes',cls:'text-xs text-slate-400'}]} rows={[...valuations].sort((a,b)=>(b.date||'').localeCompare(a.date||''))} onDel={del} dc="valuations" onEdit={r=>{setVf({date:r.date||'',value:String(r.value||''),source:r.source||'manual',notes:r.notes||''});setEditId(r.id);setModal('valuation')}}/>
+        <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500 font-medium">{fmDate(r.date)}</span>},{label:'Valor Estimado',r:true,render:r=><span className="font-bold text-emerald-600">{fm(r.value)}</span>},{label:'Fuente',render:r=><span className="text-xs text-slate-400">{r.source==='zillow'?'Zillow':r.source==='redfin'?'Redfin':r.source==='appraisal'?'Avalúo':r.source==='broker'?'Broker':'Manual'}</span>},{label:'Notas',key:'notes',cls:'text-xs text-slate-400'}]} rows={[...valuations].sort((a,b)=>(b.date||'').localeCompare(a.date||''))} onDel={del} dc="valuations" onEdit={r=>{setValForm({date:r.date||'',value:String(r.value||''),source:r.source||'manual',notes:r.notes||''});setEditId(r.id);setModal('valuation')}}/>
       </>}
       {!valuations.length&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden"><p className="text-sm text-slate-400 text-center py-4">Registra el valor actual de tu propiedad para trackear apreciación y equity real. Puedes usar Zillow, Redfin, un avalúo o tu propia estimación.</p></div>}
     </>}
 
     {/* ═══ PIPELINE ═══ */}
     {view==='pipeline'&&<>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">📋 Pipeline de Tareas</h1><button onClick={()=>{setTf({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Nueva Tarea</button></div>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">📋 Pipeline de Tareas</h1><button onClick={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Nueva Tarea</button></div>
 
       {tasks.length>0&&<div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <KPI label="Total Tareas" value={String(tasks.length)} color="blue"/>
@@ -907,7 +905,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                 <div className="flex justify-between items-start mb-1">
                   <span className="font-semibold text-sm text-slate-700">{t.title}</span>
                   <div className="flex gap-0.5">
-                    <button onClick={()=>{setTf({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||''});setEditId(t.id);setModal('task')}} className="text-slate-300 hover:text-blue-500 p-1 rounded"><Pencil size={12}/></button>
+                    <button onClick={()=>{setTaskForm({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||''});setEditId(t.id);setModal('task')}} className="text-slate-300 hover:text-blue-500 p-1 rounded"><Pencil size={12}/></button>
                     <button onClick={()=>del('tasks',t.id)} className="text-slate-300 hover:text-red-500 p-1 rounded"><Trash2 size={12}/></button>
                   </div>
                 </div>
@@ -921,7 +919,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             ))}</div>
           </div>
         ))}
-      </div>:<Empty icon={Clock} title="Sin tareas" desc="Crea tareas para llevar control de pagos pendientes, renovaciones de seguro, inspecciones y más." action="Nueva Tarea" onAction={()=>{setTf({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});setModal('task')}}/>}
+      </div>:<Empty icon={Clock} title="Sin tareas" desc="Crea tareas para llevar control de pagos pendientes, renovaciones de seguro, inspecciones y más." action="Nueva Tarea" onAction={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:''});setModal('task')}}/>}
     </>}
 
     {/* ═══ SUPPORT / TICKETS ═══ */}
@@ -948,12 +946,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           </div>
         </div>
         <button onClick={async()=>{
-          if(!ticketForm.subject||!ticketForm.message){alert('Llena asunto y descripción');return;}
+          if(!ticketForm.subject||!ticketForm.message){notify('Llena asunto y descripción','error');return;}
           try{
             await addDoc(collection(db,'tickets'),{...ticketForm,userEmail,propertyName:prop.name||'',propertyId,status:'open',createdAt:serverTimestamp()});
             setTicketForm({type:'bug',subject:'',message:'',priority:'medium'});
-            alert('✅ Ticket enviado correctamente');
-          }catch(e){alert('Error: '+e.message)}
+            notify('Ticket enviado');
+          }catch(e){notify('Error: '+e.message,'error')}
         }} disabled={!ticketForm.subject||!ticketForm.message} className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20 disabled:opacity-30 flex items-center gap-2"><Send size={15}/> Enviar Ticket</button>
       </div>
 
@@ -1007,8 +1005,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           await updateDoc(doc(db,'properties',propertyId),updates);
           const mv=parseFloat(sf2.marketValue)||0;
           if(mv>0&&mv!==(latestVal?latestVal.value:prop.purchasePrice)){await addDoc(collection(db,'properties',propertyId,'valuations'),{date:new Date().toISOString().split('T')[0],value:mv,source:'manual',notes:'Actualizado desde Configuración',createdAt:serverTimestamp()})}
-          alert('✅ Guardado correctamente')
-        }catch(e){alert('Error: '+e.message)}}} className="mt-5 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20">💾 Guardar Cambios</button>
+          notify('Guardado correctamente')
+        }catch(e){notify('Error: '+e.message,'error')}}} className="mt-5 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20">💾 Guardar Cambios</button>
       </div>
 
       {/* Partners — editable */}
@@ -1026,8 +1024,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           const updatedPartners=ep.map(p=>({id:p.id,name:p.name,email:p.email||'',ownership:parseFloat(p.ownership)||0,initialCapital:parseFloat(p.initialCapital)||0,color:p.color}));
           const memberEmails=[auth.currentUser.email,...updatedPartners.map(x=>x.email).filter(Boolean)];
           await updateDoc(doc(db,'properties',propertyId),{partners:updatedPartners,memberEmails});
-          alert('✅ Socios actualizados. Los emails agregados ahora pueden acceder a esta propiedad.')
-        }catch(e){alert('Error: '+e.message)}}} className="mt-4 px-6 py-3 bg-purple-600 text-white rounded-xl font-bold text-sm hover:bg-purple-700 transition shadow-lg shadow-purple-500/20">👥 Guardar Socios</button>
+          notify('Socios actualizados')
+        }catch(e){notify('Error: '+e.message,'error')}}} className="mt-4 px-6 py-3 bg-purple-600 text-white rounded-xl font-bold text-sm hover:bg-purple-700 transition shadow-lg shadow-purple-500/20">👥 Guardar Socios</button>
         <p className="text-[10px] text-slate-400 mt-2">El email del socio le permite acceder a esta propiedad con su propia cuenta de OwnerDesk.</p>
       </div>
 
@@ -1049,7 +1047,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`ownerdesk-${prop.name?.replace(/\s+/g,'-')||'export'}-${new Date().toISOString().split('T')[0]}.json`;a.click();URL.revokeObjectURL(url);
           }} className="px-5 py-3 bg-slate-700 text-white rounded-xl font-bold text-sm hover:bg-slate-800 active:bg-slate-900 transition flex items-center gap-2">📦 Exportar JSON</button>
           <button onClick={()=>{
-            if(!stmts.length){alert('No hay statements para exportar');return}
+            if(!stmts.length){notify('No hay statements para exportar','error');return}
             const header='Periodo,Revenue,Comision,Electricidad,Agua,HOA,Mantenimiento,Otros,Net,Noches,Reservaciones\n';
             const rows=stmts.sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>`${M[s.month-1]} ${s.year},${s.revenue||0},${s.commission||0},${s.duke||0},${s.water||0},${s.hoa||0},${s.maintenance||0},${s.vendor||0},${s.net||0},${s.nights||0},${s.reservations||0}`).join('\n');
             const blob=new Blob([header+rows],{type:'text/csv'});
@@ -1226,66 +1224,66 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     </div></div>
 
     {/* ═══ MODALS ═══ */}
-    {modal==='expense'&&<Mdl title={editId?'✏️ Editar Gasto':'Registrar Gasto'} grad="from-rose-500 to-rose-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...ef,amount:parseFloat(ef.amount)};if(editId){update('expenses',editId,data)}else{save('expenses',data)}}} disabled={!ef.amount||!ef.concept} className="flex-1 py-2.5 bg-rose-500 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={ef.date} onChange={v=>ue('date',v)} type="date" required/><Sel label="Categoría" value={ef.category} onChange={v=>ue('category',v)} options={CATS.map(c=>({v:c.v,l:c.i+' '+c.l}))}/></div>
-      <Inp label="Concepto" value={ef.concept} onChange={v=>ue('concept',v)} placeholder="Descripción del gasto" required error={ef.concept===''&&ef.amount?'Ingresa una descripción':''}/>
-      <Inp label="Monto (USD)" value={ef.amount} onChange={v=>ue('amount',v)} prefix="$" type="number" min="0" required error={ef.amount&&parseFloat(ef.amount)<=0?'El monto debe ser mayor a 0':''}/>
-      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de gasto</label><div className="grid grid-cols-2 gap-2">{[['fixed','🔄 Fijo'],['additional','➕ Adicional']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('type',v)} className={`py-2.5 rounded-xl border-2 text-sm font-medium transition ${ef.type===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
-      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={ef.paidBy} onChange={v=>ue('paidBy',v)}/></div>
+    {modal==='expense'&&<Mdl title={editId?'✏️ Editar Gasto':'Registrar Gasto'} grad="from-rose-500 to-rose-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...ef,amount:parseFloat(expenseForm.amount)};if(editId){update('expenses',editId,data)}else{save('expenses',data)}}} disabled={!expenseForm.amount||!expenseForm.concept} className="flex-1 py-2.5 bg-rose-500 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={expenseForm.date} onChange={v=>updateExpense('date',v)} type="date" required/><Sel label="Categoría" value={expenseForm.category} onChange={v=>updateExpense('category',v)} options={CATS.map(c=>({v:c.v,l:c.i+' '+c.l}))}/></div>
+      <Inp label="Concepto" value={expenseForm.concept} onChange={v=>updateExpense('concept',v)} placeholder="Descripción del gasto" required error={expenseForm.concept===''&&expenseForm.amount?'Ingresa una descripción':''}/>
+      <Inp label="Monto (USD)" value={expenseForm.amount} onChange={v=>updateExpense('amount',v)} prefix="$" type="number" min="0" required error={expenseForm.amount&&parseFloat(expenseForm.amount)<=0?'El monto debe ser mayor a 0':''}/>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Tipo de gasto</label><div className="grid grid-cols-2 gap-2">{[['fixed','🔄 Fijo'],['additional','➕ Adicional']].map(([v,l])=><button key={v} type="button" onClick={()=>updateExpense('type',v)} className={`py-2.5 rounded-xl border-2 text-sm font-medium transition ${expenseForm.type===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={expenseForm.paidBy} onChange={v=>updateExpense('paidBy',v)}/></div>
     </Mdl>}
 
-    {modal==='contribution'&&<Mdl title={editId?'✏️ Editar Aporte':'Aporte de Capital'} grad="from-purple-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...cf,amount:parseFloat(cf.amount),type:'contribution'};if(editId){update('contributions',editId,data)}else{save('contributions',data)}}} disabled={!cf.amount} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={cf.date} onChange={v=>uc('date',v)} type="date" required/><Inp label="Monto" value={cf.amount} onChange={v=>uc('amount',v)} prefix="$" type="number" required error={cf.amount&&parseFloat(cf.amount)<=0?'Monto debe ser mayor a 0':''}/></div>
-      <Inp label="Concepto" value={cf.concept} onChange={v=>uc('concept',v)} placeholder="Ej: Down payment, reparación techo" required/>
-      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Socio</label><PPick partners={partners} selected={cf.paidBy} onChange={v=>uc('paidBy',v)}/></div>
+    {modal==='contribution'&&<Mdl title={editId?'✏️ Editar Aporte':'Aporte de Capital'} grad="from-purple-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...cf,amount:parseFloat(contribForm.amount),type:'contribution'};if(editId){update('contributions',editId,data)}else{save('contributions',data)}}} disabled={!contribForm.amount} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Fecha" value={contribForm.date} onChange={v=>updateContrib('date',v)} type="date" required/><Inp label="Monto" value={contribForm.amount} onChange={v=>updateContrib('amount',v)} prefix="$" type="number" required error={contribForm.amount&&parseFloat(contribForm.amount)<=0?'Monto debe ser mayor a 0':''}/></div>
+      <Inp label="Concepto" value={contribForm.concept} onChange={v=>updateContrib('concept',v)} placeholder="Ej: Down payment, reparación techo" required/>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Socio</label><PPick partners={partners} selected={contribForm.paidBy} onChange={v=>updateContrib('paidBy',v)}/></div>
     </Mdl>}
 
-    {modal==='addStmt'&&<Mdl title={editId?'✏️ Editar Statement':'Statement Manual'} grad="from-slate-700 to-slate-800" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const yr=parseInt(sf.year),mo=parseInt(sf.month);const data={year:yr,month:mo,revenue:parseFloat(sf.revenue)||0,net:parseFloat(sf.net)||0,commission:parseFloat(sf.commission)||0,duke:parseFloat(sf.duke)||0,water:parseFloat(sf.water)||0,hoa:parseFloat(sf.hoa)||0,maintenance:parseFloat(sf.maintenance)||0,vendor:parseFloat(sf.vendor)||0};if(editId){update('statements',editId,data)}else{if(stmts.find(s=>s.year===yr&&s.month===mo)){alert(`Ya existe un statement para ${M[mo-1]} ${yr}.`);return;}save('statements',data);setSf(x=>({...x,month:x.month<12?x.month+1:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''}))}}} disabled={!sf.revenue} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Año" value={sf.year} onChange={v=>us('year',v)} type="number" disabled={!!editId}/><Sel label="Mes" value={sf.month} onChange={v=>us('month',v)} options={M.map((m,i)=>({v:i+1,l:m}))}/></div>
-      <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100"><div className="text-[10px] font-black text-emerald-700 uppercase mb-3">Ingresos</div><Inp label="Revenue Total" value={sf.revenue} onChange={v=>us('revenue',v)} prefix="$" type="number" required error={sf.revenue&&parseFloat(sf.revenue)<=0?'Ingresa el revenue del periodo':''}/></div>
-      <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100"><div className="text-[10px] font-black text-rose-700 uppercase mb-3">Gastos</div><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Comisión PM" value={sf.commission} onChange={v=>us('commission',v)} prefix="$" type="number"/><Inp label="Electricidad" value={sf.duke} onChange={v=>us('duke',v)} prefix="$" type="number"/><Inp label="Agua" value={sf.water} onChange={v=>us('water',v)} prefix="$" type="number"/><Inp label="HOA" value={sf.hoa} onChange={v=>us('hoa',v)} prefix="$" type="number"/><Inp label="Mantenimiento" value={sf.maintenance} onChange={v=>us('maintenance',v)} prefix="$" type="number"/><Inp label="Vendor/Otros" value={sf.vendor} onChange={v=>us('vendor',v)} prefix="$" type="number"/></div></div>
-      <Inp label="Net al Owner" value={sf.net} onChange={v=>us('net',v)} prefix="$" type="number"/>
+    {modal==='addStmt'&&<Mdl title={editId?'✏️ Editar Statement':'Statement Manual'} grad="from-slate-700 to-slate-800" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const yr=parseInt(stmtForm.year),mo=parseInt(stmtForm.month);const data={year:yr,month:mo,revenue:parseFloat(stmtForm.revenue)||0,net:parseFloat(stmtForm.net)||0,commission:parseFloat(stmtForm.commission)||0,duke:parseFloat(stmtForm.duke)||0,water:parseFloat(stmtForm.water)||0,hoa:parseFloat(stmtForm.hoa)||0,maintenance:parseFloat(stmtForm.maintenance)||0,vendor:parseFloat(stmtForm.vendor)||0};if(editId){update('statements',editId,data)}else{if(stmts.find(s=>s.year===yr&&s.month===mo)){notify(`Ya existe statement para ${M[mo-1]} ${yr}`,"error");return;}save('statements',data);setStmtForm(x=>({...x,month:x.month<12?x.month+1:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''}))}}} disabled={!stmtForm.revenue} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Año" value={stmtForm.year} onChange={v=>updateStmt('year',v)} type="number" disabled={!!editId}/><Sel label="Mes" value={stmtForm.month} onChange={v=>updateStmt('month',v)} options={M.map((m,i)=>({v:i+1,l:m}))}/></div>
+      <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100"><div className="text-[10px] font-black text-emerald-700 uppercase mb-3">Ingresos</div><Inp label="Revenue Total" value={stmtForm.revenue} onChange={v=>updateStmt('revenue',v)} prefix="$" type="number" required error={stmtForm.revenue&&parseFloat(stmtForm.revenue)<=0?'Ingresa el revenue del periodo':''}/></div>
+      <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100"><div className="text-[10px] font-black text-rose-700 uppercase mb-3">Gastos</div><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Comisión PM" value={stmtForm.commission} onChange={v=>updateStmt('commission',v)} prefix="$" type="number"/><Inp label="Electricidad" value={stmtForm.duke} onChange={v=>updateStmt('duke',v)} prefix="$" type="number"/><Inp label="Agua" value={stmtForm.water} onChange={v=>updateStmt('water',v)} prefix="$" type="number"/><Inp label="HOA" value={stmtForm.hoa} onChange={v=>updateStmt('hoa',v)} prefix="$" type="number"/><Inp label="Mantenimiento" value={stmtForm.maintenance} onChange={v=>updateStmt('maintenance',v)} prefix="$" type="number"/><Inp label="Vendor/Otros" value={stmtForm.vendor} onChange={v=>updateStmt('vendor',v)} prefix="$" type="number"/></div></div>
+      <Inp label="Net al Owner" value={stmtForm.net} onChange={v=>updateStmt('net',v)} prefix="$" type="number"/>
     </Mdl>}
 
-    {modal==='editMort'&&<Mdl title="Editar Hipoteca" grad="from-blue-600 to-blue-700" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={async()=>{await saveMortgage();setModal(null)}} disabled={!(parseFloat(mc.bal)>0)||!(parseFloat(mc.rate)>0)||!(parseFloat(mc.pay)>0)||savingMort} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={14} className="animate-spin"/>}Guardar</button></>}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mc.bal} onChange={v=>umc('bal',v)} prefix="$" type="number"/><Inp label="Tasa (%)" value={mc.rate} onChange={v=>umc('rate',v)} type="number"/></div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mc.term} onChange={v=>umc('term',v)} type="number"/><Inp label="Pago Mensual" value={mc.pay} onChange={v=>umc('pay',v)} prefix="$" type="number"/><Inp label="Inicio" value={mc.start} onChange={v=>umc('start',v)} type="date"/></div>
+    {modal==='editMort'&&<Mdl title="Editar Hipoteca" grad="from-blue-600 to-blue-700" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={async()=>{await saveMortgage();setModal(null)}} disabled={!(parseFloat(mortConfig.bal)>0)||!(parseFloat(mortConfig.rate)>0)||!(parseFloat(mortConfig.pay)>0)||savingMort} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={14} className="animate-spin"/>}Guardar</button></>}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mortConfig.bal} onChange={v=>updateMort('bal',v)} prefix="$" type="number"/><Inp label="Tasa (%)" value={mortConfig.rate} onChange={v=>updateMort('rate',v)} type="number"/></div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mortConfig.term} onChange={v=>updateMort('term',v)} type="number"/><Inp label="Pago Mensual" value={mortConfig.pay} onChange={v=>updateMort('pay',v)} prefix="$" type="number"/><Inp label="Inicio" value={mortConfig.start} onChange={v=>updateMort('start',v)} type="date"/></div>
     </Mdl>}
 
-    {modal==='repair'&&<Mdl title={editId?'✏️ Editar Ticket':'🔧 Nuevo Ticket de Reparación'} grad="from-amber-500 to-amber-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...rf,amount:parseFloat(rf.amount)||0};if(editId){update('repairs',editId,data)}else{save('repairs',data)}}} disabled={!rf.title} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <Inp label="Título" value={rf.title} onChange={v=>ur('title',v)} placeholder="Ej: Reparación de AC, Pintura exterior" required/>
+    {modal==='repair'&&<Mdl title={editId?'✏️ Editar Ticket':'🔧 Nuevo Ticket de Reparación'} grad="from-amber-500 to-amber-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...rf,amount:parseFloat(repairForm.amount)||0};if(editId){update('repairs',editId,data)}else{save('repairs',data)}}} disabled={!repairForm.title} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <Inp label="Título" value={repairForm.title} onChange={v=>updateRepair('title',v)} placeholder="Ej: Reparación de AC, Pintura exterior" required/>
       <div className="grid grid-cols-2 gap-3">
-        <Inp label="Fecha" value={rf.date} onChange={v=>ur('date',v)} type="date" required/>
-        <Inp label="Monto (USD)" value={rf.amount} onChange={v=>ur('amount',v)} prefix="$" type="number" min="0"/>
+        <Inp label="Fecha" value={repairForm.date} onChange={v=>updateRepair('date',v)} type="date" required/>
+        <Inp label="Monto (USD)" value={repairForm.amount} onChange={v=>updateRepair('amount',v)} prefix="$" type="number" min="0"/>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Sel label="Tipo" value={rf.category} onChange={v=>ur('category',v)} options={[{v:'repair',l:'🔧 Reparación urgente'},{v:'preventive',l:'🛡️ Mantenimiento preventivo'},{v:'capex',l:'📈 Mejora / CapEx'}]}/>
-        <Sel label="Estado" value={rf.status} onChange={v=>ur('status',v)} options={[{v:'pending',l:'⚠ Pendiente'},{v:'progress',l:'⏳ En Progreso'},{v:'done',l:'✓ Completado'}]}/>
+        <Sel label="Tipo" value={repairForm.category} onChange={v=>updateRepair('category',v)} options={[{v:'repair',l:'🔧 Reparación urgente'},{v:'preventive',l:'🛡️ Mantenimiento preventivo'},{v:'capex',l:'📈 Mejora / CapEx'}]}/>
+        <Sel label="Estado" value={repairForm.status} onChange={v=>updateRepair('status',v)} options={[{v:'pending',l:'⚠ Pendiente'},{v:'progress',l:'⏳ En Progreso'},{v:'done',l:'✓ Completado'}]}/>
       </div>
-      <Inp label="Vendor / Proveedor" value={rf.vendor} onChange={v=>ur('vendor',v)} placeholder="Ej: ABC Plumbing, Home Depot"/>
-      <Inp label="Descripción (opcional)" value={rf.description} onChange={v=>ur('description',v)} placeholder="Detalles adicionales..."/>
-      {partners.length>0&&<div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={rf.paidBy} onChange={v=>ur('paidBy',v)}/></div>}
+      <Inp label="Vendor / Proveedor" value={repairForm.vendor} onChange={v=>updateRepair('vendor',v)} placeholder="Ej: ABC Plumbing, Home Depot"/>
+      <Inp label="Descripción (opcional)" value={repairForm.description} onChange={v=>updateRepair('description',v)} placeholder="Detalles adicionales..."/>
+      {partners.length>0&&<div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién pagó?</label><PPick partners={partners} selected={repairForm.paidBy} onChange={v=>updateRepair('paidBy',v)}/></div>}
     </Mdl>}
 
-    {modal==='task'&&<Mdl title={editId?'✏️ Editar Tarea':'📋 Nueva Tarea'} grad="from-indigo-500 to-indigo-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...tf};if(editId){update('tasks',editId,data)}else{save('tasks',data)}}} disabled={!tf.title} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <Inp label="Título" value={tf.title} onChange={v=>ut('title',v)} placeholder="Ej: Renovar seguro, Pagar property tax"/>
+    {modal==='task'&&<Mdl title={editId?'✏️ Editar Tarea':'📋 Nueva Tarea'} grad="from-indigo-500 to-indigo-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={...tf};if(editId){update('tasks',editId,data)}else{save('tasks',data)}}} disabled={!taskForm.title} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <Inp label="Título" value={taskForm.title} onChange={v=>updateTask('title',v)} placeholder="Ej: Renovar seguro, Pagar property tax"/>
       <div className="grid grid-cols-2 gap-3">
-        <Inp label="Fecha límite" value={tf.dueDate} onChange={v=>ut('dueDate',v)} type="date"/>
-        <Sel label="Prioridad" value={tf.priority} onChange={v=>ut('priority',v)} options={[{v:'high',l:'🔴 Alta'},{v:'medium',l:'🟡 Media'},{v:'low',l:'🟢 Baja'}]}/>
+        <Inp label="Fecha límite" value={taskForm.dueDate} onChange={v=>updateTask('dueDate',v)} type="date"/>
+        <Sel label="Prioridad" value={taskForm.priority} onChange={v=>updateTask('priority',v)} options={[{v:'high',l:'🔴 Alta'},{v:'medium',l:'🟡 Media'},{v:'low',l:'🟢 Baja'}]}/>
       </div>
-      <Sel label="Estado" value={tf.status} onChange={v=>ut('status',v)} options={[{v:'pending',l:'⚠ Pendiente'},{v:'progress',l:'⏳ En Progreso'},{v:'done',l:'✓ Completada'}]}/>
-      <Inp label="Notas (opcional)" value={tf.notes} onChange={v=>ut('notes',v)} placeholder="Detalles adicionales..."/>
+      <Sel label="Estado" value={taskForm.status} onChange={v=>updateTask('status',v)} options={[{v:'pending',l:'⚠ Pendiente'},{v:'progress',l:'⏳ En Progreso'},{v:'done',l:'✓ Completada'}]}/>
+      <Inp label="Notas (opcional)" value={taskForm.notes} onChange={v=>updateTask('notes',v)} placeholder="Detalles adicionales..."/>
     </Mdl>}
 
-    {modal==='valuation'&&<Mdl title={editId?'✏️ Editar Valorización':'📈 Registrar Valor de Mercado'} grad="from-emerald-600 to-teal-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={date:vf.date,value:parseFloat(vf.value)||0,source:vf.source,notes:vf.notes};if(editId){update('valuations',editId,data)}else{save('valuations',data)}}} disabled={!vf.value} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
-      <Inp label="Fecha de Estimación" value={vf.date} onChange={v=>uv('date',v)} type="date"/>
-      <Inp label="Valor Estimado de Mercado" value={vf.value} onChange={v=>uv('value',v)} prefix="$" type="number" placeholder="490,000"/>
-      <Sel label="Fuente" value={vf.source} onChange={v=>uv('source',v)} options={[{v:'manual',l:'Estimación propia'},{v:'zillow',l:'Zillow Zestimate'},{v:'redfin',l:'Redfin Estimate'},{v:'appraisal',l:'Avalúo profesional'},{v:'broker',l:'CMA de broker'},{v:'comps',l:'Comparables de mercado'}]}/>
-      <Inp label="Notas (opcional)" value={vf.notes} onChange={v=>uv('notes',v)} placeholder="Ej: Basado en venta de vecino por $500K"/>
-      {vf.value&&prop.purchasePrice>0&&<div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2 text-sm">
+    {modal==='valuation'&&<Mdl title={editId?'✏️ Editar Valorización':'📈 Registrar Valor de Mercado'} grad="from-emerald-600 to-teal-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancelar</button><button onClick={()=>{const data={date:valForm.date,value:parseFloat(valForm.value)||0,source:valForm.source,notes:valForm.notes};if(editId){update('valuations',editId,data)}else{save('valuations',data)}}} disabled={!valForm.value} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?'Actualizar':'Guardar'}</button></>}>
+      <Inp label="Fecha de Estimación" value={valForm.date} onChange={v=>updateVal('date',v)} type="date"/>
+      <Inp label="Valor Estimado de Mercado" value={valForm.value} onChange={v=>updateVal('value',v)} prefix="$" type="number" placeholder="490,000"/>
+      <Sel label="Fuente" value={valForm.source} onChange={v=>updateVal('source',v)} options={[{v:'manual',l:'Estimación propia'},{v:'zillow',l:'Zillow Zestimate'},{v:'redfin',l:'Redfin Estimate'},{v:'appraisal',l:'Avalúo profesional'},{v:'broker',l:'CMA de broker'},{v:'comps',l:'Comparables de mercado'}]}/>
+      <Inp label="Notas (opcional)" value={valForm.notes} onChange={v=>updateVal('notes',v)} placeholder="Ej: Basado en venta de vecino por $500K"/>
+      {valForm.value&&prop.purchasePrice>0&&<div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2 text-sm">
         <div className="flex justify-between"><span className="text-slate-500">Precio Precio de Compra</span><span className="font-semibold">{fm(prop.purchasePrice)}</span></div>
-        <div className="flex justify-between"><span className="text-slate-500">Valor Estimado</span><span className="font-bold text-emerald-600">{fm(parseFloat(vf.value))}</span></div>
-        <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-600 font-semibold">Apreciación</span><span className={`font-extrabold ${parseFloat(vf.value)>=prop.purchasePrice?'text-emerald-600':'text-rose-500'}`}>{((parseFloat(vf.value)-prop.purchasePrice)/prop.purchasePrice*100).toFixed(1)}% ({fm(parseFloat(vf.value)-prop.purchasePrice)})</span></div>
+        <div className="flex justify-between"><span className="text-slate-500">Valor Estimado</span><span className="font-bold text-emerald-600">{fm(parseFloat(valForm.value))}</span></div>
+        <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-600 font-semibold">Apreciación</span><span className={`font-extrabold ${parseFloat(valForm.value)>=prop.purchasePrice?'text-emerald-600':'text-rose-500'}`}>{((parseFloat(valForm.value)-prop.purchasePrice)/prop.purchasePrice*100).toFixed(1)}% ({fm(parseFloat(valForm.value)-prop.purchasePrice)})</span></div>
       </div>}
     </Mdl>}
 
@@ -1312,6 +1310,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <button onClick={()=>{setModal('addStmt')}} className="w-full py-2.5 bg-slate-100 text-slate-600 rounded-xl font-semibold text-xs hover:bg-slate-200 transition flex items-center justify-center gap-2"><Plus size={14}/>O ingresar manualmente</button>
       </div>
     </Mdl>}
+
+    {/* Toast notification */}
+    {toast&&<div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-2 animate-slide-in ${toast.type==='error'?'bg-rose-600 text-white':'bg-slate-800 text-white'}`} style={{animation:'slide-up 0.3s ease-out'}} onClick={()=>setToast(null)}>
+      <span>{toast.type==='error'?'❌':'✅'}</span>{toast.msg}
+    </div>}
   </div>;
 }
 
