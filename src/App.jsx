@@ -416,7 +416,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const expData=isOwnerManaged?
         (()=>{const cp={};yearExpenses.filter(e=>e.category!=='mortgage_pay').forEach(e=>{const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};if(!cp[e.category])cp[e.category]={name:c.l,value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[e.category].value+=amt/12*(n||1);else if(ef==='monthly')cp[e.category].value+=amt*(n||1);else cp[e.category].value+=amt});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
         [['Commission',fComm,'#E11D48'],['Electricity',fDuke,'#F59E0B'],['Water',fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],['Maintenance',fMaint,'#10B981'],['Other',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
-      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>({m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:stmtToPC(s.revenue||0),net:stmtToPC(s.net||0),libre:stmtToPC(s.net||0)-mMort}));
+      const ownerMonthly=n>0?ownerExpTotal/n:0;
+      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const exp=pmExp+ownerMonthly;const cf=rev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev,exp,cf}});
 
       return <>
       <div className="hidden print-header"><div style={{display:'flex',justifyContent:'space-between'}}><div><h1 style={{fontSize:'18px',fontWeight:800,margin:0}}>{prop.name}</h1><p style={{fontSize:'9px',color:'#64748B',margin:'3px 0'}}>{prop.address}, {prop.city} {prop.state} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div><div style={{fontSize:'18px',fontWeight:900,color:'#1E3A5F'}}>OD</div></div></div>
@@ -718,16 +719,16 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
         <div className="col-span-1 md:col-span-7 bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden">
           <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Monthly Performance</h3>
-          <ResponsiveContainer width="100%" height={160}>
-            <ComposedChart data={mChart}>
+          <ResponsiveContainer width="100%" height={180}>
+            <BarChart data={mChart}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/>
               <XAxis dataKey="m" tick={{fontSize:9,fill:'#94a3b8'}} interval={mChart.length>18?2:0}/>
               <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={fm}/>
               <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
-              <Bar dataKey="rev" name="Gross Revenue" fill="#BFDBFE" radius={[3,3,0,0]}/>
-              <Bar dataKey="net" name="Neto Depositado" fill="#6EE7B7" radius={[3,3,0,0]}/>
-              {mMort>0&&<Line dataKey="libre" name="Cash Flow" stroke="#1E293B" strokeWidth={2} dot={{r:2,fill:'#1E293B'}}/>}
-            </ComposedChart>
+              <Bar dataKey="rev" name="Gross Revenue" fill="#93C5FD" radius={[3,3,0,0]}/>
+              <Bar dataKey="exp" name="Expenses" fill="#FCA5A5" radius={[3,3,0,0]}/>
+              <Bar dataKey="cf" name="Cash Flow" fill="#6EE7B7" radius={[3,3,0,0]}/>
+            </BarChart>
           </ResponsiveContainer>
         </div>
 
