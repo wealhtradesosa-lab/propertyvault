@@ -344,8 +344,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         return amt;
       };
 
-      // Owner expenses — filter by year if needed, convert currency
-      const yearExpenses=dashYear==='all'?expenses:expenses.filter(e=>(e.date||'').startsWith(String(dashYear)));
+      // Owner expenses — recurring apply to ALL periods, one-time filtered by year
+      const recurringExp=expenses.filter(e=>e.frequency==='monthly'||e.frequency==='annual');
+      const oneTimeExp=dashYear==='all'?expenses.filter(e=>!e.frequency||e.frequency==='once'):expenses.filter(e=>(!e.frequency||e.frequency==='once')&&(e.date||'').startsWith(String(dashYear)));
+      const yearExpenses=[...recurringExp,...oneTimeExp];
       const ownerExpTotal=yearExpenses.reduce((s,e)=>{
         const raw=e.amount||0;
         const amt=toPC(raw,e.expCurrency);
@@ -915,9 +917,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {view==='expenses'&&<>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🧾 Gastos <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full align-middle">{propCurrency}</span></h1><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 active:bg-rose-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Gasto</button></div>
       {expenses.length>0&&(()=>{
-        const monthlyRecurring=expenses.filter(e=>e.frequency==='monthly').reduce((s,e)=>s+(e.amount||0),0);
-        const annualRecurring=expenses.filter(e=>e.frequency==='annual').reduce((s,e)=>s+(e.amount||0),0);
-        const oneTime=expenses.filter(e=>!e.frequency||e.frequency==='once').reduce((s,e)=>s+(e.amount||0),0);
+        const monthlyRecurring=expenses.filter(e=>e.frequency==='monthly').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
+        const annualRecurring=expenses.filter(e=>e.frequency==='annual').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
+        const oneTime=expenses.filter(e=>!e.frequency||e.frequency==='once').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
         const monthlyEquiv=monthlyRecurring+(annualRecurring/12);
         return <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-5">
           <KPI label={`Costo Mensual (${propCurrency})`} value={fmP(monthlyEquiv)} sub="Fijos + anuales/12" color="blue"/>
@@ -931,7 +933,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {/* Grouped by month */}
       {expenses.length>0&&(()=>{
         const sorted=[...expenses].sort((a,b)=>{const da=a.date||'0000';const db=b.date||'0000';return db.localeCompare(da)});
-        const groups={};sorted.forEach(e=>{const d=e.date||'';const key=d?d.slice(0,7):'sin-fecha';if(!groups[key])groups[key]={label:d?M[parseInt(d.slice(5,7))-1]+' '+d.slice(0,4):'Sin fecha',items:[],total:0};groups[key].items.push(e);groups[key].total+=e.amount||0});
+        const groups={};sorted.forEach(e=>{const d=e.date||'';const key=d?d.slice(0,7):'sin-fecha';if(!groups[key])groups[key]={label:d?M[parseInt(d.slice(5,7))-1]+' '+d.slice(0,4):'Sin fecha',items:[],total:0};groups[key].items.push(e);groups[key].total+=toPropCur(e.amount||0,e.expCurrency)});
         return Object.entries(groups).map(([key,g])=><div key={key} className="mb-4">
           <div className="flex justify-between items-center mb-2 px-1"><h3 className="text-sm font-bold text-slate-600">{g.label}</h3><span className="text-sm font-extrabold text-rose-500">{fmP(g.total)} <span className="text-[9px] text-slate-400">{propCurrency}</span></span></div>
           <Tbl cols={[
