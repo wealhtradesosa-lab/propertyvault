@@ -65,7 +65,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [taskForm,setTaskForm]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30'});const ut=useCallback((k,v)=>setTaskForm(x=>({...x,[k]:v})),[]);
   const [settingsForm,setSettingsForm]=useState(null);
   const [editPartners,setEditPartners]=useState(null);
-  const [mortConfig,setMortConfig]=useState({bal:'',rate:'',term:'30',pay:'',start:''});const [savingMort,setSavingMort]=useState(false);
+  const [mortConfig,setMortConfig]=useState({bal:'',rate:'',term:'30',pay:'',start:'',includesTaxes:false,includesInsurance:false});const [savingMort,setSavingMort]=useState(false);
   const umc=useCallback((k,v)=>setMortConfig(x=>({...x,[k]:v})),[]);
   const partners=prop.partners||[];const mort=prop.mortgage||{};
   const [expenseForm,setExpenseForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});const [editId,setEditId]=useState(null);
@@ -125,7 +125,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   };
   const update=async(sub,id,data)=>{await updateDoc(doc(db,'properties',propertyId,sub,id),data);setModal(null);setEditId(null)};
   const del=async(sub,id)=>{if(!confirm('¿Eliminar?'))return;await deleteDoc(doc(db,'properties',propertyId,sub,id))};
-  const saveMortgage=async()=>{setSavingMort(true);try{await updateDoc(doc(db,'properties',propertyId),{mortgage:{balance:parseFloat(mortConfig.bal)||0,rate:parseFloat(mortConfig.rate)||0,termYears:parseInt(mortConfig.term)||30,monthlyPayment:parseFloat(mortConfig.pay)||0,startDate:mortConfig.start||''}})}catch(e){notify('Error: '+e.message,'error')}setSavingMort(false)};
+  const saveMortgage=async()=>{setSavingMort(true);try{await updateDoc(doc(db,'properties',propertyId),{mortgage:{balance:parseFloat(mortConfig.bal)||0,rate:parseFloat(mortConfig.rate)||0,termYears:parseInt(mortConfig.term)||30,monthlyPayment:parseFloat(mortConfig.pay)||0,startDate:mortConfig.start||'',includesTaxes:!!mortConfig.includesTaxes,includesInsurance:!!mortConfig.includesInsurance}})}catch(e){notify('Error: '+e.message,'error')}setSavingMort(false)};
 
   // PDF Upload handler — with robust duplicate detection
   const handlePDFs=async(files)=>{
@@ -236,7 +236,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   const fixedExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return c?.fixed||e.type==='fixed'}),[expenses,propCats,lang]);
   const additionalExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return !c?.fixed&&e.type!=='fixed'}),[expenses,propCats,lang]);
-  const expByCat=useMemo(()=>{const r={};expenses.filter(e=>e.category!=='mortgage_pay'&&!/hipoteca|mortgage|debt.service/i.test(e.concept||'')).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const k=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!r[k])r[k]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0,monthly:0};const amt=toPropCur(e.amount||0,e.expCurrency);const f=eFreq(e);const mo=f==='annual'?amt/12:f==='monthly'?amt:amt;r[k].value+=amt;r[k].monthly+=(f==='annual'?amt/12:f==='monthly'?amt:0)});return Object.values(r).sort((a,b)=>b.monthly-a.monthly||b.value-a.value)},[expenses,propCats,lang]);
+  const expByCat=useMemo(()=>{const r={};const escrowCats=[];if(mort.includesTaxes){escrowCats.push('taxes','predial')};if(mort.includesInsurance){escrowCats.push('insurance')};expenses.filter(e=>e.category!=='mortgage_pay'&&!escrowCats.includes(e.category)&&!/hipoteca|mortgage|debt.service/i.test(e.concept||'')).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const k=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!r[k])r[k]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0,monthly:0};const amt=toPropCur(e.amount||0,e.expCurrency);const f=eFreq(e);const mo=f==='annual'?amt/12:f==='monthly'?amt:amt;r[k].value+=amt;r[k].monthly+=(f==='annual'?amt/12:f==='monthly'?amt:0)});return Object.values(r).sort((a,b)=>b.monthly-a.monthly||b.value-a.value)},[expenses,propCats,lang,mort]);
 
   const annual=useMemo(()=>{const y={};stmts.forEach(s=>{if(!y[s.year])y[s.year]={year:s.year,revenue:0,net:0,commission:0,duke:0,water:0,hoa:0,maintenance:0,vendor:0,nights:0,reservations:0,n:0};const a=y[s.year];a.revenue+=s.revenue||0;a.net+=s.net||0;a.commission+=s.commission||0;a.duke+=s.duke||0;a.water+=s.water||0;a.hoa+=s.hoa||0;a.maintenance+=s.maintenance||0;a.vendor+=s.vendor||0;a.nights+=s.nights||0;a.reservations+=s.reservations||0;a.n++});return Object.values(y).sort((a,b)=>a.year-b.year)},[stmts]);
 
@@ -372,9 +372,15 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const recurringExp=expenses.filter(e=>isRecurring(e));
       const oneTimeExp=dashYear==='all'?expenses.filter(e=>!isRecurring(e)):expenses.filter(e=>!isRecurring(e)&&(e.date||'').startsWith(String(dashYear)));
       const yearExpenses=[...recurringExp,...oneTimeExp];
-      // Exclude mortgage from OpEx — by category AND by concept name
+      // Exclude from OpEx: mortgage expenses + escrow-covered categories
       const isMortgageExp=(e)=>e.category==='mortgage_pay'||/hipoteca|mortgage|debt.service/i.test(e.concept||'');
-      const ownerExpTotal=yearExpenses.filter(e=>!isMortgageExp(e)).reduce((s,e)=>{
+      const isEscrowCovered=(e)=>{
+        if(mort.includesTaxes&&(e.category==='taxes'||e.category==='predial'))return true;
+        if(mort.includesInsurance&&e.category==='insurance')return true;
+        return false;
+      };
+      const isExcludedFromOpEx=(e)=>isMortgageExp(e)||isEscrowCovered(e);
+      const ownerExpTotal=yearExpenses.filter(e=>!isExcludedFromOpEx(e)).reduce((s,e)=>{
         const amt=toPC(e.amount||0,e.expCurrency);
         const f=eFreq(e);
         if(f==='annual')return s+amt/12*(n||1);
@@ -420,7 +426,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const revChg=prevYr&&prevYr.revenue?((fRev-prevYr.revenue)/prevYr.revenue*100):null;
       const chartColors=['#E11D48','#F59E0B','#06B6D4','#8B5CF6','#10B981','#64748B','#DB2777','#EA580C'];
       const expData=isOwnerManaged?
-        (()=>{const cp={};yearExpenses.filter(e=>!isMortgageExp(e)).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const ck=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[ck].value+=amt/12*(n||1);else if(ef==='monthly')cp[ck].value+=amt*(n||1);else cp[ck].value+=amt});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
+        (()=>{const cp={};yearExpenses.filter(e=>!isExcludedFromOpEx(e)).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const ck=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[ck].value+=amt/12*(n||1);else if(ef==='monthly')cp[ck].value+=amt*(n||1);else cp[ck].value+=amt});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
         [['Commission',fComm,'#E11D48'],[t('electricity'),fDuke,'#F59E0B'],[t('water'),fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],[t('maintenance'),fMaint,'#10B981'],['Other',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
       const ownerMonthly=n>0?ownerExpTotal/n:0;
       const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const exp=pmExp+ownerMonthly;const cf=rev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev,exp,cf}});
@@ -491,7 +497,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               {fComm>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-rose-400 opacity-75" style={{width:Math.max(2,fComm/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{t('platformFees')}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(fComm)} <span className="text-slate-400">({(fComm/fRev*100).toFixed(0)}%)</span></span></div></div>}
               {(()=>{
                 const cats={};
-                yearExpenses.filter(e=>!isMortgageExp(e)).forEach(e=>{
+                yearExpenses.filter(e=>!isExcludedFromOpEx(e)).forEach(e=>{
                   const c=propCats.find(x=>x.v===e.category);
                   const isOther=!c||e.category==='otros'||!e.category;
                   const catKey=isOther?'_other':(c?e.category:'_other');
@@ -514,7 +520,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               {ownerExpTotal>0&&<>
                 {(()=>{
                   const cats={};
-                  yearExpenses.filter(e=>!isMortgageExp(e)).forEach(e=>{
+                  yearExpenses.filter(e=>!isExcludedFromOpEx(e)).forEach(e=>{
                     const c=propCats.find(x=>x.v===e.category);
                     // Consolidate: 'otros', '', undefined, unmatched → all become '_other'
                     const isOther=!c||e.category==='otros'||!e.category;
@@ -551,7 +557,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             {/* Debt Service = Mortgage */}
             {fMortP>0&&<>
               <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">{t('debtService')}</div>
-              <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,Math.abs(fMortP)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{t('mortgage')}{mMort>0?` (${dFm(mMort)}/mo × ${n}m)`:''}</span><span className="text-[10px] font-bold text-slate-700">{dFm(fMortP)} <span className="text-slate-400">({(Math.abs(fMortP)/fRev*100).toFixed(0)}%)</span></span></div></div>
+              <div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-red-400 opacity-75" style={{width:Math.max(2,Math.abs(fMortP)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{t('mortgage')}{mMort>0?` (${dFm(mMort)}/${t('mo')} × ${n}m)`:''}{(mort.includesTaxes||mort.includesInsurance)&&<span className="text-[8px] text-blue-500 ml-1">{lang==='es'?'incl.':'incl.'} {[mort.includesTaxes&&'Tax',mort.includesInsurance&&(lang==='es'?'Seguro':'Ins.')].filter(Boolean).join(' + ')}</span>}</span><span className="text-[10px] font-bold text-slate-700">{dFm(fMortP)} <span className="text-slate-400">({(Math.abs(fMortP)/fRev*100).toFixed(0)}%)</span></span></div></div>
             </>}
 
             {/* Cash Flow = NOI - Debt Service */}
@@ -801,9 +807,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               const totalInterest=mort.monthlyPayment>0?(mort.monthlyPayment*monthsLeft)-mort.balance:0;
               return <div className="space-y-2">
                 <div className="flex justify-between items-end">
-                  <div><div className="text-lg font-extrabold text-slate-800">{dFm(mort.balance)}</div><div className="text-[10px] text-slate-400">Balance actual</div></div>
-                  <div className="text-right"><div className="text-sm font-bold text-emerald-600">{dFm(mMort)}/{t('mo')}</div><div className="text-[10px] text-slate-400">{mort.rate}% · {mort.termYears} años</div></div>
+                  <div><div className="text-lg font-extrabold text-slate-800">{dFm(mort.balance)}</div><div className="text-[10px] text-slate-400">{lang==='es'?'Balance actual':'Current balance'}</div></div>
+                  <div className="text-right"><div className="text-sm font-bold text-emerald-600">{dFm(mMort)}/{t('mo')}</div><div className="text-[10px] text-slate-400">{mort.rate}% · {mort.termYears} {lang==='es'?'años':'years'}</div></div>
                 </div>
+                {(mort.includesTaxes||mort.includesInsurance)&&<div className="flex gap-1 flex-wrap">{mort.includesTaxes&&<span className="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">🏛️ {lang==='es'?'Incl. Taxes':'Incl. Taxes'}</span>}{mort.includesInsurance&&<span className="text-[9px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">🛡️ {lang==='es'?'Incl. Seguro':'Incl. Insurance'}</span>}</div>}
                 {/* Progress bar */}
                 <div>
                   <div className="flex justify-between text-[9px] text-slate-400 mb-1"><span>Pagado {pctPaid.toFixed(0)}%</span><span>Restante {(100-pctPaid).toFixed(0)}%</span></div>
@@ -1128,11 +1135,18 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <div className="bg-amber-50 rounded-2xl p-5 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Meses Menos</div><div className="text-3xl font-extrabold text-amber-700 mt-1">{sNE[sNE.length-1].mo-sE[sE.length-1].mo}</div></div>
           </div><ResponsiveContainer width="100%" height={260}><AreaChart data={sNE.map((d,i)=>({yr:'Año '+d.yr,sin:d.bal,con:sE[i]?.bal||0}))}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="yr" tick={{fontSize:9,fill:'#94a3b8'}} interval={4}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Area dataKey="sin" name="Sin extra" stroke="#DC2626" fill="rgba(220,38,38,.05)"/><Area dataKey="con" name={`$${extraP||0}/mo${extraPA?` + $${extraPA}/año`:''} extra`} stroke="#059669" fill="rgba(5,150,105,.05)"/></AreaChart></ResponsiveContainer></>}
         </div>
-        <button onClick={()=>{setMortConfig({bal:String(mort.balance||''),rate:String(mort.rate||''),term:String(mort.termYears||30),pay:String(mort.monthlyPayment||''),start:mort.startDate||''});setModal('editMort')}} className="text-sm text-blue-600 font-semibold hover:text-blue-800 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-50 transition"><Settings size={15}/> Edit mortgage details</button>
+        <button onClick={()=>{setMortConfig({bal:String(mort.balance||''),rate:String(mort.rate||''),term:String(mort.termYears||30),pay:String(mort.monthlyPayment||''),start:mort.startDate||'',includesTaxes:!!mort.includesTaxes,includesInsurance:!!mort.includesInsurance});setModal('editMort')}} className="text-sm text-blue-600 font-semibold hover:text-blue-800 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-50 transition"><Settings size={15}/> Edit mortgage details</button>
       </>:<div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm max-w-lg">
         <div className="flex items-center gap-3 mb-5"><div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center"><Landmark size={24} className="text-blue-600"/></div><div><h3 className="text-base font-extrabold text-slate-800">Configure Mortgage</h3><p className="text-xs text-slate-400">Enter your mortgage details.</p></div></div>
         <div className="space-y-3"><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mortConfig.bal} onChange={v=>umc('bal',v)} prefix="$" type="number" placeholder="285,000"/><Inp label="Tasa (%)" value={mortConfig.rate} onChange={v=>umc('rate',v)} type="number" placeholder="7.25"/></div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mortConfig.term} onChange={v=>umc('term',v)} type="number" placeholder="30"/><Inp label="Pago Mensual" value={mortConfig.pay} onChange={v=>umc('pay',v)} prefix="$" type="number" placeholder="1,945"/><Inp label="Inicio" value={mortConfig.start} onChange={v=>umc('start',v)} type="date"/></div></div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label={lang==='es'?'Plazo (años)':'Term (years)'} value={mortConfig.term} onChange={v=>umc('term',v)} type="number" placeholder="30"/><Inp label={lang==='es'?'Pago Mensual Total':'Total Monthly Payment'} value={mortConfig.pay} onChange={v=>umc('pay',v)} prefix="$" type="number" placeholder="1,945"/><Inp label={lang==='es'?'Inicio':'Start'} value={mortConfig.start} onChange={v=>umc('start',v)} type="date"/></div>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <div className="text-[11px] font-bold text-blue-700 mb-2">{lang==='es'?'¿Qué incluye tu pago mensual? (Escrow)':'What does your monthly payment include? (Escrow)'}</div>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={!!mortConfig.includesTaxes} onChange={e=>umc('includesTaxes',e.target.checked)} className="w-4 h-4 rounded border-blue-300 text-blue-600"/><span className="text-[11px] text-slate-700">{lang==='es'?'🏛️ Incluye Property Taxes':'🏛️ Includes Property Taxes'}</span></label>
+            <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={!!mortConfig.includesInsurance} onChange={e=>umc('includesInsurance',e.target.checked)} className="w-4 h-4 rounded border-blue-300 text-blue-600"/><span className="text-[11px] text-slate-700">{lang==='es'?'🛡️ Incluye Homeowner\'s Insurance':'🛡️ Includes Homeowner\'s Insurance'}</span></label>
+          </div>
+        </div></div>
         <button onClick={saveMortgage} disabled={!mortConfig.bal||!mortConfig.rate||!mortConfig.pay||savingMort} className="w-full mt-5 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 disabled:opacity-30 transition shadow-lg shadow-blue-500/20 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={16} className="animate-spin"/>}💾 Save Mortgage</button>
       </div>}
     </>}
@@ -1510,7 +1524,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Frecuencia':'Frequency'}</label><div className="grid grid-cols-3 gap-1">{[['monthly','🔄 '+t('monthly')],['annual','📅 '+t('annual')],['once','🛒 '+t('purchase')]].map(([v,l])=><button key={v} type="button" onClick={()=>{ue('frequency',v);ue('type',v==='once'?'additional':'fixed')}} className={`py-2.5 rounded-xl border-2 text-[11px] font-medium transition ${(expenseForm.frequency||(expenseForm.type==='fixed'?'monthly':'once'))===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div><div className="text-[10px] text-slate-400 mt-1">{expenseForm.frequency==='monthly'||(!expenseForm.frequency&&expenseForm.type==='fixed')?t('freqMonthlyDesc'):expenseForm.frequency==='annual'?t('freqAnnualDesc'):t('freqPurchaseDesc')}</div></div>
       </div>
       {expenseForm.frequency==='annual'&&expenseForm.amount&&<div className="text-[11px] text-blue-500 font-semibold bg-blue-50 px-3 py-2 rounded-xl">= {gFm(parseFloat(expenseForm.amount)/12)}/{t('mo')} {lang==='es'?'equivalente':'equivalent'}</div>}
-      {expenseForm.category==='mortgage_pay'&&mort.monthlyPayment>0&&<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">⚠️ {lang==='es'?`La hipoteca ya está configurada en Settings ($${mort.monthlyPayment}/mo). Este gasto NO se sumará doble — el sistema lo detecta automáticamente.`:`Mortgage is already configured in Settings ($${mort.monthlyPayment}/mo). This expense will NOT double-count — the system detects it automatically.`}</div>}
+      {expenseForm.category==='mortgage_pay'&&mort.monthlyPayment>0&&<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">⚠️ {lang==='es'?`La hipoteca ya está configurada ($${mort.monthlyPayment}/${t('mo')}). Este gasto NO se sumará doble.`:`Mortgage already configured ($${mort.monthlyPayment}/${t('mo')}). This won't double-count.`}</div>}
+      {(expenseForm.category==='taxes'||expenseForm.category==='predial')&&mort.includesTaxes&&<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">⚠️ {lang==='es'?'Tu pago de hipoteca ya incluye Property Taxes (escrow). Este gasto se excluirá del P&L automáticamente para no contar doble.':'Your mortgage payment already includes Property Taxes (escrow). This expense will be auto-excluded from P&L to avoid double-counting.'}</div>}
+      {expenseForm.category==='insurance'&&mort.includesInsurance&&<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">⚠️ {lang==='es'?'Tu pago de hipoteca ya incluye Insurance (escrow). Este gasto se excluirá del P&L automáticamente para no contar doble.':'Your mortgage payment already includes Insurance (escrow). This expense will be auto-excluded from P&L to avoid double-counting.'}</div>}
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'¿Quién pagó?':'Who paid?'}</label><PPick partners={partners} selected={expenseForm.paidBy} onChange={v=>ue('paidBy',v)}/></div>
     </Mdl>}
 
@@ -1539,8 +1555,16 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     </Mdl>}
 
     {modal==='editMort'&&<Mdl title="Edit Mortgage" grad="from-blue-600 to-blue-700" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={async()=>{await saveMortgage();setModal(null)}} disabled={!(parseFloat(mortConfig.bal)>0)||!(parseFloat(mortConfig.rate)>0)||!(parseFloat(mortConfig.pay)>0)||savingMort} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={14} className="animate-spin"/>}Save</button></>}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mortConfig.bal} onChange={v=>umc('bal',v)} prefix="$" type="number"/><Inp label="Tasa (%)" value={mortConfig.rate} onChange={v=>umc('rate',v)} type="number"/></div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Plazo (años)" value={mortConfig.term} onChange={v=>umc('term',v)} type="number"/><Inp label="Pago Mensual" value={mortConfig.pay} onChange={v=>umc('pay',v)} prefix="$" type="number"/><Inp label="Inicio" value={mortConfig.start} onChange={v=>umc('start',v)} type="date"/></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mortConfig.bal} onChange={v=>umc('bal',v)} prefix="$" type="number"/><Inp label={lang==='es'?'Tasa (%)':'Rate (%)'} value={mortConfig.rate} onChange={v=>umc('rate',v)} type="number"/></div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label={lang==='es'?'Plazo (años)':'Term (years)'} value={mortConfig.term} onChange={v=>umc('term',v)} type="number"/><Inp label={lang==='es'?'Pago Mensual Total':'Total Monthly Payment'} value={mortConfig.pay} onChange={v=>umc('pay',v)} prefix="$" type="number"/><Inp label={lang==='es'?'Inicio':'Start'} value={mortConfig.start} onChange={v=>umc('start',v)} type="date"/></div>
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mt-1">
+        <div className="text-[11px] font-bold text-blue-700 mb-2">{lang==='es'?'¿Qué incluye tu pago mensual? (Escrow)':'What does your monthly payment include? (Escrow)'}</div>
+        <div className="text-[10px] text-blue-600 mb-2">{lang==='es'?'En USA muchas hipotecas incluyen taxes y/o seguro en el mismo pago. Marca lo que aplique para evitar contar doble.':'In the US many mortgages include taxes and/or insurance in the same payment. Check what applies to avoid double-counting.'}</div>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={!!mortConfig.includesTaxes} onChange={e=>umc('includesTaxes',e.target.checked)} className="w-4 h-4 rounded border-blue-300 text-blue-600"/><span className="text-[11px] text-slate-700">{lang==='es'?'🏛️ Incluye Property Taxes':'🏛️ Includes Property Taxes'}</span></label>
+          <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={!!mortConfig.includesInsurance} onChange={e=>umc('includesInsurance',e.target.checked)} className="w-4 h-4 rounded border-blue-300 text-blue-600"/><span className="text-[11px] text-slate-700">{lang==='es'?'🛡️ Incluye Homeowner\'s Insurance':'🛡️ Includes Homeowner\'s Insurance'}</span></label>
+        </div>
+      </div>
     </Mdl>}
 
     {modal==='repair'&&<Mdl title={editId?'✏️ Editar Ticket':'🔧 Nuevo Ticket de Reparación'} grad="from-amber-500 to-amber-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={()=>{const data={...repairForm,amount:parseFloat(repairForm.amount)||0};if(editId){update('repairs',editId,data)}else{save('repairs',data)}}} disabled={!repairForm.title} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
