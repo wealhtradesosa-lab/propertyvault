@@ -179,6 +179,22 @@ function parseAirbnbAnnual(t) {
 }
 
 // ═══ MORTGAGE STATEMENT PARSER ═══
+
+// Smarter grab — only matches $ amounts, ignores account numbers
+function grabMort(text, label) {
+  // Match label followed by a dollar amount (with $, within 60 chars)
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // Try with $ sign first (most reliable)
+  const rx1 = new RegExp(escaped + '[\\s:]*\\$\\s*(\\d[\\d,]*\\.\\d{2})', 'i');
+  const m1 = text.match(rx1);
+  if (m1) return parseFloat(m1[1].replace(/,/g, ''));
+  // Fallback: number within 40 chars but must have decimal (rules out IDs)
+  const rx2 = new RegExp(escaped + '[\\s\\S]{0,40}?\\$?(\\d{1,3}(?:,\\d{3})*\\.\\d{2})\\b', 'i');
+  const m2 = text.match(rx2);
+  if (m2) return parseFloat(m2[1].replace(/,/g, ''));
+  return 0;
+}
+
 export async function parseMortgageStatement(file) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
@@ -191,68 +207,89 @@ export async function parseMortgageStatement(file) {
   if (fullText.trim().length < 30) return { error: 'PDF empty or unreadable' };
 
   const result = {
-    balance: 0,
-    rate: 0,
-    monthlyPayment: 0,
-    principalAndInterest: 0,
-    taxEscrow: 0,
-    insuranceEscrow: 0,
-    otherEscrow: 0,
-    includesTaxes: false,
-    includesInsurance: false,
-    servicer: '',
-    parsed: true,
+    balance: 0, rate: 0, monthlyPayment: 0,
+    principalAndInterest: 0, taxEscrow: 0, insuranceEscrow: 0, otherEscrow: 0,
+    includesTaxes: false, includesInsurance: false,
+    servicer: '', parsed: true, rawPreview: '',
   };
 
+  // Show first 500 chars for debugging
+  result.rawPreview = fullText.slice(0, 500).replace(/\s+/g, ' ').trim();
+
   // Detect servicer
-  const servicers = ['Mr. Cooper','NewRez','Wells Fargo','Chase','Bank of America','Flagstar','PennyMac','Rocket Mortgage','loanDepot','Freedom Mortgage','Caliber Home Loans','PHH Mortgage','Nationstar','Shellpoint','Carrington'];
+  const servicers = ['Mr. Cooper','NewRez','Wells Fargo','Chase','Bank of America','Flagstar','PennyMac','Rocket Mortgage','loanDepot','Freedom Mortgage','Caliber','PHH','Nationstar','Shellpoint','Carrington'];
   for (const s of servicers) { if (fullText.toLowerCase().includes(s.toLowerCase())) { result.servicer = s; break; } }
 
-  // Balance — Unpaid Principal Balance, Outstanding Balance, Loan Balance
-  const balLabels = ['Unpaid Principal Balance','Principal Balance','Outstanding Principal','Current Principal Balance','Loan Balance','Remaining Balance','Beginning Balance'];
-  for (const l of balLabels) { const v = grab(fullText, l); if (v > 1000) { result.balance = v; break; } }
-
-  // Interest Rate
-  const rateMatch = fullText.match(/(?:Interest Rate|Current Rate|Note Rate|Annual Rate|Rate)\s*:?\s*(\d+\.?\d*)\s*%/i);
-  if (rateMatch) result.rate = parseFloat(rateMatch[1]);
-
-  // Principal & Interest (P&I)
-  const piLabels = ['Principal and Interest','Principal & Interest','P&I','Principal/Interest','Regular Payment','P & I'];
-  for (const l of piLabels) { const v = grab(fullText, l); if (v > 100) { result.principalAndInterest = v; break; } }
-
-  // Tax Escrow
-  const taxLabels = ['Tax Escrow','Property Tax','County Tax','Real Estate Tax','Taxes','Tax Payment','Escrow for Taxes','Tax Impound'];
-  for (const l of taxLabels) { const v = grab(fullText, l); if (v > 10) { result.taxEscrow = v; result.includesTaxes = true; break; } }
-
-  // Insurance Escrow
-  const insLabels = ['Insurance Escrow','Hazard Insurance','Homeowner.?s? Insurance','HO Insurance','Insurance Payment','Escrow for Insurance','Insurance Impound','Dwelling Insurance'];
-  for (const l of insLabels) {
-    const rx = new RegExp(l + '[\\s\\S]{0,40}?-?\\$?(\\d[\\d,]*\\.\\d{2})', 'i');
-    const m = fullText.match(rx);
-    if (m) { const v = parseFloat(m[1].replace(/,/g,'')); if (v > 10) { result.insuranceEscrow = v; result.includesInsurance = true; break; } }
+  // Balance (must be between $10K and $2M to be realistic)
+  for (const l of ['Unpaid Principal Balance','Principal Balance','Outstanding Principal','Current Principal Balance','Loan Balance']) {
+    const v = grabMort(fullText, l);
+    if (v >= 10000 && v <= 2000000) { result.balance = v; break; }
   }
 
-  // Other escrow (PMI, flood insurance, etc.)
-  const otherLabels = ['PMI','Mortgage Insurance','MIP','Flood Insurance','Other Escrow'];
-  for (const l of otherLabels) { const v = grab(fullText, l); if (v > 0) { result.otherEscrow += v; } }
+  // Interest Rate (must be between 1% and 15%)
+  const rateMatch = fullText.match(/(?:Interest Rate|Current Rate|Note Rate|Annual Rate)\s*:?\s*(\d+\.?\d*)\s*%/i);
+  if (rateMatch) { const r = parseFloat(rateMatch[1]); if (r >= 1 && r <= 15) result.rate = r; }
 
-  // Total Monthly Payment
-  const totalLabels = ['Total Payment','Total Monthly Payment','Total Amount Due','Amount Due','Monthly Payment Amount','Payment Amount','Total Due'];
-  for (const l of totalLabels) { const v = grab(fullText, l); if (v > 200) { result.monthlyPayment = v; break; } }
+  // Principal & Interest (must be between $200 and $15,000/mo)
+  for (const l of ['Principal and Interest','Principal & Interest','P&I','Principal/Interest','P & I','Regular Payment']) {
+    const v = grabMort(fullText, l);
+    if (v >= 200 && v <= 15000) { result.principalAndInterest = v; break; }
+  }
 
-  // If no total found, calculate from components
+  // Tax Escrow (must be between $50 and $3,000/mo)
+  for (const l of ['Tax Escrow','Property Tax','County Tax','Real Estate Tax','Escrow for Taxes','Tax Impound','Taxes']) {
+    const v = grabMort(fullText, l);
+    if (v >= 50 && v <= 3000) { result.taxEscrow = v; result.includesTaxes = true; break; }
+  }
+  // Also check for annual tax divided by 12
+  if (!result.taxEscrow) {
+    for (const l of ['Annual Property Tax','Annual Tax','Yearly Tax']) {
+      const v = grabMort(fullText, l);
+      if (v >= 500 && v <= 30000) { result.taxEscrow = Math.round(v / 12 * 100) / 100; result.includesTaxes = true; break; }
+    }
+  }
+
+  // Insurance Escrow (must be between $30 and $2,000/mo)
+  for (const l of ['Insurance Escrow','Hazard Insurance','Homeowner Insurance','Homeowners Insurance','HO Insurance','Escrow for Insurance','Insurance Impound','Dwelling Insurance','Insurance Payment']) {
+    const v = grabMort(fullText, l);
+    if (v >= 30 && v <= 2000) { result.insuranceEscrow = v; result.includesInsurance = true; break; }
+  }
+  // Also check annual insurance
+  if (!result.insuranceEscrow) {
+    for (const l of ['Annual Insurance','Annual Premium','Yearly Insurance','Insurance Premium']) {
+      const v = grabMort(fullText, l);
+      if (v >= 300 && v <= 20000) { result.insuranceEscrow = Math.round(v / 12 * 100) / 100; result.includesInsurance = true; break; }
+    }
+  }
+
+  // Other escrow — PMI, Flood (must be < $500/mo)
+  for (const l of ['PMI','Mortgage Insurance','MIP','Flood Insurance']) {
+    const v = grabMort(fullText, l);
+    if (v > 0 && v <= 500) { result.otherEscrow += v; }
+  }
+
+  // Total Monthly Payment (must be between $300 and $20,000)
+  for (const l of ['Total Payment','Total Monthly Payment','Total Amount Due','Amount Due','Monthly Payment Amount','Payment Amount']) {
+    const v = grabMort(fullText, l);
+    if (v >= 300 && v <= 20000) { result.monthlyPayment = v; break; }
+  }
+
+  // Calculate total from components if not found
   if (!result.monthlyPayment && result.principalAndInterest > 0) {
     result.monthlyPayment = result.principalAndInterest + result.taxEscrow + result.insuranceEscrow + result.otherEscrow;
   }
 
-  // If we found P&I but no total, use P&I as total
-  if (!result.monthlyPayment && result.principalAndInterest > 0) {
-    result.monthlyPayment = result.principalAndInterest;
+  // Cross-validate: if total ≈ sum of parts, good. If not, trust the total.
+  if (result.monthlyPayment > 0 && result.principalAndInterest > 0) {
+    const sum = result.principalAndInterest + result.taxEscrow + result.insuranceEscrow + result.otherEscrow;
+    if (Math.abs(sum - result.monthlyPayment) > result.monthlyPayment * 0.1) {
+      // Parts don't add up — might have wrong components, keep total but flag
+      result.partsNote = 'Components may not match total — verify manually';
+    }
   }
 
-  // Validate — need at least a payment or balance
   if (result.monthlyPayment === 0 && result.balance === 0) {
-    return { error: 'Could not extract mortgage data from this PDF. Try a monthly statement or escrow analysis from your servicer.' };
+    return { error: 'Could not extract mortgage data. This may not be a standard US mortgage statement. Preview: ' + result.rawPreview.slice(0, 200) };
   }
 
   return result;
