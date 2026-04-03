@@ -1482,7 +1482,22 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     </ViewGuard></div></div>
 
     {/* ═══ MODALS ═══ */}
-    {modal==='expense'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Gasto':'✏️ Edit Expense'):(lang==='es'?'Registrar Gasto':'Add Expense')} grad="from-rose-500 to-rose-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={()=>{const data={...expenseForm,amount:parseFloat(expenseForm.amount)};if(editId){update('expenses',editId,data)}else{save('expenses',data)}}} disabled={!expenseForm.amount||!expenseForm.concept} className="flex-1 py-2.5 bg-rose-500 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
+    {modal==='expense'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Gasto':'✏️ Edit Expense'):(lang==='es'?'Registrar Gasto':'Add Expense')} grad="from-rose-500 to-rose-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={()=>{
+        const data={...expenseForm,amount:parseFloat(expenseForm.amount)};
+        // Smart detection: if this category has a fixed expense already AND this is a new entry (not edit)
+        // AND the new entry is also fixed/recurring → redirect to contribution
+        if(!editId){
+          const existingFixed=expenses.find(e=>e.category===data.category&&e.category!=='otros'&&e.category!==''&&(e.type==='fixed'||eFreq(e)==='monthly'||eFreq(e)==='annual'));
+          if(existingFixed&&(data.type==='fixed'||data.frequency==='monthly'||data.frequency==='annual')){
+            // Auto-convert to contribution
+            setContribForm({date:data.date||new Date().toISOString().split('T')[0],concept:data.concept||existingFixed.concept,amount:String(data.amount||''),paidBy:data.paidBy||partners[0]?.id||'',purpose:'operations'});
+            setModal('contribution');
+            notify(lang==='es'?'Este costo fijo ya existe. Convertido a Aporte de Socio automáticamente.':'This fixed cost already exists. Auto-converted to Partner Payment.','info');
+            return;
+          }
+        }
+        if(editId){update('expenses',editId,data)}else{save('expenses',data)}
+      }} disabled={!expenseForm.amount||!expenseForm.concept} className="flex-1 py-2.5 bg-rose-500 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label={lang==='es'?'Fecha':'Date'} value={expenseForm.date} onChange={v=>ue('date',v)} type="date" required/><Sel label={lang==='es'?'Categoría':'Category'} value={expenseForm.category} onChange={v=>ue('category',v)} options={propCats.map(c=>({v:c.v,l:c.i+' '+c.l}))}/></div>
       {(()=>{const existing=expenses.find(e=>e.category===expenseForm.category&&e.category!=='otros'&&(e.type==='fixed'||eFreq(e)==='monthly'||eFreq(e)==='annual')&&!editId);return existing?<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2.5 rounded-xl">⚠️ {lang==='es'?<>Ya tienes un gasto fijo en esta categoría (<b>{existing.concept}</b>). Si un socio pagó esta obligación, usa <button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:existing.concept,amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});setModal('contribution')}} className="underline text-purple-600 font-bold">Aporte de Socio</button> en vez de crear otro gasto.</>:<>You already have a fixed expense in this category (<b>{existing.concept}</b>). If a partner paid this obligation, use <button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:existing.concept,amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});setModal('contribution')}} className="underline text-purple-600 font-bold">Partner Payment</button> instead of creating another expense.</>}</div>:null})()}
       <Inp label={lang==='es'?'Concepto':'Concept'} value={expenseForm.concept} onChange={v=>ue('concept',v)} placeholder={lang==='es'?'Descripción del gasto':'Expense description'} required error={expenseForm.concept===''&&expenseForm.amount?(lang==='es'?'Ingresa una descripción':'Enter a description'):''}/>
