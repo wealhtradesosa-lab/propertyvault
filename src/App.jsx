@@ -7,7 +7,7 @@ import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, L
 
 import { ADMIN_EMAILS, C, M, fm, fmCurrency, fmDate, pct, CATS, getCats, getTerms, COUNTRIES, CURRENCY_LIST, US_STATES as US, PROPERTY_TYPES as PT } from './lib/constants';
 import { createT } from './lib/i18n';
-import { parsePDF } from './lib/pdfParser';
+import { parsePDF, parseMortgageStatement } from './lib/pdfParser';
 import { Inp, Sel, PPick, Mdl, Empty, Tbl, Tip, UpgradeBanner, KPI } from './components/ui';
 import { LandingPage } from './components/LandingPage';
 import { AuthScreen } from './components/AuthScreen';
@@ -125,7 +125,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   };
   const update=async(sub,id,data)=>{await updateDoc(doc(db,'properties',propertyId,sub,id),data);setModal(null);setEditId(null)};
   const del=async(sub,id)=>{if(!confirm('¿Eliminar?'))return;await deleteDoc(doc(db,'properties',propertyId,sub,id))};
-  const saveMortgage=async()=>{setSavingMort(true);try{await updateDoc(doc(db,'properties',propertyId),{mortgage:{balance:parseFloat(mortConfig.bal)||0,rate:parseFloat(mortConfig.rate)||0,termYears:parseInt(mortConfig.term)||30,monthlyPayment:parseFloat(mortConfig.pay)||0,startDate:mortConfig.start||'',includesTaxes:!!mortConfig.includesTaxes,includesInsurance:!!mortConfig.includesInsurance}})}catch(e){notify('Error: '+e.message,'error')}setSavingMort(false)};
+  const saveMortgage=async()=>{setSavingMort(true);try{const data={balance:parseFloat(mortConfig.bal)||0,rate:parseFloat(mortConfig.rate)||0,termYears:parseInt(mortConfig.term)||30,monthlyPayment:parseFloat(mortConfig.pay)||0,startDate:mortConfig.start||'',includesTaxes:!!mortConfig.includesTaxes,includesInsurance:!!mortConfig.includesInsurance};const p=window.__mortParsed;if(p?.parsed){data.principalAndInterest=p.principalAndInterest||0;data.taxEscrow=p.taxEscrow||0;data.insuranceEscrow=p.insuranceEscrow||0;data.otherEscrow=p.otherEscrow||0;data.servicer=p.servicer||'';window.__mortParsed=null;}await updateDoc(doc(db,'properties',propertyId),{mortgage:data})}catch(e){notify('Error: '+e.message,'error')}setSavingMort(false)};
 
   // PDF Upload handler — with robust duplicate detection
   const handlePDFs=async(files)=>{
@@ -1125,8 +1125,59 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {/* ═══ MORTGAGE ═══ */}
     {view==='mortgage'&&<>
       <h1 className="text-[22px] font-extrabold text-slate-800 mb-6">🏦 {t('mortgageNav')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1>
+
+      {/* Upload mortgage statement */}
+      <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-2xl border border-blue-200 p-4 mb-5">
+        <div className="flex items-center gap-3 mb-2">
+          <Upload size={20} className="text-blue-600"/>
+          <div>
+            <div className="font-bold text-slate-800 text-sm">{lang==='es'?'Subir Statement de Hipoteca (PDF)':'Upload Mortgage Statement (PDF)'}</div>
+            <div className="text-[11px] text-slate-500">{lang==='es'?'Extrae automáticamente: P&I, Tax Escrow, Insurance Escrow, Balance, Tasa':'Auto-extracts: P&I, Tax Escrow, Insurance Escrow, Balance, Rate'}</div>
+          </div>
+        </div>
+        <label className="flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-blue-700 transition w-full sm:w-auto">
+          <Upload size={14}/> {lang==='es'?'Seleccionar PDF':'Select PDF'}
+          <input type="file" accept=".pdf" className="hidden" onChange={async(e)=>{
+            const file=e.target.files?.[0];if(!file)return;
+            notify(lang==='es'?'Analizando statement...':'Analyzing statement...','info');
+            try{
+              const r=await parseMortgageStatement(file);
+              if(r.error){notify(r.error,'error');return;}
+              setMortConfig({
+                bal:r.balance?String(r.balance):(mortConfig.bal||''),
+                rate:r.rate?String(r.rate):(mortConfig.rate||''),
+                term:mortConfig.term||'30',
+                pay:r.monthlyPayment?String(r.monthlyPayment):(mortConfig.pay||''),
+                start:mortConfig.start||'',
+                includesTaxes:r.includesTaxes||false,
+                includesInsurance:r.includesInsurance||false,
+              });
+              const parts=[];
+              if(r.principalAndInterest)parts.push(`P&I: $${r.principalAndInterest.toLocaleString()}`);
+              if(r.taxEscrow)parts.push(`Tax: $${r.taxEscrow.toLocaleString()}`);
+              if(r.insuranceEscrow)parts.push(`Ins: $${r.insuranceEscrow.toLocaleString()}`);
+              if(r.otherEscrow)parts.push(`Other: $${r.otherEscrow.toLocaleString()}`);
+              notify(`✅ ${r.servicer?r.servicer+' — ':''}${lang==='es'?'Datos extraídos':'Data extracted'}: ${parts.join(' · ')||'$'+r.monthlyPayment?.toLocaleString()+'/mo'}`,'success');
+              // Show breakdown modal
+              setModal('mortgageParsed');
+              window.__mortParsed=r;
+            }catch(err){notify('Error: '+err.message,'error')}
+            e.target.value='';
+          }}/>
+        </label>
+        <div className="text-[9px] text-slate-400 mt-2">{lang==='es'?'Compatible con: Mr. Cooper, Wells Fargo, Chase, NewRez, PennyMac, Flagstar, Freedom Mortgage y más':'Compatible with: Mr. Cooper, Wells Fargo, Chase, NewRez, PennyMac, Flagstar, Freedom Mortgage and more'}</div>
+      </div>
       {mort.balance>0?<>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6"><KPI label="Balance" value={gFm(mort.balance)} color="red"/><KPI label="Tasa" value={mort.rate+'%'} sub={mort.termYears+' años'} color="amber"/><KPI label="Pago Mensual" value={gFm(mort.monthlyPayment)} color="blue"/><KPI label="Total Intereses" value={sNE.length>0?fm(sNE[sNE.length-1].ti):'$0'} sub="sin pagos extra" color="purple"/><KPI label="Equity" value={gFm(equity)} sub={'LTV: '+ltv.toFixed(0)+'%'} color="green"/></div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4"><KPI label="Balance" value={gFm(mort.balance)} color="red"/><KPI label={lang==='es'?'Tasa':'Rate'} value={mort.rate+'%'} sub={mort.termYears+` ${lang==='es'?'años':'years'}`} color="amber"/><KPI label={lang==='es'?'Pago Mensual':'Monthly Payment'} value={gFm(mort.monthlyPayment)} color="blue"/><KPI label={lang==='es'?'Total Intereses':'Total Interest'} value={sNE.length>0?fm(sNE[sNE.length-1].ti):'$0'} sub={lang==='es'?'sin pagos extra':'without extra payments'} color="purple"/><KPI label="Equity" value={gFm(equity)} sub={'LTV: '+ltv.toFixed(0)+'%'} color="green"/></div>
+        {(mort.principalAndInterest||mort.taxEscrow||mort.insuranceEscrow)&&<div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-5">
+          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">{lang==='es'?'Desglose del Pago':'Payment Breakdown'} {mort.servicer&&<span className="text-blue-500 normal-case">· {mort.servicer}</span>}</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {mort.principalAndInterest>0&&<div className="bg-slate-50 rounded-xl p-3 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">P&I</div><div className="text-base font-extrabold text-slate-700">{gFm(mort.principalAndInterest)}<span className="text-[10px] text-slate-400">/{t('mo')}</span></div></div>}
+            {mort.taxEscrow>0&&<div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100"><div className="text-[9px] text-blue-600 font-bold uppercase">🏛️ Tax Escrow</div><div className="text-base font-extrabold text-blue-700">{gFm(mort.taxEscrow)}<span className="text-[10px] text-blue-400">/{t('mo')}</span></div></div>}
+            {mort.insuranceEscrow>0&&<div className="bg-cyan-50 rounded-xl p-3 text-center border border-cyan-100"><div className="text-[9px] text-cyan-600 font-bold uppercase">🛡️ Insurance Escrow</div><div className="text-base font-extrabold text-cyan-700">{gFm(mort.insuranceEscrow)}<span className="text-[10px] text-cyan-400">/{t('mo')}</span></div></div>}
+            {mort.otherEscrow>0&&<div className="bg-slate-50 rounded-xl p-3 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">PMI / Other</div><div className="text-base font-extrabold text-slate-700">{gFm(mort.otherEscrow)}<span className="text-[10px] text-slate-400">/{t('mo')}</span></div></div>}
+          </div>
+        </div>}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-4"><h3 className="text-base font-extrabold text-slate-800 mb-1">💰 Simulador de Pagos Anticipados</h3><p className="text-xs text-slate-400 mb-5">¿Cuánto extra al principal cada mes?</p>
           <div className="max-w-md mb-6"><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Extra MENSUAL al principal" value={extraP} onChange={setExtraP} prefix="$" type="number" placeholder="Ej: 200"/><Inp label="Extra ANUAL al principal" value={extraPA} onChange={setExtraPA} prefix="$" type="number" placeholder="Ej: 5,000"/></div><p className="text-[10px] text-slate-400 mt-2">El pago mensual extra se aplica cada mes. El pago anual se aplica una vez al año al final de cada año.</p></div>
           {sE.length>0&&sNE.length>0&&<><div className="grid grid-cols-3 gap-4 mb-6">
@@ -1553,6 +1604,24 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100"><div className="text-[10px] font-black text-rose-700 uppercase mb-3">Expenses</div><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="PM Commission" value={stmtForm.commission} onChange={v=>us('commission',v)} prefix="$" type="number"/><Inp label="Electricity" value={stmtForm.duke} onChange={v=>us('duke',v)} prefix="$" type="number"/><Inp label="Water" value={stmtForm.water} onChange={v=>us('water',v)} prefix="$" type="number"/><Inp label="HOA" value={stmtForm.hoa} onChange={v=>us('hoa',v)} prefix="$" type="number"/><Inp label="Maintenance" value={stmtForm.maintenance} onChange={v=>us('maintenance',v)} prefix="$" type="number"/><Inp label="Vendor/Other" value={stmtForm.vendor} onChange={v=>us('vendor',v)} prefix="$" type="number"/></div></div>
       <Inp label="Net al Owner" value={stmtForm.net} onChange={v=>us('net',v)} prefix="$" type="number"/>
     </Mdl>}
+
+    {/* Mortgage statement parsed results */}
+    {modal==='mortgageParsed'&&(()=>{const r=window.__mortParsed||{};return<Mdl title={lang==='es'?'📋 Datos del Mortgage Statement':'📋 Mortgage Statement Data'} grad="from-blue-600 to-cyan-600" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={async()=>{await saveMortgage();setModal(null);notify(lang==='es'?'✅ Hipoteca actualizada con datos del statement':'✅ Mortgage updated from statement','success')}} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm">{lang==='es'?'Guardar':'Save'}</button></>}>
+      {r.servicer&&<div className="text-[11px] text-blue-600 font-semibold bg-blue-50 px-3 py-2 rounded-xl mb-3">{lang==='es'?'Servicer detectado:':'Servicer detected:'} <b>{r.servicer}</b></div>}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+        <div className="bg-slate-50 px-4 py-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">{lang==='es'?'Desglose del Pago Mensual':'Monthly Payment Breakdown'}</div>
+        <div className="divide-y divide-slate-100">
+          {r.principalAndInterest>0&&<div className="flex justify-between px-4 py-2.5"><span className="text-[11px] text-slate-600">Principal & Interest (P&I)</span><span className="text-[11px] font-bold text-slate-800">${r.principalAndInterest.toLocaleString()}</span></div>}
+          {r.taxEscrow>0&&<div className="flex justify-between px-4 py-2.5 bg-blue-50"><span className="text-[11px] text-blue-700">🏛️ Property Tax Escrow</span><span className="text-[11px] font-bold text-blue-800">${r.taxEscrow.toLocaleString()}</span></div>}
+          {r.insuranceEscrow>0&&<div className="flex justify-between px-4 py-2.5 bg-blue-50"><span className="text-[11px] text-blue-700">🛡️ Insurance Escrow</span><span className="text-[11px] font-bold text-blue-800">${r.insuranceEscrow.toLocaleString()}</span></div>}
+          {r.otherEscrow>0&&<div className="flex justify-between px-4 py-2.5"><span className="text-[11px] text-slate-600">Other (PMI, Flood, etc.)</span><span className="text-[11px] font-bold text-slate-800">${r.otherEscrow.toLocaleString()}</span></div>}
+          <div className="flex justify-between px-4 py-3 bg-slate-800"><span className="text-[11px] font-bold text-white">{lang==='es'?'Pago Mensual Total':'Total Monthly Payment'}</span><span className="text-[12px] font-black text-white">${r.monthlyPayment?.toLocaleString()}</span></div>
+        </div>
+      </div>
+      {r.balance>0&&<div className="flex justify-between px-4 py-2 mt-2 bg-slate-50 rounded-xl"><span className="text-[11px] text-slate-500">{lang==='es'?'Balance del Préstamo':'Loan Balance'}</span><span className="text-[11px] font-bold text-slate-700">${r.balance.toLocaleString()}</span></div>}
+      {r.rate>0&&<div className="flex justify-between px-4 py-2 bg-slate-50 rounded-xl"><span className="text-[11px] text-slate-500">{lang==='es'?'Tasa de Interés':'Interest Rate'}</span><span className="text-[11px] font-bold text-slate-700">{r.rate}%</span></div>}
+      {(r.includesTaxes||r.includesInsurance)&&<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mt-3 text-[11px] text-emerald-700">✅ {lang==='es'?'El sistema detectó que tu pago incluye':'The system detected your payment includes'} <b>{[r.includesTaxes&&'Taxes',r.includesInsurance&&'Insurance'].filter(Boolean).join(' + ')}</b>. {lang==='es'?'Estos conceptos se excluirán automáticamente de Operating Expenses para no contar doble.':'These will be auto-excluded from Operating Expenses to avoid double-counting.'}</div>}
+    </Mdl>})()}
 
     {modal==='editMort'&&<Mdl title="Edit Mortgage" grad="from-blue-600 to-blue-700" onClose={()=>setModal(null)} footer={<><button onClick={()=>setModal(null)} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={async()=>{await saveMortgage();setModal(null)}} disabled={!(parseFloat(mortConfig.bal)>0)||!(parseFloat(mortConfig.rate)>0)||!(parseFloat(mortConfig.pay)>0)||savingMort} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30 flex items-center justify-center gap-2">{savingMort&&<Loader2 size={14} className="animate-spin"/>}Save</button></>}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Balance" value={mortConfig.bal} onChange={v=>umc('bal',v)} prefix="$" type="number"/><Inp label={lang==='es'?'Tasa (%)':'Rate (%)'} value={mortConfig.rate} onChange={v=>umc('rate',v)} type="number"/></div>

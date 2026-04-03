@@ -178,6 +178,86 @@ function parseAirbnbAnnual(t) {
   return results; // Returns ARRAY
 }
 
+// ═══ MORTGAGE STATEMENT PARSER ═══
+export async function parseMortgageStatement(file) {
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+  let fullText = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    fullText += content.items.map(it => it.str).join(' ') + '\n';
+  }
+  if (fullText.trim().length < 30) return { error: 'PDF empty or unreadable' };
+
+  const result = {
+    balance: 0,
+    rate: 0,
+    monthlyPayment: 0,
+    principalAndInterest: 0,
+    taxEscrow: 0,
+    insuranceEscrow: 0,
+    otherEscrow: 0,
+    includesTaxes: false,
+    includesInsurance: false,
+    servicer: '',
+    parsed: true,
+  };
+
+  // Detect servicer
+  const servicers = ['Mr. Cooper','NewRez','Wells Fargo','Chase','Bank of America','Flagstar','PennyMac','Rocket Mortgage','loanDepot','Freedom Mortgage','Caliber Home Loans','PHH Mortgage','Nationstar','Shellpoint','Carrington'];
+  for (const s of servicers) { if (fullText.toLowerCase().includes(s.toLowerCase())) { result.servicer = s; break; } }
+
+  // Balance — Unpaid Principal Balance, Outstanding Balance, Loan Balance
+  const balLabels = ['Unpaid Principal Balance','Principal Balance','Outstanding Principal','Current Principal Balance','Loan Balance','Remaining Balance','Beginning Balance'];
+  for (const l of balLabels) { const v = grab(fullText, l); if (v > 1000) { result.balance = v; break; } }
+
+  // Interest Rate
+  const rateMatch = fullText.match(/(?:Interest Rate|Current Rate|Note Rate|Annual Rate|Rate)\s*:?\s*(\d+\.?\d*)\s*%/i);
+  if (rateMatch) result.rate = parseFloat(rateMatch[1]);
+
+  // Principal & Interest (P&I)
+  const piLabels = ['Principal and Interest','Principal & Interest','P&I','Principal/Interest','Regular Payment','P & I'];
+  for (const l of piLabels) { const v = grab(fullText, l); if (v > 100) { result.principalAndInterest = v; break; } }
+
+  // Tax Escrow
+  const taxLabels = ['Tax Escrow','Property Tax','County Tax','Real Estate Tax','Taxes','Tax Payment','Escrow for Taxes','Tax Impound'];
+  for (const l of taxLabels) { const v = grab(fullText, l); if (v > 10) { result.taxEscrow = v; result.includesTaxes = true; break; } }
+
+  // Insurance Escrow
+  const insLabels = ['Insurance Escrow','Hazard Insurance','Homeowner.?s? Insurance','HO Insurance','Insurance Payment','Escrow for Insurance','Insurance Impound','Dwelling Insurance'];
+  for (const l of insLabels) {
+    const rx = new RegExp(l + '[\\s\\S]{0,40}?-?\\$?(\\d[\\d,]*\\.\\d{2})', 'i');
+    const m = fullText.match(rx);
+    if (m) { const v = parseFloat(m[1].replace(/,/g,'')); if (v > 10) { result.insuranceEscrow = v; result.includesInsurance = true; break; } }
+  }
+
+  // Other escrow (PMI, flood insurance, etc.)
+  const otherLabels = ['PMI','Mortgage Insurance','MIP','Flood Insurance','Other Escrow'];
+  for (const l of otherLabels) { const v = grab(fullText, l); if (v > 0) { result.otherEscrow += v; } }
+
+  // Total Monthly Payment
+  const totalLabels = ['Total Payment','Total Monthly Payment','Total Amount Due','Amount Due','Monthly Payment Amount','Payment Amount','Total Due'];
+  for (const l of totalLabels) { const v = grab(fullText, l); if (v > 200) { result.monthlyPayment = v; break; } }
+
+  // If no total found, calculate from components
+  if (!result.monthlyPayment && result.principalAndInterest > 0) {
+    result.monthlyPayment = result.principalAndInterest + result.taxEscrow + result.insuranceEscrow + result.otherEscrow;
+  }
+
+  // If we found P&I but no total, use P&I as total
+  if (!result.monthlyPayment && result.principalAndInterest > 0) {
+    result.monthlyPayment = result.principalAndInterest;
+  }
+
+  // Validate — need at least a payment or balance
+  if (result.monthlyPayment === 0 && result.balance === 0) {
+    return { error: 'Could not extract mortgage data from this PDF. Try a monthly statement or escrow analysis from your servicer.' };
+  }
+
+  return result;
+}
+
 // ═══ MAIN EXPORT ═══
 export async function parsePDF(file) {
   const buf = await file.arrayBuffer();
