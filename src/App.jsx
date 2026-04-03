@@ -1178,48 +1178,59 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           </div>
 
           {(()=>{
-            // Calculate breakdown — from PDF data OR from loan terms
+            const total=mort.monthlyPayment||0;
+            if(total<=0) return <div className="text-[11px] text-slate-400 text-center py-4">{lang==='es'?'Configura el pago mensual para ver el desglose.':'Set the monthly payment to see the breakdown.'}</div>;
+
+            // Get breakdown from saved data
             let p=mort.principal||0;
             let i=mort.interest||0;
             let pi=mort.principalAndInterest||0;
-            const tiCombined=mort.taxAndInsuranceCombined||0;
+            let tiCombined=mort.taxAndInsuranceCombined||0;
             let tax=mort.taxEscrow||0;
             let ins=mort.insuranceEscrow||0;
             const other=mort.otherEscrow||0;
-            const total=mort.monthlyPayment||0;
 
-            // If no P&I from PDF, calculate from loan terms
+            // Calculate P&I from loan terms if not saved
             if(!pi && mort.balance>0 && mort.rate>0) {
               const mr=mort.rate/100/12;
               const nm=(mort.termYears||30)*12;
               pi=mort.balance*(mr*Math.pow(1+mr,nm))/(Math.pow(1+mr,nm)-1);
               pi=Math.round(pi*100)/100;
-              // Calculate P and I for current month
               i=Math.round(mort.balance*mr*100)/100;
               p=Math.round((pi-i)*100)/100;
             }
 
-            // If we have total and P&I but no escrow, calculate escrow
-            if(total>0 && pi>0 && !tiCombined && !tax && !ins) {
-              const escrow=total-pi-other;
-              if(escrow>50 && (mort.includesTaxes||mort.includesInsurance)) {
+            // Calculate escrow from total minus P&I
+            if(pi>0 && !tiCombined && !tax && !ins) {
+              const escrow=Math.round((total-pi-other)*100)/100;
+              if(escrow>50) {
                 if(mort.includesTaxes&&mort.includesInsurance) {
-                  tiCombined>0||(tax=Math.round(escrow*0.6*100)/100, ins=Math.round(escrow*0.4*100)/100);
-                } else if(mort.includesTaxes) { tax=Math.round(escrow*100)/100; }
-                else if(mort.includesInsurance) { ins=Math.round(escrow*100)/100; }
+                  tiCombined=escrow;
+                } else if(mort.includesTaxes) { tax=escrow; }
+                else if(mort.includesInsurance) { ins=escrow; }
+                else { tiCombined=escrow; } // assume escrow if there's a gap
               }
             }
-
-            if(!pi && !p && total<=0) return <div className="text-[11px] text-slate-400 text-center py-4">{lang==='es'?'Configura balance, tasa y plazo para ver el desglose.':'Set balance, rate, and term to see the breakdown.'}</div>;
 
             const items=[];
             if(p>0) items.push({label:'Principal',value:p,color:'bg-emerald-500',desc:lang==='es'?'Reduce tu deuda — construye equity':'Reduces your debt — builds equity'});
             if(i>0) items.push({label:lang==='es'?'Interés':'Interest',value:i,color:'bg-rose-400',desc:lang==='es'?'Costo del préstamo — no recuperable':'Cost of borrowing — non-recoverable'});
             if(!p&&!i&&pi>0) items.push({label:'P&I',value:pi,color:'bg-slate-500',desc:'Principal + Interest'});
-            if(tiCombined>0) items.push({label:'Tax + Insurance',value:tiCombined,color:'bg-blue-500',desc:lang==='es'?'Escrow — impuestos + seguro de la propiedad':'Escrow — property taxes + homeowner insurance'});
-            if(!tiCombined&&tax>0) items.push({label:lang==='es'?'Impuestos':'Taxes',value:tax,color:'bg-blue-500',desc:lang==='es'?'Property Tax via escrow':'Property Tax via escrow'});
-            if(!tiCombined&&ins>0) items.push({label:lang==='es'?'Seguro':'Insurance',value:ins,color:'bg-cyan-500',desc:lang==='es'?'Seguro de propietario via escrow':'Homeowner insurance via escrow'});
-            if(other>0) items.push({label:'PMI / Other',value:other,color:'bg-amber-400',desc:lang==='es'?'Seguro hipotecario privado':'Private mortgage insurance'});
+            if(tiCombined>0) items.push({label:'Tax + Insurance',value:tiCombined,color:'bg-blue-500',desc:lang==='es'?'Escrow — impuestos + seguro':'Escrow — taxes + insurance'});
+            if(!tiCombined&&tax>0) items.push({label:lang==='es'?'Impuestos':'Taxes',value:tax,color:'bg-blue-500',desc:'Property Tax via escrow'});
+            if(!tiCombined&&ins>0) items.push({label:lang==='es'?'Seguro':'Insurance',value:ins,color:'bg-cyan-500',desc:lang==='es'?'Seguro via escrow':'Insurance via escrow'});
+            if(other>0) items.push({label:'PMI / Other',value:other,color:'bg-amber-400',desc:lang==='es'?'Seguro hipotecario':'Mortgage insurance'});
+
+            // Fallback: if no breakdown available, show what we know
+            if(items.length===0) {
+              if(mort.includesTaxes||mort.includesInsurance) {
+                // We know escrow is included but can't calculate — show simple split
+                items.push({label:'P&I',value:total*0.7,color:'bg-slate-500',desc:lang==='es'?'Estimado — sube statement para datos exactos':'Estimated — upload statement for exact data'});
+                items.push({label:'Tax + Insurance',value:total*0.3,color:'bg-blue-500',desc:lang==='es'?'Estimado — sube statement para datos exactos':'Estimated — upload statement for exact data'});
+              } else {
+                items.push({label:lang==='es'?'Pago Mensual':'Monthly Payment',value:total,color:'bg-slate-500',desc:lang==='es'?'Sube el statement de tu banco para ver el desglose completo':'Upload your bank statement to see the full breakdown'});
+              }
+            }
 
             const sumParts=items.reduce((s,x)=>s+x.value,0);
             const barTotal=sumParts>0?sumParts:total;
