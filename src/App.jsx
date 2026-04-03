@@ -542,7 +542,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </>}
 
             {/* NOI = Revenue - Operating Expenses */}
-            <div className={`rounded-lg relative overflow-hidden mt-1 ${fNoi>=0?'bg-emerald-50':'bg-rose-50'}`} style={{height:'38px'}}><div className={`absolute inset-y-0 left-0 ${fNoi>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fNoi)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><div><span className={`text-[11px] font-bold ${fNoi>=0?'text-emerald-800':'text-rose-800'}`}>{`= ${t('noi')}`}</span><span className="text-[9px] text-slate-400 ml-2">{t('revMinusOpex')}</span></div><span className={`text-[12px] font-extrabold ${fNoi>=0?'text-emerald-800':'text-rose-800'}`}>{dFm(fNoi)} <span className="text-[10px]">{fMargin.toFixed(0)}%</span></span></div></div>
+            <div className={`rounded-lg relative overflow-hidden mt-1 ${fNoi>=0?'bg-emerald-600':'bg-rose-600'}`} style={{height:'38px'}}><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><div><span className="text-[11px] font-bold text-white">{`= ${t('noi')}`}</span><span className="text-[9px] text-white/60 ml-2">{t('revMinusOpex')}</span></div><span className="text-[12px] font-extrabold text-white">{dFm(fNoi)} <span className="text-white/70 text-[10px]">{fMargin.toFixed(0)}%</span></span></div></div>
 
             {/* Debt Service = Mortgage */}
             {fMortP>0&&<>
@@ -551,11 +551,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </>}
 
             {/* Cash Flow = NOI - Debt Service */}
-            <div className={`rounded-lg relative overflow-hidden border-2 mt-2 ${fCF>=0?'border-emerald-300 bg-emerald-50':'border-rose-300 bg-rose-50'}`} style={{height:'44px'}}>
-              <div className={`absolute inset-y-0 left-0 ${fCF>=0?'bg-emerald-500':'bg-rose-500'}`} style={{width:Math.max(2,Math.abs(fCF)/fRev*100)+'%'}}/>
+            <div className={`rounded-lg relative overflow-hidden border-2 mt-2 ${fCF>=0?'border-emerald-400 bg-emerald-600':'border-rose-400 bg-rose-600'}`} style={{height:'44px'}}>
               <div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden">
-                <div><span className={`text-[12px] font-extrabold ${fCF>=0?'text-emerald-800':'text-rose-800'}`}>{`= ${t('cashFlow')}`}</span>{fMortP>0&&<span className="text-[9px] text-slate-400 ml-2">{t('noiMinusDebt')}</span>}</div>
-                <div className="text-right"><span className={`text-[14px] font-black ${fCF>=0?'text-emerald-700':'text-rose-700'}`}>{dFm(fCF)}</span><div className={`text-[10px] ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/{t('mo')}</div></div>
+                <div><span className="text-[12px] font-extrabold text-white">{`= ${t('cashFlow')}`}</span>{fMortP>0&&<span className="text-[9px] text-white/60 ml-2">{t('noiMinusDebt')}</span>}</div>
+                <div className="text-right"><span className="text-[14px] font-black text-white">{dFm(fCF)}</span><div className="text-[10px] text-white/70">{dFm(fCFmo)}/{t('mo')}</div></div>
               </div>
             </div>
 
