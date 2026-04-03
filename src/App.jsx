@@ -188,7 +188,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const propCountry=prop.country||'US';
   const propCurrency=prop.currency||'USD';
   const fmP=v=>fmCurrency(v,propCurrency);
-  const propCats=getCats(propCountry);
+  const propCats=getCats(propCountry,lang);
   const propTerms=getTerms(propCountry);
 
   // Global display formatter — respects currency toggle everywhere
@@ -488,16 +488,18 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5">{t('operatingExpenses')}</div>
               {fComm>0&&<div className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-rose-400 opacity-75" style={{width:Math.max(2,fComm/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{t('platformFees')}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(fComm)} <span className="text-slate-400">({(fComm/fRev*100).toFixed(0)}%)</span></span></div></div>}
               {(()=>{
-                const catPeriod={};
+                const cats={};
                 yearExpenses.filter(e=>e.category!=='mortgage_pay').forEach(e=>{
-                  const c=propCats.find(x=>x.v===e.category)||{l:'Otros'};
-                  if(!catPeriod[e.category])catPeriod[e.category]={name:c.l,value:0};
+                  const c=propCats.find(x=>x.v===e.category);
+                  const catName=c?c.l:(lang==='es'?'Otros':'Other');
+                  const catKey=c?e.category:'_other';
+                  if(!cats[catKey])cats[catKey]={name:catName,value:0};
                   const amt=toPC(e.amount||0,e.expCurrency);
-                  const ef2=eFreq(e);if(ef2==='annual')catPeriod[e.category].value+=amt/12*(n||1);
-                  else if(ef2==='monthly')catPeriod[e.category].value+=amt*(n||1);
-                  else catPeriod[e.category].value+=amt;
+                  const ef2=eFreq(e);if(ef2==='annual')cats[catKey].value+=amt/12*(n||1);
+                  else if(ef2==='monthly')cats[catKey].value+=amt*(n||1);
+                  else cats[catKey].value+=amt;
                 });
-                return Object.values(catPeriod).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map(c=>
+                return Object.values(cats).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map(c=>
                   <div key={c.name} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,(c.value||0)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{c.name}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(c.value)} <span className="text-slate-400">({(c.value/fRev*100).toFixed(0)}%)</span></span></div></div>
                 );
               })()}
@@ -507,7 +509,35 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                 <div key={l} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className={`absolute inset-y-0 left-0 ${bg} opacity-75`} style={{width:Math.max(2,v/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{l}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(v)} <span className="text-slate-400">({(v/fRev*100).toFixed(0)}%)</span></span></div></div>
               )}
               {ownerExpTotal>0&&<>
-                {expByCat.filter(c=>c.monthly>0||c.value>0).map(c=><div key={c.name} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,(c.monthly||c.value)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{c.name}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(c.monthly||c.value)} <span className="text-slate-400">({((c.monthly||c.value)/fRev*100).toFixed(0)}%)</span></span></div></div>)}
+                {(()=>{
+                  // Build period-correct expense breakdown grouped by category
+                  const cats={};
+                  yearExpenses.filter(e=>e.category!=='mortgage_pay').forEach(e=>{
+                    const c=propCats.find(x=>x.v===e.category);
+                    const catName=c?c.l:'Other';
+                    const catKey=c?e.category:'_other';
+                    const isFixed=c?.fixed||e.type==='fixed';
+                    if(!cats[catKey])cats[catKey]={name:catName,fixed:isFixed,value:0};
+                    const amt=toPC(e.amount||0,e.expCurrency);
+                    const f=eFreq(e);
+                    if(f==='annual')cats[catKey].value+=amt/12*(n||1);
+                    else if(f==='monthly')cats[catKey].value+=amt*(n||1);
+                    else cats[catKey].value+=amt;
+                  });
+                  const sorted=Object.values(cats).filter(c=>c.value>0).sort((a,b)=>b.value-a.value);
+                  const fixed=sorted.filter(c=>c.fixed);
+                  const additional=sorted.filter(c=>!c.fixed);
+                  return<>
+                    {fixed.length>0&&<>
+                      <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">{t('operatingExpenses')} ({lang==='es'?'Propietario':'Owner'})</div>
+                      {fixed.map(c=><div key={c.name} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,c.value/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{c.name}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(c.value)} <span className="text-slate-400">({(c.value/fRev*100).toFixed(0)}%)</span></span></div></div>)}
+                    </>}
+                    {additional.length>0&&<>
+                      <div className="pl-2 text-[9px] font-bold text-slate-300 uppercase tracking-widest py-0.5 mt-1">{lang==='es'?'Gastos Adicionales':'Additional Expenses'}</div>
+                      {additional.map(c=><div key={c.name} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-yellow-400 opacity-75" style={{width:Math.max(2,c.value/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{c.name}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(c.value)} <span className="text-slate-400">({(c.value/fRev*100).toFixed(0)}%)</span></span></div></div>)}
+                    </>}
+                  </>;
+                })()}
               </>}
             </>}
 

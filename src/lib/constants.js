@@ -35,37 +35,38 @@ export const getTerms=(country)=>TERMS[country]||TERMS.DEFAULT;
 
 // Expense categories — country-aware
 const baseCats=(t)=>[
-  {v:'commission',l:'Comisión PM',i:'💼',fixed:true},{v:'electricity',l:'Electricidad',i:'⚡',fixed:true},
-  {v:'water',l:'Agua',i:'💧',fixed:true},{v:'hoa',l:t.hoa,i:'🏢',fixed:true},
-  {v:'maintenance',l:'Mantenimiento',i:'🔧',fixed:true},{v:'insurance',l:'Seguro',i:'🛡️',fixed:true},
-  {v:'taxes',l:'Impuestos',i:'🏛️'},{v:'legal',l:'Legal',i:'⚖️'},
-  {v:'renovacion',l:'Renovación',i:'🔨'},{v:'equipamiento',l:'Equipamiento',i:'🛋️'},
-  {v:'contabilidad',l:'Contabilidad',i:'📊'},{v:'marketing',l:'Marketing',i:'📸'},
-  {v:'vendor',l:'Vendor',i:'🛠️'},{v:'mortgage_pay',l:'Pago Hipoteca',i:'🏦',fixed:true},
-  {v:'pool',l:'Piscina',i:'🏊'},{v:'cleaning',l:'Limpieza',i:'🧹'},{v:'otros',l:'Otros',i:'📦'},
+  {v:'commission',l:'PM Commission',les:'Comisión PM',i:'💼',fixed:true},{v:'electricity',l:'Electricity',les:'Electricidad',i:'⚡',fixed:true},
+  {v:'water',l:'Water',les:'Agua',i:'💧',fixed:true},{v:'hoa',l:t.hoa,i:'🏢',fixed:true},
+  {v:'maintenance',l:'Maintenance',les:'Mantenimiento',i:'🔧',fixed:true},{v:'insurance',l:'Insurance',les:'Seguro',i:'🛡️',fixed:true},
+  {v:'taxes',l:'Taxes',les:'Impuestos',i:'🏛️'},{v:'legal',l:'Legal',les:'Legal',i:'⚖️'},
+  {v:'renovacion',l:'Renovation',les:'Renovación',i:'🔨'},{v:'equipamiento',l:'Equipment',les:'Equipamiento',i:'🛋️'},
+  {v:'contabilidad',l:'Accounting',les:'Contabilidad',i:'📊'},{v:'marketing',l:'Marketing',les:'Marketing',i:'📸'},
+  {v:'vendor',l:'Vendor',les:'Proveedor',i:'🛠️'},{v:'mortgage_pay',l:'Mortgage',les:'Hipoteca',i:'🏦',fixed:true},
+  {v:'pool',l:'Pool',les:'Piscina',i:'🏊'},{v:'cleaning',l:'Cleaning',les:'Limpieza',i:'🧹'},{v:'otros',l:'Other',les:'Otros',i:'📦'},
 ];
 const coCats=(t)=>[
-  {v:'personal',l:'Personal de Servicio',i:'👷',fixed:true},{v:'prestaciones',l:'Prestaciones Sociales',i:'📋',fixed:true},
-  {v:'electricity',l:'Energía',i:'⚡',fixed:true},{v:'water',l:'Agua',i:'💧',fixed:true},
-  {v:'gas',l:'Gas',i:'🔥',fixed:true},{v:'internet',l:'Internet / WiFi',i:'📶',fixed:true},{v:'cable',l:'Cable / TV',i:'📺',fixed:true},{v:'hoa',l:t.hoa,i:'🏢',fixed:true},
-  {v:'pool',l:'Piscina',i:'🏊',fixed:true},{v:'jardineria',l:'Jardinería / Zonas Verdes',i:'🌿',fixed:true},
-  {v:'maintenance',l:'Mantenimiento Preventivo',i:'🔧',fixed:true},
-  {v:'repairs',l:'Reparaciones',i:'🛠️'},
-  {v:'lenceria',l:'Lencería (sábanas, toallas, almohadas)',i:'🛏️'},
-  {v:'menaje',l:'Menaje (vajilla, cubiertos, vasos, ollas)',i:'🍽️'},
-  {v:'electrodomesticos',l:'Electrodomésticos',i:'🔌'},
-  {v:'renovacion',l:'Remodelación / Mejoras',i:'🔨'},
-  {v:'equipamiento',l:'Mobiliario / Decoración',i:'🛋️'},
-  {v:'insurance',l:'Seguros',i:'🛡️'},{v:'predial',l:'Impuesto Predial',i:'🏛️'},
-  {v:'taxes',l:'Otros Impuestos',i:'🏛️'},{v:'commission',l:'Comisión PM',i:'💼'},
-  {v:'contabilidad',l:'Contabilidad',i:'📊'},{v:'legal',l:'Legal',i:'⚖️'},
-  {v:'cleaning',l:'Aseo / Limpieza',i:'🧹'},{v:'vendor',l:'Proveedor / Otro Servicio',i:'📦'},
-  {v:'mortgage_pay',l:'Pago Hipoteca',i:'🏦',fixed:true},{v:'otros',l:'Otros',i:'📦'},
+  {v:'personal',l:'Staff',les:'Personal de Servicio',i:'👷',fixed:true},{v:'prestaciones',l:'Benefits',les:'Prestaciones Sociales',i:'📋',fixed:true},
+  {v:'electricity',l:'Electricity',les:'Energía',i:'⚡',fixed:true},{v:'water',l:'Water',les:'Agua',i:'💧',fixed:true},
+  {v:'gas',l:'Gas',les:'Gas',i:'🔥',fixed:true},{v:'internet',l:'Internet / WiFi',les:'Internet / WiFi',i:'📶',fixed:true},{v:'cable',l:'Cable / TV',les:'Cable / TV',i:'📺',fixed:true},{v:'hoa',l:t.hoa,i:'🏢',fixed:true},
+  {v:'pool',l:'Pool',les:'Piscina',i:'🏊',fixed:true},{v:'jardineria',l:'Landscaping',les:'Jardinería',i:'🌿',fixed:true},
+  {v:'maintenance',l:'Maintenance',les:'Mantenimiento',i:'🔧',fixed:true},
+  {v:'repairs',l:'Repairs',les:'Reparaciones',i:'🛠️'},
+  {v:'lenceria',l:'Linens',les:'Lencería',i:'🛏️'},
+  {v:'menaje',l:'Kitchenware',les:'Menaje',i:'🍽️'},
+  {v:'electrodomesticos',l:'Appliances',les:'Electrodomésticos',i:'🔌'},
+  {v:'renovacion',l:'Renovation',les:'Remodelación',i:'🔨'},
+  {v:'equipamiento',l:'Furniture',les:'Mobiliario',i:'🛋️'},
+  {v:'insurance',l:'Insurance',les:'Seguros',i:'🛡️'},{v:'predial',l:'Property Tax',les:'Impuesto Predial',i:'🏛️'},
+  {v:'taxes',l:'Other Taxes',les:'Otros Impuestos',i:'🏛️'},{v:'commission',l:'PM Commission',les:'Comisión PM',i:'💼'},
+  {v:'contabilidad',l:'Accounting',les:'Contabilidad',i:'📊'},{v:'legal',l:'Legal',les:'Legal',i:'⚖️'},
+  {v:'cleaning',l:'Cleaning',les:'Limpieza',i:'🧹'},{v:'vendor',l:'Vendor',les:'Proveedor',i:'📦'},
+  {v:'mortgage_pay',l:'Mortgage',les:'Hipoteca',i:'🏦',fixed:true},{v:'otros',l:'Other',les:'Otros',i:'📦'},
 ];
-export const getCats=(country)=>{
+export const getCats=(country,lang='en')=>{
   const t=getTerms(country);
-  if(country==='CO')return coCats(t);
-  return baseCats(t);
+  const cats=country==='CO'?coCats(t):baseCats(t);
+  if(lang==='es')return cats.map(c=>({...c,l:c.les||c.l}));
+  return cats;
 };
 export const CATS=getCats('US');
 
