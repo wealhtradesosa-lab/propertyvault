@@ -217,7 +217,7 @@ export async function parseMortgageStatement(file) {
   result.rawPreview = fullText.slice(0, 500).replace(/\s+/g, ' ').trim();
 
   // Detect servicer
-  const servicers = ['Mr. Cooper','NewRez','Wells Fargo','Chase','Bank of America','Flagstar','PennyMac','Rocket Mortgage','loanDepot','Freedom Mortgage','Caliber','PHH','Nationstar','Shellpoint','Carrington'];
+  const servicers = ['AmWest','Mr. Cooper','NewRez','Wells Fargo','Chase','Bank of America','Flagstar','PennyMac','Rocket Mortgage','loanDepot','Freedom Mortgage','Caliber','PHH','Nationstar','Shellpoint','Carrington'];
   for (const s of servicers) { if (fullText.toLowerCase().includes(s.toLowerCase())) { result.servicer = s; break; } }
 
   // Balance (must be between $10K and $2M to be realistic)
@@ -227,21 +227,48 @@ export async function parseMortgageStatement(file) {
   }
 
   // Interest Rate (must be between 1% and 15%)
-  const rateMatch = fullText.match(/(?:Interest Rate|Current Rate|Note Rate|Annual Rate)\s*:?\s*(\d+\.?\d*)\s*%/i);
+  const rateMatch = fullText.match(/(?:Interest Rate|Current Rate|Note Rate|Annual Rate)\s*:?\s*(\d+\.?\d*)\s*%?/i);
   if (rateMatch) { const r = parseFloat(rateMatch[1]); if (r >= 1 && r <= 15) result.rate = r; }
 
-  // Principal & Interest (must be between $200 and $15,000/mo)
-  for (const l of ['Principal and Interest','Principal & Interest','P&I','Principal/Interest','P & I','Regular Payment']) {
+  // Principal & Interest — try combined first, then calculate from separate P + I
+  for (const l of ['Principal and Interest','Principal & Interest','P&I','Principal/Interest','P & I']) {
     const v = grabMort(fullText, l);
     if (v >= 200 && v <= 15000) { result.principalAndInterest = v; break; }
   }
-
-  // Tax Escrow (must be between $50 and $3,000/mo)
-  for (const l of ['Tax Escrow','Property Tax','County Tax','Real Estate Tax','Escrow for Taxes','Tax Impound','Taxes']) {
-    const v = grabMort(fullText, l);
-    if (v >= 50 && v <= 3000) { result.taxEscrow = v; result.includesTaxes = true; break; }
+  // If not found as combined, try separate Principal + Interest lines
+  if (!result.principalAndInterest) {
+    const pMatch = fullText.match(/\bPrincipal:\s*\$?([\d,]+\.\d{2})/i);
+    const iMatch = fullText.match(/\bInterest:\s*\$?([\d,]+\.\d{2})/i);
+    if (pMatch && iMatch) {
+      const p = parseFloat(pMatch[1].replace(/,/g,''));
+      const i = parseFloat(iMatch[1].replace(/,/g,''));
+      if (p > 0 && p < 5000 && i > 0 && i < 10000) {
+        result.principalAndInterest = p + i;
+        result.principal = p;
+        result.interest = i;
+      }
+    }
   }
-  // Also check for annual tax divided by 12
+
+  // Tax and Insurance COMBINED (AmWest, some other servicers)
+  const tiCombined = grabMort(fullText, 'Tax and Insurance');
+  if (tiCombined >= 100 && tiCombined <= 5000) {
+    // Combined — split roughly 60/40 tax/insurance (common ratio)
+    // User can edit in the confirmation modal
+    result.taxEscrow = Math.round(tiCombined * 0.6 * 100) / 100;
+    result.insuranceEscrow = Math.round(tiCombined * 0.4 * 100) / 100;
+    result.taxAndInsuranceCombined = tiCombined;
+    result.includesTaxes = true;
+    result.includesInsurance = true;
+  }
+
+  // Tax Escrow — only if not already found from combined
+  if (!result.taxEscrow) {
+    for (const l of ['Tax Escrow','Property Tax','County Tax','Real Estate Tax','Escrow for Taxes','Tax Impound']) {
+      const v = grabMort(fullText, l);
+      if (v >= 50 && v <= 3000) { result.taxEscrow = v; result.includesTaxes = true; break; }
+    }
+  }
   if (!result.taxEscrow) {
     for (const l of ['Annual Property Tax','Annual Tax','Yearly Tax']) {
       const v = grabMort(fullText, l);
@@ -249,12 +276,13 @@ export async function parseMortgageStatement(file) {
     }
   }
 
-  // Insurance Escrow (must be between $30 and $2,000/mo)
-  for (const l of ['Insurance Escrow','Hazard Insurance','Homeowner Insurance','Homeowners Insurance','HO Insurance','Escrow for Insurance','Insurance Impound','Dwelling Insurance','Insurance Payment']) {
-    const v = grabMort(fullText, l);
-    if (v >= 30 && v <= 2000) { result.insuranceEscrow = v; result.includesInsurance = true; break; }
+  // Insurance Escrow — only if not already found from combined
+  if (!result.insuranceEscrow) {
+    for (const l of ['Insurance Escrow','Hazard Insurance','Homeowner Insurance','Homeowners Insurance','HO Insurance','Escrow for Insurance','Insurance Impound','Dwelling Insurance','Insurance Payment']) {
+      const v = grabMort(fullText, l);
+      if (v >= 30 && v <= 2000) { result.insuranceEscrow = v; result.includesInsurance = true; break; }
+    }
   }
-  // Also check annual insurance
   if (!result.insuranceEscrow) {
     for (const l of ['Annual Insurance','Annual Premium','Yearly Insurance','Insurance Premium']) {
       const v = grabMort(fullText, l);
@@ -263,13 +291,13 @@ export async function parseMortgageStatement(file) {
   }
 
   // Other escrow — PMI, Flood (must be < $500/mo)
-  for (const l of ['PMI','Mortgage Insurance','MIP','Flood Insurance']) {
+  for (const l of ['PMI','Mortgage Insurance','MIP','Flood Insurance','Miscellaneous Insurance']) {
     const v = grabMort(fullText, l);
     if (v > 0 && v <= 500) { result.otherEscrow += v; }
   }
 
   // Total Monthly Payment (must be between $300 and $20,000)
-  for (const l of ['Total Payment','Total Monthly Payment','Total Amount Due','Amount Due','Monthly Payment Amount','Payment Amount']) {
+  for (const l of ['Regular Monthly Payment','Total Payment','Total Monthly Payment','Total Amount Due','Amount Due','Monthly Payment Amount','Payment Amount']) {
     const v = grabMort(fullText, l);
     if (v >= 300 && v <= 20000) { result.monthlyPayment = v; break; }
   }
