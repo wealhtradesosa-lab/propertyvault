@@ -226,9 +226,9 @@ export async function parseMortgageStatement(file) {
     if (v >= 10000 && v <= 2000000) { result.balance = v; break; }
   }
 
-  // Interest Rate (must be between 1% and 15%)
-  const rateMatch = fullText.match(/(?:Interest Rate|Current Rate|Note Rate|Annual Rate)\s*:?\s*(\d+\.?\d*)\s*%?/i);
-  if (rateMatch) { const r = parseFloat(rateMatch[1]); if (r >= 1 && r <= 15) result.rate = r; }
+  // Interest Rate — handle "7.25000" format with or without %
+  const rateMatch = fullText.match(/Interest Rate\s*:?\s*(\d+\.\d+)\s*%?/i);
+  if (rateMatch) { const r = parseFloat(rateMatch[1]); if (r >= 1 && r <= 15) result.rate = Math.round(r * 100) / 100; }
 
   // Principal & Interest — try combined first, then calculate from separate P + I
   for (const l of ['Principal and Interest','Principal & Interest','P&I','Principal/Interest','P & I']) {
@@ -236,14 +236,15 @@ export async function parseMortgageStatement(file) {
     if (v >= 200 && v <= 15000) { result.principalAndInterest = v; break; }
   }
   // If not found as combined, try separate Principal + Interest lines
+  // IMPORTANT: "Principal:" must NOT be followed by "Balance" (that's the loan balance)
   if (!result.principalAndInterest) {
-    const pMatch = fullText.match(/\bPrincipal:\s*\$?([\d,]+\.\d{2})/i);
+    const pMatch = fullText.match(/\bPrincipal:(?!\s*Balance)\s*\$?([\d,]+\.\d{2})/i);
     const iMatch = fullText.match(/\bInterest:\s*\$?([\d,]+\.\d{2})/i);
     if (pMatch && iMatch) {
       const p = parseFloat(pMatch[1].replace(/,/g,''));
       const i = parseFloat(iMatch[1].replace(/,/g,''));
       if (p > 0 && p < 5000 && i > 0 && i < 10000) {
-        result.principalAndInterest = p + i;
+        result.principalAndInterest = Math.round((p + i) * 100) / 100;
         result.principal = p;
         result.interest = i;
       }
