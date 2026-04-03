@@ -125,7 +125,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   };
   const update=async(sub,id,data)=>{await updateDoc(doc(db,'properties',propertyId,sub,id),data);setModal(null);setEditId(null)};
   const del=async(sub,id)=>{if(!confirm('¿Eliminar?'))return;await deleteDoc(doc(db,'properties',propertyId,sub,id))};
-  const saveMortgage=async()=>{setSavingMort(true);try{const data={balance:parseFloat(mortConfig.bal)||0,rate:parseFloat(mortConfig.rate)||0,termYears:parseInt(mortConfig.term)||30,monthlyPayment:parseFloat(mortConfig.pay)||0,startDate:mortConfig.start||'',includesTaxes:!!mortConfig.includesTaxes,includesInsurance:!!mortConfig.includesInsurance};const p=window.__mortParsed;if(p?.parsed){data.principalAndInterest=p.principalAndInterest||0;data.taxEscrow=p.taxEscrow||0;data.insuranceEscrow=p.insuranceEscrow||0;data.otherEscrow=p.otherEscrow||0;data.servicer=p.servicer||'';window.__mortParsed=null;}await updateDoc(doc(db,'properties',propertyId),{mortgage:data})}catch(e){notify('Error: '+e.message,'error')}setSavingMort(false)};
+  const saveMortgage=async()=>{setSavingMort(true);try{const data={balance:parseFloat(mortConfig.bal)||0,rate:parseFloat(mortConfig.rate)||0,termYears:parseInt(mortConfig.term)||30,monthlyPayment:parseFloat(mortConfig.pay)||0,startDate:mortConfig.start||'',includesTaxes:!!mortConfig.includesTaxes,includesInsurance:!!mortConfig.includesInsurance};const p=window.__mortParsed;if(p?.parsed){data.principalAndInterest=p.principalAndInterest||0;data.principal=p.principal||0;data.interest=p.interest||0;data.taxEscrow=p.taxEscrow||0;data.insuranceEscrow=p.insuranceEscrow||0;data.taxAndInsuranceCombined=p.taxAndInsuranceCombined||0;data.otherEscrow=p.otherEscrow||0;data.servicer=p.servicer||'';window.__mortParsed=null;}await updateDoc(doc(db,'properties',propertyId),{mortgage:data})}catch(e){notify('Error: '+e.message,'error')}setSavingMort(false)};
 
   // PDF Upload handler — with robust duplicate detection
   const handlePDFs=async(files)=>{
@@ -1168,16 +1168,64 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="text-[9px] text-slate-400 mt-2">{lang==='es'?'Compatible con: Mr. Cooper, Wells Fargo, Chase, NewRez, PennyMac, Flagstar, Freedom Mortgage y más':'Compatible with: Mr. Cooper, Wells Fargo, Chase, NewRez, PennyMac, Flagstar, Freedom Mortgage and more'}</div>
       </div>
       {mort.balance>0?<>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4"><KPI label="Balance" value={gFm(mort.balance)} color="red"/><KPI label={lang==='es'?'Tasa':'Rate'} value={mort.rate+'%'} sub={mort.termYears+` ${lang==='es'?'años':'years'}`} color="amber"/><KPI label={lang==='es'?'Pago Mensual':'Monthly Payment'} value={gFm(mort.monthlyPayment)} color="blue"/><KPI label={lang==='es'?'Total Intereses':'Total Interest'} value={sNE.length>0?fm(sNE[sNE.length-1].ti):'$0'} sub={lang==='es'?'sin pagos extra':'without extra payments'} color="purple"/><KPI label="Equity" value={gFm(equity)} sub={'LTV: '+ltv.toFixed(0)+'%'} color="green"/></div>
-        {(mort.principalAndInterest||mort.taxEscrow||mort.insuranceEscrow)&&<div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm mb-5">
-          <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">{lang==='es'?'Desglose del Pago':'Payment Breakdown'} {mort.servicer&&<span className="text-blue-500 normal-case">· {mort.servicer}</span>}</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {mort.principalAndInterest>0&&<div className="bg-slate-50 rounded-xl p-3 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">P&I</div><div className="text-base font-extrabold text-slate-700">{gFm(mort.principalAndInterest)}<span className="text-[10px] text-slate-400">/{t('mo')}</span></div></div>}
-            {mort.taxEscrow>0&&<div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100"><div className="text-[9px] text-blue-600 font-bold uppercase">🏛️ Tax Escrow</div><div className="text-base font-extrabold text-blue-700">{gFm(mort.taxEscrow)}<span className="text-[10px] text-blue-400">/{t('mo')}</span></div></div>}
-            {mort.insuranceEscrow>0&&<div className="bg-cyan-50 rounded-xl p-3 text-center border border-cyan-100"><div className="text-[9px] text-cyan-600 font-bold uppercase">🛡️ Insurance Escrow</div><div className="text-base font-extrabold text-cyan-700">{gFm(mort.insuranceEscrow)}<span className="text-[10px] text-cyan-400">/{t('mo')}</span></div></div>}
-            {mort.otherEscrow>0&&<div className="bg-slate-50 rounded-xl p-3 text-center"><div className="text-[9px] text-slate-500 font-bold uppercase">PMI / Other</div><div className="text-base font-extrabold text-slate-700">{gFm(mort.otherEscrow)}<span className="text-[10px] text-slate-400">/{t('mo')}</span></div></div>}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5"><KPI label="Balance" value={gFm(mort.balance)} color="red"/><KPI label={lang==='es'?'Tasa':'Rate'} value={mort.rate+'%'} sub={mort.termYears+` ${lang==='es'?'años':'years'}`} color="amber"/><KPI label="Equity" value={gFm(equity)} sub={'LTV: '+ltv.toFixed(0)+'%'} color="green"/><KPI label={lang==='es'?'Total Intereses':'Total Interest'} value={sNE.length>0?fm(sNE[sNE.length-1].ti):'$0'} sub={lang==='es'?'vida del préstamo':'life of loan'} color="purple"/></div>
+
+        {/* Payment Breakdown — where every dollar goes */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm mb-5">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-sm font-bold text-slate-700">{lang==='es'?'¿A dónde va tu pago mensual?':'Where does your monthly payment go?'} {mort.servicer&&<span className="text-[10px] text-blue-500 font-normal">· {mort.servicer}</span>}</h3>
+            <div className="text-right"><div className="text-lg font-black text-slate-800">{gFm(mort.monthlyPayment)}<span className="text-[10px] text-slate-400 font-normal">/{t('mo')}</span></div></div>
           </div>
-        </div>}
+
+          {(()=>{
+            const pi=mort.principalAndInterest||0;
+            const p=mort.principal||0;
+            const i=mort.interest||0;
+            const tiCombined=mort.taxAndInsuranceCombined||0;
+            const tax=mort.taxEscrow||0;
+            const ins=mort.insuranceEscrow||0;
+            const other=mort.otherEscrow||0;
+            const total=mort.monthlyPayment||1;
+            const hasBd=pi>0||p>0||tiCombined>0||tax>0||ins>0;
+
+            if(!hasBd) return <div className="text-[11px] text-slate-400 text-center py-4">{lang==='es'?'Sube un statement de tu banco para ver el desglose, o edita la hipoteca manualmente.':'Upload a bank statement to see the breakdown, or edit the mortgage manually.'}</div>;
+
+            const items=[];
+            if(p>0) items.push({label:'Principal',value:p,color:'bg-emerald-500',desc:lang==='es'?'Reduce tu deuda':'Reduces your debt'});
+            if(i>0) items.push({label:lang==='es'?'Interés':'Interest',value:i,color:'bg-rose-400',desc:lang==='es'?'Costo del préstamo':'Cost of borrowing'});
+            if(!p&&!i&&pi>0) items.push({label:'P&I',value:pi,color:'bg-slate-500',desc:'Principal + Interest'});
+            if(tiCombined>0) items.push({label:'Tax + Insurance',value:tiCombined,color:'bg-blue-500',desc:lang==='es'?'Escrow — impuestos y seguro':'Escrow — taxes and insurance'});
+            if(!tiCombined&&tax>0) items.push({label:lang==='es'?'🏛️ Impuestos':'🏛️ Taxes',value:tax,color:'bg-blue-500',desc:'Property Tax Escrow'});
+            if(!tiCombined&&ins>0) items.push({label:lang==='es'?'🛡️ Seguro':'🛡️ Insurance',value:ins,color:'bg-cyan-500',desc:'Homeowner Insurance Escrow'});
+            if(other>0) items.push({label:'PMI / Other',value:other,color:'bg-amber-400',desc:lang==='es'?'Seguro hipotecario privado':'Private mortgage insurance'});
+
+            return<div className="space-y-2.5">
+              {/* Stacked bar */}
+              <div className="h-8 rounded-lg overflow-hidden flex">
+                {items.map((it,idx)=><div key={idx} className={`${it.color} relative group`} style={{width:(it.value/total*100)+'%'}}><div className="absolute inset-0 flex items-center justify-center"><span className="text-[8px] font-bold text-white truncate px-1">{(it.value/total*100).toFixed(0)}%</span></div></div>)}
+              </div>
+              {/* Detail rows */}
+              {items.map((it,idx)=><div key={idx} className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-sm ${it.color} shrink-0`}/>
+                <div className="flex-1">
+                  <div className="text-[11px] font-semibold text-slate-700">{it.label}</div>
+                  <div className="text-[9px] text-slate-400">{it.desc}</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[12px] font-bold text-slate-800">{gFm(it.value)}</div>
+                  <div className="text-[9px] text-slate-400">{(it.value/total*100).toFixed(1)}%</div>
+                </div>
+              </div>)}
+              {/* Annual totals */}
+              <div className="border-t border-slate-100 pt-2 mt-1 grid grid-cols-2 gap-2 text-center">
+                <div className="bg-slate-50 rounded-lg p-2"><div className="text-[9px] text-slate-400 uppercase">{lang==='es'?'Pagas al año':'Annual payment'}</div><div className="text-sm font-extrabold text-slate-700">{gFm(total*12)}</div></div>
+                {p>0&&<div className="bg-emerald-50 rounded-lg p-2"><div className="text-[9px] text-emerald-500 uppercase">{lang==='es'?'A principal/año':'To principal/yr'}</div><div className="text-sm font-extrabold text-emerald-700">{gFm(p*12)}</div></div>}
+              </div>
+            </div>;
+          })()}
+
+          {(mort.includesTaxes||mort.includesInsurance)&&<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 mt-3 text-[10px] text-emerald-700">✅ {lang==='es'?'Tax e Insurance incluidos en tu pago — excluidos automáticamente de Operating Expenses en el P&L.':'Tax and Insurance included in your payment — auto-excluded from Operating Expenses in the P&L.'}</div>}
+        </div>
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm mb-4"><h3 className="text-base font-extrabold text-slate-800 mb-1">💰 Simulador de Pagos Anticipados</h3><p className="text-xs text-slate-400 mb-5">¿Cuánto extra al principal cada mes?</p>
           <div className="max-w-md mb-6"><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Extra MENSUAL al principal" value={extraP} onChange={setExtraP} prefix="$" type="number" placeholder="Ej: 200"/><Inp label="Extra ANUAL al principal" value={extraPA} onChange={setExtraPA} prefix="$" type="number" placeholder="Ej: 5,000"/></div><p className="text-[10px] text-slate-400 mt-2">El pago mensual extra se aplica cada mes. El pago anual se aplica una vez al año al final de cada año.</p></div>
           {sE.length>0&&sNE.length>0&&<><div className="grid grid-cols-3 gap-4 mb-6">
