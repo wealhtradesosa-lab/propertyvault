@@ -70,7 +70,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const partners=prop.partners||[];const mort=prop.mortgage||{};
   const [expenseForm,setExpenseForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});const [editId,setEditId]=useState(null);
   const [nf,setNf]=useState({date:'',month:'',grossAmount:''});
-  const [contribForm,setContribForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||''});
+  const [contribForm,setContribForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});
   const [stmtForm,setStmtForm]=useState({year:new Date().getFullYear(),month:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''});
   const ue=useCallback((k,v)=>setExpenseForm(x=>({...x,[k]:v})),[]);const un=useCallback((k,v)=>setNf(x=>({...x,[k]:v})),[]);
   const uc=useCallback((k,v)=>setContribForm(x=>({...x,[k]:v})),[]);const us=useCallback((k,v)=>setStmtForm(x=>({...x,[k]:v})),[]);
@@ -432,7 +432,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="hidden md:block"><h1 className="text-lg md:text-xl font-extrabold text-slate-800">{prop.name}</h1><p className="text-xs text-slate-400 mt-0.5">{prop.address}, {prop.city} {prop.state}</p></div>
         <div className="flex gap-2">
           <button onClick={()=>window.print()} aria-label="Imprimir" className="hidden md:flex px-3 py-2 bg-slate-100 text-slate-500 text-xs rounded-xl font-bold hover:bg-slate-200 items-center gap-1.5"><Printer size={13}/></button>
-          <button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 active:bg-slate-900 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> {t('addExpense')}</button>
+          <button onClick={()=>setModal('recordWhat')} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-slate-700 text-white text-xs rounded-xl font-bold hover:bg-slate-800 active:bg-slate-900 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> {lang==='es'?'Registrar':'Record'}</button>
           <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="flex-1 md:flex-none px-4 py-3 md:py-2 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-1.5 shadow-sm"><Upload size={14}/> Statements</button>
         </div>
       </div>
@@ -899,7 +899,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       });
 
       return <>
-      <div className="flex justify-between items-center mb-4"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">👥 {t('partnersCapital')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||''});setModal('contribution')}} className="px-4 py-2.5 bg-purple-600 text-white text-xs rounded-xl font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {t('capital')}</button></div>
+      <div className="flex justify-between items-center mb-4"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">👥 {t('partnersCapital')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});setModal('contribution')}} className="px-4 py-2.5 bg-purple-600 text-white text-xs rounded-xl font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {t('capital')}</button></div>
 
       {/* Instructional card — how capital vs expenses work */}
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-5">
@@ -965,7 +965,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {/* Contribution history */}
       {contribs.length>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Historial de Movimientos</h3>
-        <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},{label:'Socio',render:r=><span className="font-semibold" style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>},{label:'Concepto',key:'concept',cls:'text-slate-600'},{label:'Monto',r:true,render:r=><span className="font-bold text-emerald-600">{gFm(r.amount)}</span>}]} rows={contribs} onDel={del} dc="contributions" onEdit={r=>{setContribForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||''});setEditId(r.id);setModal('contribution')}}/>
+        <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500">{fmDate(r.date)}</span>},{label:'Socio',render:r=><span className="font-semibold" style={{color:pCl(r.paidBy)}}>{pN(r.paidBy)}</span>},{label:'Concepto',key:'concept',cls:'text-slate-600'},{label:'Monto',r:true,render:r=><span className="font-bold text-emerald-600">{gFm(r.amount)}</span>}]} rows={contribs} onDel={del} dc="contributions" onEdit={r=>{setContribForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',purpose:r.purpose||'operations'});setEditId(r.id);setModal('contribution')}}/>
       </>}
     </>})()}
 
@@ -1484,6 +1484,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {/* ═══ MODALS ═══ */}
     {modal==='expense'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Gasto':'✏️ Edit Expense'):(lang==='es'?'Registrar Gasto':'Add Expense')} grad="from-rose-500 to-rose-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={()=>{const data={...expenseForm,amount:parseFloat(expenseForm.amount)};if(editId){update('expenses',editId,data)}else{save('expenses',data)}}} disabled={!expenseForm.amount||!expenseForm.concept} className="flex-1 py-2.5 bg-rose-500 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label={lang==='es'?'Fecha':'Date'} value={expenseForm.date} onChange={v=>ue('date',v)} type="date" required/><Sel label={lang==='es'?'Categoría':'Category'} value={expenseForm.category} onChange={v=>ue('category',v)} options={propCats.map(c=>({v:c.v,l:c.i+' '+c.l}))}/></div>
+      {(()=>{const existing=expenses.find(e=>e.category===expenseForm.category&&e.category!=='otros'&&(e.type==='fixed'||eFreq(e)==='monthly'||eFreq(e)==='annual')&&!editId);return existing?<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2.5 rounded-xl">⚠️ {lang==='es'?<>Ya tienes un gasto fijo en esta categoría (<b>{existing.concept}</b>). Si un socio pagó esta obligación, usa <button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:existing.concept,amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});setModal('contribution')}} className="underline text-purple-600 font-bold">Aporte de Socio</button> en vez de crear otro gasto.</>:<>You already have a fixed expense in this category (<b>{existing.concept}</b>). If a partner paid this obligation, use <button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:existing.concept,amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});setModal('contribution')}} className="underline text-purple-600 font-bold">Partner Payment</button> instead of creating another expense.</>}</div>:null})()}
       <Inp label={lang==='es'?'Concepto':'Concept'} value={expenseForm.concept} onChange={v=>ue('concept',v)} placeholder={lang==='es'?'Descripción del gasto':'Expense description'} required error={expenseForm.concept===''&&expenseForm.amount?(lang==='es'?'Ingresa una descripción':'Enter a description'):''}/>
       <div className="grid grid-cols-2 gap-3">
         <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moneda</label><div className="grid grid-cols-3 gap-1">{[['USD','🇺🇸 USD'],['COP','🇨🇴 COP'],['EUR','🇪🇺 EUR']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('expCurrency',v)} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${(expenseForm.expCurrency||propCurrency)===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
@@ -1498,10 +1499,20 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'¿Quién pagó?':'Who paid?'}</label><PPick partners={partners} selected={expenseForm.paidBy} onChange={v=>ue('paidBy',v)}/></div>
     </Mdl>}
 
-    {modal==='contribution'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Aporte':'✏️ Edit Contribution'):(lang==='es'?'Aporte de Capital':'Capital Contribution')} grad="from-purple-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{const data={...contribForm,amount:parseFloat(contribForm.amount),type:'contribution'};if(editId){update('contributions',editId,data)}else{save('contributions',data)}}} disabled={!contribForm.amount} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
+    {modal==='contribution'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Aporte':'✏️ Edit Contribution'):(lang==='es'?'Aporte de Capital':'Capital Contribution')} grad="from-purple-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{const data={...contribForm,amount:parseFloat(contribForm.amount),type:'contribution',purpose:contribForm.purpose||'operations'};if(editId){update('contributions',editId,data)}else{save('contributions',data)}}} disabled={!contribForm.amount} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
       <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-3 text-[11px] text-blue-700">💡 {lang==='es'?'Los aportes de capital NO son gastos. No afectan el P&L. Solo registran quién puso dinero para cubrir la operación.':'Capital contributions are NOT expenses. They don\'t affect the P&L. They only track who put money in to cover operations.'}</div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label={lang==='es'?'Fecha':'Date'} value={contribForm.date} onChange={v=>uc('date',v)} type="date" required/><Inp label={lang==='es'?'Monto':'Amount'} value={contribForm.amount} onChange={v=>uc('amount',v)} prefix="$" type="number" required error={contribForm.amount&&parseFloat(contribForm.amount)<=0?(lang==='es'?'Monto debe ser mayor a 0':'Amount must be > 0'):''}/></div>
-      <Inp label={lang==='es'?'Concepto':'Concept'} value={contribForm.concept} onChange={v=>uc('concept',v)} placeholder={lang==='es'?'Ej: Aporte mensual para operación':'e.g. Monthly operating contribution'} required/>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'¿Para qué es este aporte?':'What is this contribution for?'}</label>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">{[
+          ['operations',lang==='es'?'🏠 Operación mensual':'🏠 Monthly operations'],
+          ['mortgage',lang==='es'?'🏦 Hipoteca':'🏦 Mortgage'],
+          ['insurance',lang==='es'?'🛡️ Seguro':'🛡️ Insurance'],
+          ['taxes',lang==='es'?'🏛️ Impuestos':'🏛️ Taxes'],
+          ['repair',lang==='es'?'🔧 Reparación':'🔧 Repair'],
+          ['other',lang==='es'?'📦 Otro':'📦 Other'],
+        ].map(([v,l])=><button key={v} type="button" onClick={()=>uc('purpose',v)} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${(contribForm.purpose||'operations')===v?'border-purple-500 bg-purple-50 text-purple-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div>
+      </div>
+      <Inp label={lang==='es'?'Nota (opcional)':'Note (optional)'} value={contribForm.concept} onChange={v=>uc('concept',v)} placeholder={lang==='es'?'Ej: Transferencia para cubrir déficit de marzo':'e.g. Transfer to cover March deficit'}/>
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Socio':'Partner'}</label><PPick partners={partners} selected={contribForm.paidBy} onChange={v=>uc('paidBy',v)}/></div>
     </Mdl>}
 
@@ -1556,6 +1567,37 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="flex justify-between"><span className="text-slate-500">Valor Estimado</span><span className="font-bold text-emerald-600">{gFm(parseFloat(valForm.value))}</span></div>
         <div className="flex justify-between border-t border-slate-200 pt-2"><span className="text-slate-600 font-semibold">Apreciación</span><span className={`font-extrabold ${parseFloat(valForm.value)>=prop.purchasePrice?'text-emerald-600':'text-rose-500'}`}>{((parseFloat(valForm.value)-prop.purchasePrice)/prop.purchasePrice*100).toFixed(1)}% ({gFm(parseFloat(valForm.value)-prop.purchasePrice)})</span></div>
       </div>}
+    </Mdl>}
+
+    {/* Smart routing: What are you recording? */}
+    {modal==='recordWhat'&&<Mdl title={lang==='es'?'¿Qué deseas registrar?':'What do you want to record?'} grad="from-slate-700 to-slate-800" onClose={()=>setModal(null)}>
+      <div className="grid grid-cols-1 gap-3">
+        <button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-rose-400 hover:bg-rose-50 transition group">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 flex items-center justify-center text-rose-600 text-lg group-hover:bg-rose-200 transition">🧾</div>
+            <div>
+              <div className="font-bold text-slate-800 text-sm">{lang==='es'?'Nuevo Gasto':'New Expense'}</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">{lang==='es'?'Un costo nuevo de la propiedad (reparación, compra, servicio adicional)':'A new property cost (repair, purchase, additional service)'}</div>
+            </div>
+          </div>
+          <div className="text-[10px] text-rose-500 mt-2 ml-13 pl-[52px]">{lang==='es'?'→ Afecta el P&L':'→ Affects P&L'}</div>
+        </button>
+        <button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});setModal('contribution')}} className="text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-purple-400 hover:bg-purple-50 transition group">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center text-purple-600 text-lg group-hover:bg-purple-200 transition">💰</div>
+            <div>
+              <div className="font-bold text-slate-800 text-sm">{lang==='es'?'Aporte de Socio':'Partner Payment'}</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">{lang==='es'?'Un socio transfirió dinero para cubrir costos existentes (hipoteca, seguro, operación mensual)':'A partner transferred money to cover existing costs (mortgage, insurance, monthly operations)'}</div>
+            </div>
+          </div>
+          <div className="text-[10px] text-purple-500 mt-2 ml-13 pl-[52px]">{lang==='es'?'→ NO afecta el P&L — solo registra quién pagó':'→ Does NOT affect P&L — only tracks who paid'}</div>
+        </button>
+      </div>
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3 text-[11px] text-amber-700">
+        💡 {lang==='es'
+          ?'Si el gasto ya existe (seguro, hipoteca, servicios mensuales), usa "Aporte de Socio". Registrar el mismo costo como Gasto Y como Aporte lo contaría doble.'
+          :'If the cost already exists (insurance, mortgage, monthly utilities), use "Partner Payment." Recording the same cost as an Expense AND a Payment would double-count it.'}
+      </div>
     </Mdl>}
 
     {modal==='upload'&&<Mdl title="📤 Subir Statements (PDF)" grad="from-blue-600 to-cyan-600" onClose={()=>setModal(null)}>
