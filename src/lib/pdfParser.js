@@ -138,74 +138,56 @@ const mesesES={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8
 const monthsEN={january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
 
 function parseAirbnbAnnual(t) {
-  // Default year from header: "2025 Informe de ganancias" or date range
-  const yrMatch = t.match(/(\d{4})\s*(?:Informe de ganancias|Earnings)/i) || t.match(/–\s*\d+\s*de\s*\w+\s*de\s*(\d{4})/);
+  const yrMatch = t.match(/[–-]\s*\d+\s*de\s*\w+\s*de\s*(\d{4})/);
   const defaultYear = yrMatch ? parseInt(yrMatch[1]) : new Date().getFullYear() - 1;
-
   const results = [];
-  const allMonths = 'enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre|january|february|march|april|may|june|july|august|september|october|november|december';
-
-  // Pattern: "enero de 2023 $4,983.28 USD $4,380.43 USD"
-  // OR: "enero $4,983.28 USD $4,380.43 USD" (without year)
-  // OR: "1 – 3 de abr de 2026 $645.21 USD $625.85 USD" (partial month)
-  const monthRx = new RegExp('(' + allMonths + ')(?:\\s+de\\s+(\\d{4}))?\\s+\\$?([\\d,]+\\.\\d{2})\\s*USD\\s+\\$?([\\d,]+\\.\\d{2})\\s*USD', 'gi');
-
-  let m;
   const seen = new Set();
-  while ((m = monthRx.exec(t)) !== null) {
-    const monthName = m[1].toLowerCase();
-    const month = mesesES[monthName] || monthsEN[monthName];
-    const year = m[2] ? parseInt(m[2]) : defaultYear;
-    const revenue = parseFloat(m[3].replace(/,/g, ''));
-    const net = parseFloat(m[4].replace(/,/g, ''));
-    const commission = Math.max(0, revenue - net);
-    const key = `${year}-${month}`;
-    if (month && revenue >= 0 && !seen.has(key)) {
-      seen.add(key);
-      if (revenue > 0) {
-        results.push(result({ year, month, revenue, commission, net, format: 'Airbnb Annual' }));
+  const allMonthMap = {...mesesES, ...monthsEN};
+  const lines = t.split(/\n/);
+  for (const line of lines) {
+    for (const [mName, mNum] of Object.entries(allMonthMap)) {
+      const rx = new RegExp(mName + '\\s+(?:de\\s+(\\d{4})\\s+)?[$]?([\\d,]+[.]\\d{2})\\s*USD\\s+[$]?([\\d,]+[.]\\d{2})\\s*USD', 'i');
+      const match = line.match(rx);
+      if (match) {
+        const year = match[1] ? parseInt(match[1]) : defaultYear;
+        const revenue = parseFloat(match[2].replace(/,/g, ''));
+        const net = parseFloat(match[3].replace(/,/g, ''));
+        const key = year + '-' + mNum;
+        if (revenue > 0 && !seen.has(key)) {
+          seen.add(key);
+          results.push(result({ year, month: mNum, revenue, commission: Math.max(0, revenue - net), net, format: 'Airbnb Annual' }));
+        }
+        break;
+      }
+    }
+    // Partial month: "1 – 3 de abr de 2026 $645.21 USD $625.85 USD"
+    const abbrMap = {ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12};
+    const pm = line.match(/\d+\s*[\u2013-]\s*\d+\s+de\s+(\w+)\s+de\s+(\d{4})\s+[$]?([\d,]+[.]\d{2})\s*USD\s+[$]?([\d,]+[.]\d{2})\s*USD/i);
+    if (pm) {
+      const month = abbrMap[pm[1].toLowerCase()] || mesesES[pm[1].toLowerCase()];
+      if (month) {
+        const year = parseInt(pm[2]);
+        const revenue = parseFloat(pm[3].replace(/,/g, ''));
+        const net = parseFloat(pm[4].replace(/,/g, ''));
+        const key = year + '-' + month;
+        if (revenue > 0 && !seen.has(key)) {
+          seen.add(key);
+          results.push(result({ year, month, revenue, commission: Math.max(0, revenue - net), net, format: 'Airbnb Annual' }));
+        }
       }
     }
   }
-
-  // Also try partial month pattern: "1 – 3 de abr de 2026"
-  const partialRx = /\d+\s*[–-]\s*\d+\s+de\s+(\w+)\s+de\s+(\d{4})\s+\$?([\d,]+\.\d{2})\s*USD\s+\$?([\d,]+\.\d{2})\s*USD/gi;
-  let pm;
-  while ((pm = partialRx.exec(t)) !== null) {
-    const abbr = pm[1].toLowerCase();
-    // Map abbreviations
-    const abbrMap = {ene:1,feb:2,mar:3,abr:4,may:5,jun:6,jul:7,ago:8,sep:9,oct:10,nov:11,dic:12,jan:1,apr:4,aug:8,dec:12};
-    const month = abbrMap[abbr] || mesesES[abbr] || monthsEN[abbr];
-    const year = parseInt(pm[2]);
-    const revenue = parseFloat(pm[3].replace(/,/g, ''));
-    const net = parseFloat(pm[4].replace(/,/g, ''));
-    const commission = Math.max(0, revenue - net);
-    const key = `${year}-${month}`;
-    if (month && revenue > 0 && !seen.has(key)) {
-      seen.add(key);
-      results.push(result({ year, month, revenue, commission, net, format: 'Airbnb Annual' }));
-    }
-  }
-
-  // Sort by year+month
   results.sort((a, b) => a.year * 100 + a.month - b.year * 100 - b.month);
-
-  // Extract total nights
-  let totalNights = Math.min(nights(t), 365 * 4); // up to 4 years
+  let totalNights = Math.min(nights(t), 365 * 4);
   if (totalNights > 0 && results.length > 0) {
     const totalRev = results.reduce((s, r) => s + r.revenue, 0);
-    if (totalRev > 0) {
-      results.forEach(r => { r.nights = Math.round(totalNights * (r.revenue / totalRev)); });
-    }
+    if (totalRev > 0) results.forEach(r => { r.nights = Math.round(totalNights * (r.revenue / totalRev)); });
   }
-
-  // Extract total reservations
   const totalRes = reservations(t);
   if (totalRes > 0 && results.length > 0) {
     const totalRev = results.reduce((s, r) => s + r.revenue, 0);
     results.forEach(r => { r.reservations = totalRev > 0 ? Math.round(totalRes * (r.revenue / totalRev)) : Math.round(totalRes / results.length); });
   }
-
   if (results.length === 0) return { error: 'Airbnb Annual: no monthly data found' };
   return results; // Returns ARRAY
 }
