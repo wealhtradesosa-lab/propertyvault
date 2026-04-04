@@ -429,7 +429,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         (()=>{const cp={};yearExpenses.filter(e=>!isExcludedFromOpEx(e)).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const ck=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[ck].value+=amt/12*(n||1);else if(ef==='monthly')cp[ck].value+=amt*(n||1);else cp[ck].value+=amt});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
         [['Commission',fComm,'#E11D48'],[t('electricity'),fDuke,'#F59E0B'],[t('water'),fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],[t('maintenance'),fMaint,'#10B981'],['Other',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
       const ownerMonthly=n>0?ownerExpTotal/n:0;
-      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const exp=pmExp+ownerMonthly;const cf=rev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev,exp,cf}});
+      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const exp=pmExp+ownerMonthly;const cf=rev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:dConv(rev),exp:dConv(exp),cf:dConv(cf)}});
 
       return <>
       <div className="hidden print-header"><div style={{display:'flex',justifyContent:'space-between'}}><div><h1 style={{fontSize:'18px',fontWeight:800,margin:0}}>{prop.name}</h1><p style={{fontSize:'9px',color:'#64748B',margin:'3px 0'}}>{prop.address}, {prop.city} {prop.state} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div><div style={{fontSize:'18px',fontWeight:900,color:'#1E3A5F'}}>OD</div></div></div>
@@ -772,8 +772,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <BarChart data={mChart}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/>
               <XAxis dataKey="m" tick={{fontSize:9,fill:'#94a3b8'}} interval={mChart.length>18?2:0}/>
-              <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={fm}/>
-              <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
+              <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>dFm(v)}/>
+              <Tooltip content={<Tip fmt={dFm}/>}/><Legend wrapperStyle={{fontSize:10}}/>
               <Bar dataKey="rev" name={t("grossRevenue")} fill="#93C5FD" radius={[3,3,0,0]}/>
               <Bar dataKey="exp" name={t("expenses")} fill="#FCA5A5" radius={[3,3,0,0]}/>
               <Bar dataKey="cf" name={t("cashFlow")} fill="#6EE7B7" radius={[3,3,0,0]}/>
@@ -844,8 +844,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <ComposedChart data={annual}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/>
               <XAxis dataKey="year" tick={{fontSize:11,fill:'#64748b'}}/>
-              <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={fm}/>
-              <Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:10}}/>
+              <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>dFm(v)}/>
+              <Tooltip content={<Tip fmt={dFm}/>}/><Legend wrapperStyle={{fontSize:10}}/>
               <Bar dataKey="revenue" name={t("grossRevenue")} fill="#93C5FD" radius={[4,4,0,0]}/>
               <Bar dataKey="net" name="Neto Depositado" fill="#6EE7B7" radius={[4,4,0,0]}/>
               <Line dataKey="hoa" name="HOA" stroke="#8B5CF6" strokeWidth={2} dot={{r:3}}/>
@@ -1054,7 +1054,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <KPI label="Compras" value={gFm(oneTime)} sub={expenses.filter(e=>!isRecurring(e)).length+' gastos'} color="red"/>
         </div>
       })()}
-      {expByCat.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4"><h3 className="text-sm font-bold text-slate-700 mb-3">Costo Mensual por Categoría <span className="text-[10px] text-slate-400 font-normal">(anuales ÷ 12)</span></h3><ResponsiveContainer width="100%" height={Math.max(150,expByCat.length*35)}><BarChart data={expByCat.map(c=>({...c,mensual:c.monthly||c.value}))} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis type="number" tickFormatter={v=>gFm(v)} tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#64748b'}} width={120}/><Tooltip content={<Tip/>}/><Bar dataKey="mensual" name={t('monthly')} fill="#DC2626" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer></div>}
+      {expByCat.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4"><h3 className="text-sm font-bold text-slate-700 mb-3">Costo Mensual por Categoría <span className="text-[10px] text-slate-400 font-normal">(anuales ÷ 12)</span></h3><ResponsiveContainer width="100%" height={Math.max(150,expByCat.length*35)}><BarChart data={expByCat.map(c=>({...c,mensual:c.monthly||c.value}))} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis type="number" tickFormatter={v=>dFm(v)} tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#64748b'}} width={120}/><Tooltip content={<Tip fmt={gFm}/>}/><Bar dataKey="mensual" name={t('monthly')} fill="#DC2626" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer></div>}
 
       {/* Grouped by month */}
       {expenses.length>0&&(()=>{
@@ -1265,7 +1265,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             <div className="bg-emerald-50 rounded-2xl p-5 text-center border border-emerald-100"><div className="text-[10px] text-emerald-600 font-bold uppercase">Se paga en</div><div className="text-3xl font-extrabold text-emerald-700 mt-1">{Math.ceil(sE[sE.length-1].mo/12)} años</div><div className="text-xs text-emerald-500">vs {Math.ceil(sNE[sNE.length-1].mo/12)} sin extra</div></div>
             <div className="bg-blue-50 rounded-2xl p-5 text-center border border-blue-100"><div className="text-[10px] text-blue-600 font-bold uppercase">Ahorro</div><div className="text-3xl font-extrabold text-blue-700 mt-1">{gFm(sNE[sNE.length-1].ti-sE[sE.length-1].ti)}</div></div>
             <div className="bg-amber-50 rounded-2xl p-5 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Meses Menos</div><div className="text-3xl font-extrabold text-amber-700 mt-1">{sNE[sNE.length-1].mo-sE[sE.length-1].mo}</div></div>
-          </div><ResponsiveContainer width="100%" height={260}><AreaChart data={sNE.map((d,i)=>({yr:'Año '+d.yr,sin:d.bal,con:sE[i]?.bal||0}))}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="yr" tick={{fontSize:9,fill:'#94a3b8'}} interval={4}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Area dataKey="sin" name="Sin extra" stroke="#DC2626" fill="rgba(220,38,38,.05)"/><Area dataKey="con" name={`$${extraP||0}/mo${extraPA?` + $${extraPA}/año`:''} extra`} stroke="#059669" fill="rgba(5,150,105,.05)"/></AreaChart></ResponsiveContainer></>}
+          </div><ResponsiveContainer width="100%" height={260}><AreaChart data={sNE.map((d,i)=>({yr:'Año '+d.yr,sin:d.bal,con:sE[i]?.bal||0}))}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="yr" tick={{fontSize:9,fill:'#94a3b8'}} interval={4}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={v=>gFm(v)}/><Tooltip content={<Tip fmt={gFm}/>}/><Legend wrapperStyle={{fontSize:11}}/><Area dataKey="sin" name="Sin extra" stroke="#DC2626" fill="rgba(220,38,38,.05)"/><Area dataKey="con" name={`$${extraP||0}/mo${extraPA?` + $${extraPA}/año`:''} extra`} stroke="#059669" fill="rgba(5,150,105,.05)"/></AreaChart></ResponsiveContainer></>}
         </div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={()=>{setMortConfig({bal:String(mort.balance||''),rate:String(mort.rate||''),term:String(mort.termYears||30),pay:String(mort.monthlyPayment||''),start:mort.startDate||'',includesTaxes:!!mort.includesTaxes,includesInsurance:!!mort.includesInsurance});setModal('editMort')}} className="text-sm text-blue-600 font-semibold hover:text-blue-800 flex items-center gap-1.5 px-3 py-2 rounded-xl hover:bg-blue-50 transition"><Settings size={15}/> {lang==='es'?'Editar hipoteca':'Edit mortgage'}</button>
@@ -1344,7 +1344,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {/* Valuation History */}
       {valuations.length>0&&<>
         <div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4"><h3 className="text-sm font-bold text-slate-700 mb-4">Historial de Appreciation</h3>
-          <ResponsiveContainer width="100%" height={160}><AreaChart data={[{date:fmDate(prop.purchaseDate),value:prop.purchasePrice},...[...valuations].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(v=>({date:fmDate(v.date),value:parseFloat(v.value)||0}))]}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="date" tick={{fontSize:9,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Area dataKey="value" name="Valor" stroke="#059669" fill="rgba(5,150,105,.1)" strokeWidth={2.5}/></AreaChart></ResponsiveContainer>
+          <ResponsiveContainer width="100%" height={160}><AreaChart data={[{date:fmDate(prop.purchaseDate),value:prop.purchasePrice},...[...valuations].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).map(v=>({date:fmDate(v.date),value:parseFloat(v.value)||0}))]}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="date" tick={{fontSize:9,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={v=>gFm(v)}/><Tooltip content={<Tip fmt={gFm}/>}/><Area dataKey="value" name="Valor" stroke="#059669" fill="rgba(5,150,105,.1)" strokeWidth={2.5}/></AreaChart></ResponsiveContainer>
         </div>
         <Tbl cols={[{label:'Fecha',render:r=><span className="text-slate-500 font-medium">{fmDate(r.date)}</span>},{label:'Valor Estimado',r:true,render:r=><span className="font-bold text-emerald-600">{gFm(r.value)}</span>},{label:'Fuente',render:r=><span className="text-xs text-slate-400">{r.source==='zillow'?'Zillow':r.source==='redfin'?'Redfin':r.source==='appraisal'?'Avalúo':r.source==='broker'?'Broker':'Manual'}</span>},{label:'Notas',key:'notes',cls:'text-xs text-slate-400'}]} rows={[...valuations].sort((a,b)=>(b.date||'').localeCompare(a.date||''))} onDel={del} dc="valuations" onEdit={r=>{setValForm({date:r.date||'',value:String(r.value||''),source:r.source||'manual',notes:r.notes||''});setEditId(r.id);setModal('valuation')}}/>
       </>}
@@ -1501,7 +1501,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="bg-slate-50 rounded-lg p-2.5 text-center"><div className="text-[9px] text-slate-500 font-semibold uppercase">Capital</div><div className="text-sm font-extrabold text-slate-800">{gFm(totCont)}</div></div>
         </div>
         {relAnnual.length>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Evolución Anual</h3>
-          <ResponsiveContainer width="100%" height={220}><ComposedChart data={relAnnual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={fm}/><Tooltip content={<Tip/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name={t("grossRevenue")} fill="#2563EB" radius={[4,4,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[4,4,0,0]}/><Line dataKey="commission" name={t("pmCommission")} stroke="#DC2626" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
+          <ResponsiveContainer width="100%" height={220}><ComposedChart data={relAnnual}><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis dataKey="year" tick={{fontSize:11,fill:'#94a3b8'}}/><YAxis tick={{fontSize:10,fill:'#94a3b8'}} tickFormatter={v=>gFm(v)}/><Tooltip content={<Tip fmt={gFm}/>}/><Legend wrapperStyle={{fontSize:11}}/><Bar dataKey="revenue" name={t("grossRevenue")} fill="#2563EB" radius={[4,4,0,0]}/><Bar dataKey="net" name="Net" fill="#059669" radius={[4,4,0,0]}/><Line dataKey="commission" name={t("pmCommission")} stroke="#DC2626" strokeWidth={2} dot={{r:3}}/></ComposedChart></ResponsiveContainer>
         </>}
         {monthRank.length>0&&<><h3 className="text-sm font-bold text-slate-700 mt-5 mb-3">Estacionalidad — Mejores y Peores Meses</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2">{monthRank.slice(0,4).map((r,i)=><div key={r.month} className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-100"><div className="text-[10px] text-emerald-600 font-bold">#{i+1} MEJOR</div><div className="text-base font-extrabold text-emerald-700">{r.month}</div><div className="text-xs text-emerald-500">{gFm(r.avg)} avg</div></div>)}
@@ -1623,7 +1623,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           </div>
         </>}
         {expByCat.length>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Additional Expenses by Category</h3>
-          <ResponsiveContainer width="100%" height={Math.max(150,expByCat.length*35)}><BarChart data={expByCat} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis type="number" tickFormatter={fm} tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#64748b'}} width={120}/><Tooltip content={<Tip/>}/><Bar dataKey="value" name="Monto" fill="#DC2626" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer>
+          <ResponsiveContainer width="100%" height={Math.max(150,expByCat.length*35)}><BarChart data={expByCat} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis type="number" tickFormatter={v=>gFm(v)} tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#64748b'}} width={120}/><Tooltip content={<Tip fmt={gFm}/>}/><Bar dataKey="value" name="Monto" fill="#DC2626" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer>
         </>}
       </div>}
     </>}
