@@ -701,9 +701,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                 else insights.push({type:'danger',icon:'📉',title:`Low occupancy: ${occupancy.toFixed(0)}%`,desc:`Only ${fNights} de ${availNights} nights booked. Review pricing, listing photos, and local competition.`});
               }
 
-              // ADR vs market (Orlando STR avg ~$180-250)
+              // ADR vs market
               if(adr>0){
-                if(adr>300) insights.push({type:'good',icon:'💎',title:`ADR premium: ${dFm(adr)}/noche`,desc:'Tu tarifa está por encima del promedio del mercado de Orlando. Asegúrate de que las reseñas y amenities justifiquen el premium.'});
+                if(adr>300) insights.push({type:'good',icon:'💎',title:`ADR premium: ${dFm(adr)}/noche`,desc:`Tu tarifa está por encima del promedio del mercado${prop.city?' de '+prop.city:''}. Asegúrate de que las reseñas y amenities justifiquen el premium.`});
                 else if(adr<150) insights.push({type:'warn',icon:'💰',title:`ADR below market: ${dFm(adr)}/noche`,desc:'Consider improving amenities to raise rates. Each $25 increase = ~'+dFm(fNights/n*25*12)+'/year extra.'});
               }
 
@@ -719,10 +719,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                 if(opExPct>55) insights.push({type:'warn',icon:'📋',title:`Ratio de gastos alto: ${opExPct.toFixed(0)}%`,desc:`Los gastos operativos consumesn más de la mitad of revenue. Los principales: PM Commission ${dFm(fComm)} (${(fComm/fRev*100).toFixed(0)}%), Electricity ${dFm(fDuke)} (${(fDuke/fRev*100).toFixed(0)}%), HOA ${dFm(fHoa)} (${(fHoa/fRev*100).toFixed(0)}%).`});
               }
 
-              // Duke Energy trend
+              // Electricity trend
               if(fDuke>0&&fRev>0){
                 const dukePct=fDuke/fRev*100;
-                if(dukePct>15) insights.push({type:'warn',icon:'⚡',title:`Electricity alta: ${(dukePct).toFixed(0)}% of revenue`,desc:`Duke Energy ${dFm(fDuke)} (${dFm(fDuke/n)}/mo). Para una propiedad STR en Orlando, lo típico es 8-12%. Verifica termostato inteligente, pool heater timer, y eficiencia del A/C.`});
+                if(dukePct>15) insights.push({type:'warn',icon:'⚡',title:`Electricity alta: ${(dukePct).toFixed(0)}% of revenue`,desc:`Electricidad ${dFm(fDuke)} (${dFm(fDuke/n)}/mo). Para una propiedad STR${prop.city?' en '+prop.city:''}, lo típico es 8-12% del revenue. Revisa termostato, equipos de alto consumo y eficiencia del A/C.`});
               }
 
               // YoY comparison
