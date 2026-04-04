@@ -62,6 +62,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const notify=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),4000)};
   const [valForm,setValForm]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setValForm(x=>({...x,[k]:v})),[]);
   const [repairForm,setRepairForm]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRepairForm(x=>({...x,[k]:v})),[]);
+  const [incForm,setIncForm]=useState({date:'',amount:'',source:'direct',concept:'',currency:'USD'});const uif=useCallback((k,v)=>setIncForm(x=>({...x,[k]:v})),[]);
   const [taskForm,setTaskForm]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30'});const ut=useCallback((k,v)=>setTaskForm(x=>({...x,[k]:v})),[]);
   const [settingsForm,setSettingsForm]=useState(null);
   const [editPartners,setEditPartners]=useState(null);
@@ -341,8 +342,12 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const rawWater=fy?(fy.water||0):(stmtWater||0);
       const rawVendor=fy?(fy.vendor||0):(stmtVendor||0);
 
+      // Direct booking income (from income collection)
+      const fIncomeEntries=dashYear==='all'?income:income.filter(i=>{const d=i.date||'';const yr=parseInt(d.split('-')[0]);return yr===dashYear});
+      const directIncomePC=fIncomeEntries.reduce((s,i)=>{const amt=i.amount||0;const cur=i.currency||'USD';if(cur===propCurrency)return s+amt;if(cur==='USD'&&propCurrency!=='USD')return s+amt*xRate;if(cur!=='USD'&&propCurrency==='USD')return s+amt/xRate;return s+amt},0);
+
       // Everything in PROPERTY CURRENCY for calculations
-      const fRev=stmtToPC(rawRev);
+      const fRev=stmtToPC(rawRev)+directIncomePC;
       const fNet=stmtToPC(rawNet);
       const fComm=stmtToPC(rawComm);
       const fDuke=stmtToPC(rawDuke);
@@ -436,7 +441,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         (()=>{const cp={};yearExpenses.filter(e=>!isExcludedFromOpEx(e)).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const ck=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[ck].value+=amt/12*(n||1);else if(ef==='monthly')cp[ck].value+=amt*(n||1);else cp[ck].value+=amt});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
         [['Commission',fComm,'#E11D48'],[t('electricity'),fDuke,'#F59E0B'],[t('water'),fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],[t('maintenance'),fMaint,'#10B981'],['Other',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
       const ownerMonthly=n>0?ownerExpTotal/n:0;
-      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const exp=pmExp+ownerMonthly;const cf=rev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev,exp,cf}});
+      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const directForMonth=income.filter(i=>{const d=i.date||'';const [iy,im]=d.split('-').map(Number);return iy===s.year&&im===s.month}).reduce((sum,i)=>{const amt=i.amount||0;const cur=i.currency||'USD';if(cur===propCurrency)return sum+amt;if(cur==='USD'&&propCurrency!=='USD')return sum+amt*xRate;return sum+amt},0);const totalRev=rev+directForMonth;const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const exp=pmExp+ownerMonthly;const cf=totalRev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:totalRev,exp,cf}});
 
       return <>
       <div className="hidden print-header"><div style={{display:'flex',justifyContent:'space-between'}}><div><h1 style={{fontSize:'18px',fontWeight:800,margin:0}}>{prop.name}</h1><p style={{fontSize:'9px',color:'#64748B',margin:'3px 0'}}>{prop.address}, {prop.city} {prop.state} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div><div style={{fontSize:'18px',fontWeight:900,color:'#1E3A5F'}}>OD</div></div></div>
@@ -1084,7 +1089,35 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ INCOME (powered by statements) ═══ */}
     {view==='income'&&<>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">💰 {t('income')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><p className="text-xs text-slate-400 bg-slate-100 px-3 py-1.5 rounded-full">{t('statements')}</p></div>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">💰 {t('income')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><button onClick={()=>{setIncForm({date:new Date().toISOString().split('T')[0],amount:'',source:'direct',concept:'',currency:'USD'});setEditId(null);setModal('addIncome')}} className="px-4 py-2.5 bg-emerald-600 text-white text-xs rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {lang==='es'?'Reserva Directa':'Direct Booking'}</button></div>
+
+      {/* Direct bookings */}
+      {income.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-3">{lang==='es'?'Reservas Directas & Ingresos Adicionales':'Direct Bookings & Additional Income'} <span className="text-[10px] text-slate-400 font-normal">({income.length})</span></h3>
+        <Tbl cols={[
+          {label:lang==='es'?'Fecha':'Date',render:r=><span className="font-bold text-slate-700">{fmDate(r.date)}</span>},
+          {label:lang==='es'?'Fuente':'Source',render:r=><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.source==='direct'?'bg-emerald-100 text-emerald-700':r.source==='booking'?'bg-blue-100 text-blue-700':r.source==='vrbo'?'bg-purple-100 text-purple-700':'bg-slate-100 text-slate-600'}`}>{r.source==='direct'?(lang==='es'?'Directa':'Direct'):r.source==='booking'?'Booking.com':r.source==='vrbo'?'VRBO':r.source||'Other'}</span>},
+          {label:lang==='es'?'Concepto':'Concept',key:'concept',cls:'text-slate-600'},
+          {label:lang==='es'?'Monto':'Amount',r:true,render:r=><span className="font-bold text-emerald-600">{gFm(r.amount)} <span className="text-[9px] text-slate-400">{r.currency||'USD'}</span></span>},
+        ]} rows={[...income].sort((a,b)=>(b.date||'').localeCompare(a.date||''))} onDel={del} dc="income" onEdit={r=>{setIncForm({date:r.date||'',amount:String(r.amount||''),source:r.source||'direct',concept:r.concept||'',currency:r.currency||'USD'});setEditId(r.id);setModal('addIncome')}}/>
+        <div className="bg-emerald-50 rounded-xl p-3 mt-3 flex justify-between items-center text-xs border border-emerald-100">
+          <span className="text-emerald-600 font-semibold">{lang==='es'?'Total Ingresos Directos':'Total Direct Income'}</span>
+          <span className="font-bold text-emerald-700">{gFm(income.reduce((s,i)=>s+(i.amount||0),0))}</span>
+        </div>
+      </div>}
+
+      {/* Instructional card */}
+      {income.length===0&&<div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-5">
+        <div className="flex items-start gap-3">
+          <div className="text-lg">💡</div>
+          <div className="text-[11px] text-emerald-800">
+            <div className="font-bold text-[12px] mb-1">{lang==='es'?'¿Tienes reservas que no pasan por tu PM?':'Have bookings that don\'t go through your PM?'}</div>
+            <div>{lang==='es'
+              ?'Reservas directas, Booking.com, VRBO, o cualquier ingreso que no aparece en los statements del property manager. Regístralos aquí y se suman automáticamente al revenue del dashboard.'
+              :'Direct bookings, Booking.com, VRBO, or any income not in your PM statements. Register them here and they auto-add to dashboard revenue.'}</div>
+          </div>
+        </div>
+      </div>}
 
       {stmts.length>0?(()=>{
         const sorted=[...stmts].sort((a,b)=>b.year*100+b.month-a.year*100-a.month);
@@ -1689,6 +1722,27 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Socio':'Partner'}</label><PPick partners={partners} selected={contribForm.paidBy} onChange={v=>uc('paidBy',v)}/></div>
     </Mdl>}
 
+    {/* Direct Booking / Additional Income Modal */}
+    {modal==='addIncome'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Ingreso':'✏️ Edit Income'):(lang==='es'?'💰 Registrar Ingreso Directo':'💰 Register Direct Income')} grad="from-emerald-500 to-emerald-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{const data={date:incForm.date,amount:parseFloat(incForm.amount)||0,source:incForm.source,concept:incForm.concept,currency:incForm.currency};if(editId){update('income',editId,data)}else{save('income',data)}}} disabled={!incForm.amount||!incForm.date} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
+      <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-3 text-[11px] text-emerald-700">💡 {lang==='es'?'Los ingresos directos se suman automáticamente al Revenue Bruto del dashboard en el mes correspondiente.':'Direct income auto-adds to Gross Revenue in the dashboard for the corresponding month.'}</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <Inp label={lang==='es'?'Fecha del ingreso':'Income date'} value={incForm.date} onChange={v=>uif('date',v)} type="date" required/>
+        <Inp label={lang==='es'?'Monto':'Amount'} value={incForm.amount} onChange={v=>uif('amount',v)} prefix="$" type="number" required/>
+      </div>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Fuente':'Source'}</label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">{[
+          ['direct',lang==='es'?'🏠 Directa':'🏠 Direct'],
+          ['booking','🅱️ Booking.com'],
+          ['vrbo','🏡 VRBO'],
+          ['other',lang==='es'?'📦 Otro':'📦 Other'],
+        ].map(([v,l])=><button key={v} type="button" onClick={()=>uif('source',v)} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${incForm.source===v?'border-emerald-500 bg-emerald-50 text-emerald-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div>
+      </div>
+      <Inp label={lang==='es'?'Concepto':'Concept'} value={incForm.concept} onChange={v=>uif('concept',v)} placeholder={lang==='es'?'Ej: Reserva directa familia García, 5 noches':'e.g. Direct booking García family, 5 nights'}/>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Moneda':'Currency'}</label>
+        <div className="grid grid-cols-3 gap-1">{[['USD','🇺🇸 USD'],['COP','🇨🇴 COP'],['EUR','🇪🇺 EUR']].map(([v,l])=><button key={v} type="button" onClick={()=>uif('currency',v)} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${(incForm.currency||'USD')===v?'border-emerald-500 bg-emerald-50 text-emerald-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div>
+      </div>
+    </Mdl>}
+
     {modal==='addStmt'&&<Mdl title={editId?'✏️ Editar Statement':'Statement Manual'} grad="from-slate-700 to-slate-800" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={()=>{const yr=parseInt(stmtForm.year),mo=parseInt(stmtForm.month);const data={year:yr,month:mo,revenue:parseFloat(stmtForm.revenue)||0,net:parseFloat(stmtForm.net)||0,commission:parseFloat(stmtForm.commission)||0,duke:parseFloat(stmtForm.duke)||0,water:parseFloat(stmtForm.water)||0,hoa:parseFloat(stmtForm.hoa)||0,maintenance:parseFloat(stmtForm.maintenance)||0,vendor:parseFloat(stmtForm.vendor)||0};if(editId){update('statements',editId,data)}else{if(stmts.find(s=>s.year===yr&&s.month===mo)){notify(`Ya existe statement para ${M[mo-1]} ${yr}`,"error");return;}save('statements',data);setStmtForm(x=>({...x,month:x.month<12?x.month+1:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''}))}}} disabled={!stmtForm.revenue} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Año" value={stmtForm.year} onChange={v=>us('year',v)} type="number" disabled={!!editId}/><Sel label="Mes" value={stmtForm.month} onChange={v=>us('month',v)} options={M.map((m,i)=>({v:i+1,l:m}))}/></div>
       <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100"><div className="text-[10px] font-black text-emerald-700 uppercase mb-3">Revenue</div><Inp label="Revenue Total" value={stmtForm.revenue} onChange={v=>us('revenue',v)} prefix="$" type="number" required error={stmtForm.revenue&&parseFloat(stmtForm.revenue)<=0?'Enter revenue for the period':''}/></div>
@@ -1796,6 +1850,16 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </div>
           </div>
           <div className="text-[10px] text-purple-500 mt-2 ml-13 pl-[52px]">{lang==='es'?'→ NO afecta el P&L — solo registra quién pagó':'→ Does NOT affect P&L — only tracks who paid'}</div>
+        </button>
+        <button onClick={()=>{setIncForm({date:new Date().toISOString().split('T')[0],amount:'',source:'direct',concept:'',currency:'USD'});setModal('addIncome')}} className="text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 transition group">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 text-lg group-hover:bg-emerald-200 transition">🏠</div>
+            <div>
+              <div className="font-bold text-slate-800 text-sm">{lang==='es'?'Reserva Directa / Ingreso Extra':'Direct Booking / Extra Income'}</div>
+              <div className="text-[11px] text-slate-400 mt-0.5">{lang==='es'?'Ingreso que no aparece en los statements del PM (reserva directa, Booking.com, VRBO)':'Income not in PM statements (direct booking, Booking.com, VRBO)'}</div>
+            </div>
+          </div>
+          <div className="text-[10px] text-emerald-500 mt-2 ml-13 pl-[52px]">{lang==='es'?'→ Se suma al Revenue Bruto del mes':'→ Adds to Gross Revenue for the month'}</div>
         </button>
       </div>
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3 text-[11px] text-amber-700">
