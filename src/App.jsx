@@ -857,7 +857,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         {(()=>{
           const years=[...new Set(stmts.map(s=>s.year))].sort();
           const curYear=new Date().getFullYear();
-          const colors=['#94A3B8','#A78BFA','#60A5FA','#34D399','#F59E0B','#F472B6'];
+          const colors=['#DC2626','#F59E0B','#059669','#8B5CF6','#EC4899','#0EA5E9'];
           // Build data: [{month:'Ene', 2023: 4983, 2024: 7006, 2025: 3795, 2026: 7600}, ...]
           const data=M.map((mName,mi)=>{
             const row={month:mName.slice(0,3)};
@@ -874,8 +874,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <XAxis dataKey="month" tick={{fontSize:10,fill:'#94a3b8'}}/>
               <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>dFm(v)}/>
               <Tooltip content={<Tip fmt={dFm}/>}/>
-              <Legend wrapperStyle={{fontSize:10}}/>
-              {years.map((y,i)=><Line key={y} dataKey={String(y)} name={String(y)} stroke={y===curYear?'#2563EB':colors[i%colors.length]} strokeWidth={y===curYear?3:1.5} dot={{r:y===curYear?4:2}} strokeDasharray={y===curYear?'':'5 3'} opacity={y===curYear?1:0.7}/>)}
+              <Legend wrapperStyle={{fontSize:11}}/>
+              {years.map((y,i)=><Line key={y} dataKey={String(y)} name={String(y)} stroke={y===curYear?'#2563EB':colors[i%colors.length]} strokeWidth={y===curYear?3.5:2} dot={{r:y===curYear?5:3,strokeWidth:y===curYear?2:0,fill:y===curYear?'#2563EB':colors[i%colors.length]}} opacity={1}/>)}
             </LineChart>
           </ResponsiveContainer>;
         })()}
