@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { db, auth } from './firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where, updateDoc, getDocs } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart, Line } from 'recharts';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart, Line, LineChart } from 'recharts';
 import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer, MessageSquare, Send, Moon, Sun } from 'lucide-react';
 
 import { ADMIN_EMAILS, C, M, fm, fmCurrency, fmDate, pct, CATS, getCats, getTerms, COUNTRIES, CURRENCY_LIST, US_STATES as US, PROPERTY_TYPES as PT } from './lib/constants';
@@ -847,6 +847,39 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           </div>}
         </div>
       </div>
+
+      {/* ── ROW: Year-over-Year Performance Comparison ── */}
+      {annual.length>1&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider">{lang==='es'?'Rendimiento Año vs Año':'Year-over-Year Performance'}</h3>
+          <div className="text-[10px] text-slate-400">{lang==='es'?'Revenue mensual por año':'Monthly revenue by year'}</div>
+        </div>
+        {(()=>{
+          const years=[...new Set(stmts.map(s=>s.year))].sort();
+          const curYear=new Date().getFullYear();
+          const colors=['#94A3B8','#A78BFA','#60A5FA','#34D399','#F59E0B','#F472B6'];
+          // Build data: [{month:'Ene', 2023: 4983, 2024: 7006, 2025: 3795, 2026: 7600}, ...]
+          const data=M.map((mName,mi)=>{
+            const row={month:mName.slice(0,3)};
+            years.forEach(y=>{
+              const s=stmts.find(st=>st.year===y&&st.month===mi+1);
+              const directForMonth=income.filter(inc=>{const d=inc.date||'';const [iy,im]=d.split('-').map(Number);return iy===y&&im===mi+1}).reduce((sum,inc)=>sum+(inc.amount||0),0);
+              row[y]=stmtToPC((s?.revenue||0)+directForMonth);
+            });
+            return row;
+          }).filter(row=>years.some(y=>row[y]>0));
+          return<ResponsiveContainer width="100%" height={220}>
+            <LineChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/>
+              <XAxis dataKey="month" tick={{fontSize:10,fill:'#94a3b8'}}/>
+              <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>dFm(v)}/>
+              <Tooltip content={<Tip fmt={dFm}/>}/>
+              <Legend wrapperStyle={{fontSize:10}}/>
+              {years.map((y,i)=><Line key={y} dataKey={String(y)} name={String(y)} stroke={y===curYear?'#2563EB':colors[i%colors.length]} strokeWidth={y===curYear?3:1.5} dot={{r:y===curYear?4:2}} strokeDasharray={y===curYear?'':'5 3'} opacity={y===curYear?1:0.7}/>)}
+            </LineChart>
+          </ResponsiveContainer>;
+        })()}
+      </div>}
 
       {/* ── ROW 4: Year comparison + Partners ── */}
       {(annual.length>1||partners.length>1)&&<div className={`grid ${annual.length>1&&partners.length>1?'grid-cols-2':'grid-cols-1'} gap-4`}>
