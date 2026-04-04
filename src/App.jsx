@@ -849,7 +849,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>
 
       {/* ── ROW: Year-over-Year Performance Comparison ── */}
-      {annual.length>1&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4">
+      {stmts.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider">{lang==='es'?'Rendimiento Año vs Año':'Year-over-Year Performance'}</h3>
           <div className="text-[10px] text-slate-400">{lang==='es'?'Revenue mensual por año':'Monthly revenue by year'}</div>
