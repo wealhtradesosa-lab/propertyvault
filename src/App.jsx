@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
 import { db, auth } from './firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where, updateDoc, getDocs, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
@@ -7,9 +7,18 @@ import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, L
 
 import { ADMIN_EMAILS, C, M, fm, fmCurrency, fmDate, pct, CATS, getCats, getTerms, COUNTRIES, CURRENCY_LIST, US_STATES as US, PROPERTY_TYPES as PT } from './lib/constants';
 import { createT } from './lib/i18n';
-import { parsePDF, parseMortgageStatement } from './lib/pdfParser';
+// PDF parser loaded dynamically — delays 328KB pdf.js chunk until first upload
+let _parsePDF = null, _parseMortgage = null;
+const loadParsers = async () => {
+  if (!_parsePDF) {
+    const mod = await import('./lib/pdfParser');
+    _parsePDF = mod.parsePDF;
+    _parseMortgage = mod.parseMortgageStatement;
+  }
+  return { parsePDF: _parsePDF, parseMortgageStatement: _parseMortgage };
+};
 import { Inp, Sel, PPick, Mdl, Empty, Tbl, Tip, UpgradeBanner, KPI } from './components/ui';
-import { LandingPage } from './components/LandingPage';
+const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
 import { AuthScreen } from './components/AuthScreen';
 
 import { Onboarding } from './components/Onboarding';
@@ -145,7 +154,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       if(!f.name.toLowerCase().endsWith('.pdf')){log.push({file:f.name,status:'error',msg:'No es un archivo PDF'});setUploadLog([...log]);continue;}
       log.push({file:f.name,status:'processing',msg:`Procesando... (${fi+1}/${fileArr.length})`});setUploadLog([...log]);
       try{
-        const rawResult=await parsePDF(f);
+        const {parsePDF:pPDF}=await loadParsers();const rawResult=await pPDF(f);
         if(rawResult.error){log[log.length-1]={file:f.name,status:'error',msg:rawResult.error};setUploadLog([...log]);continue;}
 
         // Normalize: single result → array, annual report already returns array
@@ -1220,7 +1229,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             const file=e.target.files?.[0];if(!file)return;
             notify(lang==='es'?'Analizando statement...':'Analyzing statement...','info');
             try{
-              const r=await parseMortgageStatement(file);
+              const {parseMortgageStatement:pMort}=await loadParsers();const r=await pMort(file);
               if(r.error){notify(r.error,'error');return;}
               setMortConfig({
                 bal:r.balance?String(r.balance):(mortConfig.bal||''),
@@ -1956,7 +1965,7 @@ export default function App() {
   if(!ready)return<div className="min-h-screen bg-[#080E1A] flex items-center justify-center"><div className="text-center"><div className="w-12 h-12 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/20"><span className="text-sm font-black text-white">OD</span></div><Loader2 size={24} className="animate-spin text-blue-500 mx-auto"/></div></div>;
   if(!user){
     if(authMode)return<AuthScreen initialMode={authMode} onBack={()=>setAuthMode(null)}/>;
-    return<LandingPage onLogin={m=>setAuthMode(m)}/>;
+    return<Suspense fallback={<div className="min-h-screen bg-[#080E1A]"/>}><LandingPage onLogin={m=>setAuthMode(m)}/></Suspense>;
   }
   if(checking)return<div className="min-h-screen bg-[#080E1A] flex items-center justify-center"><div className="text-center"><div className="w-12 h-12 bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 rounded-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-600/20"><span className="text-sm font-black text-white">OD</span></div><Loader2 size={24} className="animate-spin text-blue-500 mx-auto mb-3"/><p className="text-white/30 text-sm">Cargando propiedades...</p></div></div>;
   if(!allProps.length||!ap||addingProp)return<Onboarding userId={user.uid} onComplete={id=>{setActive(id);setAddingProp(false)}} onBack={allProps.length>0?()=>{setAddingProp(false);if(!active&&allProps.length)setActive(allProps[0].id)}:null}/>;

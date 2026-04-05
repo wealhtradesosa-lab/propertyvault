@@ -146,7 +146,7 @@ function parseAirbnbAnnual(t) {
   const lines = t.split(/\n/);
   for (const line of lines) {
     for (const [mName, mNum] of Object.entries(allMonthMap)) {
-      const rx = new RegExp(mName + '\\s+(?:de\\s+(\\d{4})\\s+)?[$]?([\\d,]+[.]\\d{2})\\s*USD\\s+[$]?([\\d,]+[.]\\d{2})\\s*USD', 'i');
+      const rx = new RegExp(mName + '\\s+(?:(?:de\\s+)?(\\d{4})\\s+)?[$]?([\\d,]+[.]\\d{2})\\s*USD\\s+[$]?([\\d,]+[.]\\d{2})\\s*USD', 'i');
       const match = line.match(rx);
       if (match) {
         const year = match[1] ? parseInt(match[1]) : defaultYear;
