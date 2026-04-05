@@ -17,7 +17,7 @@ export function LandingPage({onLogin}) {
         <div className="flex gap-2 md:gap-3">
           <button onClick={()=>onLogin('login')} className="hidden md:block px-4 py-2 text-sm font-semibold text-white/60 hover:text-white transition">Iniciar Sesión</button>
           <button onClick={()=>onLogin('login')} className="md:hidden px-3 py-2 text-xs font-semibold text-white/60 hover:text-white transition">Login</button>
-          <button onClick={()=>onLogin('register')} className="px-3 md:px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs md:text-sm font-bold rounded-xl hover:from-blue-700 hover:to-blue-600 transition shadow-lg shadow-blue-600/20">Crear Cuenta</button>
+          <button onClick={()=>onLogin('register')} className="px-3 md:px-5 py-2 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-xs md:text-sm font-bold rounded-xl hover:from-blue-700 hover:to-blue-600 transition shadow-lg shadow-blue-600/20">14 días gratis</button>
         </div>
       </div>
     </nav>
@@ -31,7 +31,7 @@ export function LandingPage({onLogin}) {
       </div>
       <div className="relative z-10 px-6 pt-12 md:pt-20 pb-16">
         <div className="max-w-4xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-black/30 backdrop-blur-md border border-white/15 rounded-full px-5 py-2 mb-8"><div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/><span className="text-sm font-semibold text-white/60">¿Tu propiedad realmente gana dinero?</span></div>
+          <div className="inline-flex items-center gap-2 bg-emerald-500/20 backdrop-blur-md border border-emerald-400/30 rounded-full px-5 py-2 mb-8"><div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"/><span className="text-sm font-semibold text-emerald-300">🎁 14 días gratis · Acceso Pro completo · Sin tarjeta</span></div>
           <h1 className="text-3xl md:text-6xl font-black tracking-tight leading-[1.1] mb-6 drop-shadow-2xl">
             El control financiero de tu propiedad no es opcional.<br/>
             <span className="bg-gradient-to-r from-blue-400 via-cyan-300 to-emerald-400 bg-clip-text text-transparent">Es la diferencia entre hacerla crecer o que te cueste dinero.</span>
@@ -88,6 +88,27 @@ export function LandingPage({onLogin}) {
       </div>
     </section>
 
+    {/* ═══ TRIAL CTA BANNER ═══ */}
+    <section className="py-12 px-6">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-gradient-to-r from-emerald-600/20 via-blue-600/20 to-purple-600/20 border border-emerald-500/20 rounded-3xl p-8 md:p-12 text-center relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/5 to-blue-600/5"/>
+          <div className="relative z-10">
+            <div className="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-400/30 rounded-full px-4 py-1.5 mb-5"><span className="text-emerald-400 text-xs font-bold">🎁 SIN TARJETA DE CRÉDITO</span></div>
+            <h2 className="text-2xl md:text-4xl font-black tracking-tight mb-4">Prueba todo gratis por 14 días</h2>
+            <p className="text-white/40 max-w-lg mx-auto mb-3 text-sm md:text-base">Acceso completo a todas las funciones Pro. Sube tus statements, configura tu hipoteca, invita a tus socios. Sin límites.</p>
+            <div className="grid grid-cols-3 gap-4 max-w-md mx-auto mb-8 mt-6">
+              <div className="text-center"><div className="text-2xl mb-1">📊</div><div className="text-[11px] text-white/50">Dashboard<br/>completo</div></div>
+              <div className="text-center"><div className="text-2xl mb-1">🏦</div><div className="text-[11px] text-white/50">Hipoteca<br/>& escrow</div></div>
+              <div className="text-center"><div className="text-2xl mb-1">👥</div><div className="text-[11px] text-white/50">Socios<br/>& reportes</div></div>
+            </div>
+            <button onClick={()=>onLogin('register')} className="px-10 py-4 bg-gradient-to-r from-emerald-500 to-blue-500 text-white text-base font-bold rounded-2xl shadow-2xl shadow-emerald-600/30 hover:shadow-emerald-600/40 hover:-translate-y-0.5 transition-all">Empezar mi trial de 14 días</button>
+            <p className="text-[11px] text-white/20 mt-4">Después del trial: plan Free (1 propiedad) o elige Starter desde $9/mes</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
     {/* ═══ D — DESIRE: Social proof + Results ═══ */}
     <section className="py-20 px-6 bg-gradient-to-b from-transparent via-blue-950/20 to-transparent">
       <div className="max-w-5xl mx-auto">
@@ -119,8 +140,8 @@ export function LandingPage({onLogin}) {
     <section id="pricing" className="py-20 px-6">
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-6">
-          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-4">Empieza gratis.<br/><span className="text-white/40">Paga solo si tu portafolio crece.</span></h2>
-          <p className="text-white/30 max-w-md mx-auto">Sin compromisos. Sin sorpresas. Sin letra pequeña.</p>
+          <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight mb-4">14 días con acceso completo.<br/><span className="text-white/40">Sin tarjeta. Sin compromiso.</span></h2>
+          <p className="text-white/30 max-w-md mx-auto">Prueba todo gratis. Después elige el plan que necesites — o quédate en Free.</p>
         </div>
         <div className="flex items-center gap-3 justify-center mb-12">
           <span className={`text-sm font-semibold cursor-pointer transition ${!annual?'text-white':'text-white/40'}`} onClick={()=>setAnnual(false)}>Mensual</span>
