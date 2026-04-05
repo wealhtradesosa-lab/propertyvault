@@ -923,21 +923,43 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>}
       </div>}
 
-      </>:<div className="max-w-lg mx-auto py-8">
-        <div className="text-center mb-8"><div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4"><Building2 size={28} className="text-blue-500"/></div><h2 className="text-xl font-extrabold text-slate-800 mb-2">Configura tu propiedad</h2><p className="text-sm text-slate-400">Completa estos pasos para ver tu dashboard con datos reales.</p></div>
+      </>:<div className="max-w-xl mx-auto py-8">
+        {/* Welcome header */}
+        <div className="text-center mb-8">
+          <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-500/20"><span className="text-2xl">📊</span></div>
+          <h2 className="text-xl font-extrabold text-slate-800 mb-2">{lang==='es'?'¡Bienvenido a OwnerDesk!':'Welcome to OwnerDesk!'}</h2>
+          <p className="text-sm text-slate-400">{lang==='es'?'Configura tu propiedad en 3 minutos y ve tu rentabilidad real.':'Set up your property in 3 minutes and see your real profitability.'}</p>
+          {isTrial&&<div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold px-3 py-1 rounded-full mt-3">🎁 {lang==='es'?`Trial Pro — ${trialDays} días de acceso completo`:`Pro Trial — ${trialDays} days full access`}</div>}
+        </div>
+
+        {/* Preview of what they'll see */}
+        <div className="bg-gradient-to-b from-slate-50 to-white rounded-2xl border border-slate-200 p-4 mb-6 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-white/90 z-10 pointer-events-none"/>
+          <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-3">{lang==='es'?'Así se verá tu dashboard:':'Your dashboard will look like this:'}</div>
+          <div className="grid grid-cols-5 gap-2 opacity-60">
+            {[['Revenue','$5,100','text-blue-400'],['NOI','$2,800','text-amber-500'],['Cash Flow','-$286','text-rose-400'],['Ocupación','74%','text-cyan-400'],['CoC','8.2%','text-purple-400']].map(([l,v,c])=>
+              <div key={l} className="bg-white rounded-xl p-2 border border-slate-100 text-center">
+                <div className="text-[8px] text-slate-300 font-bold uppercase">{l}</div>
+                <div className={`text-sm font-extrabold ${c} mt-0.5`}>{v}</div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Steps */}
         <div className="space-y-3">
           {[
-            {done:stmts.length>0, step:'1', title:'Sube tus statements', desc:'Arrastra los PDFs de tu property manager (IHM, Host U, etc.)', action:'Subir PDFs', onClick:()=>{setUploadLog([]);setModal('upload')}, color:'blue'},
-            {done:!!(mort.balance||mort.monthlyPayment), step:'2', title:'Configure mortgage', desc:'Enter balance, rate, and monthly payment for accurate cash flow.', action:'Configure', onClick:()=>setView('mortgage'), color:'indigo'},
-            {done:expenses.filter(e=>e.category==='insurance'||e.category==='taxes').length>0, step:'3', title:'Add insurance & taxes', desc:'These fixed expenses complete your P&L.', action:'Add Expenses', onClick:()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'insurance',type:'fixed',frequency:'monthly',expCurrency:''});setModal('expense')}, color:'emerald'},
-            {done:valuations.length>0, step:'4', title:'Registra el valor de mercado', desc:'Con esto calculas equity real, apreciación y Cap Rate correcto.', action:'Registrar Valor', onClick:()=>setView('valuation'), color:'purple'},
-          ].map(s=><button key={s.step} onClick={s.onClick} className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${s.done?'bg-slate-50 border-slate-100':'bg-white border-slate-200 hover:border-blue-300 hover:shadow-sm'}`}>
+            {done:stmts.length>0, step:'1', title:lang==='es'?'Sube tus statements':'Upload your statements', desc:lang==='es'?'Arrastra los PDFs de tu property manager (IHM, Vacasa, Airbnb, Host U)':'Drag your PM PDFs (IHM, Vacasa, Airbnb, Host U)', action:lang==='es'?'Subir PDFs':'Upload PDFs', onClick:()=>{setUploadLog([]);setModal('upload')}, color:'blue', highlight:true},
+            {done:!!(mort.balance||mort.monthlyPayment), step:'2', title:lang==='es'?'Configura tu hipoteca':'Configure your mortgage', desc:lang==='es'?'Balance, tasa y pago mensual para calcular cash flow real':'Balance, rate, and payment for accurate cash flow', action:lang==='es'?'Configurar':'Configure', onClick:()=>setView('mortgage'), color:'indigo'},
+            {done:expenses.filter(e=>e.category==='insurance'||e.category==='taxes').length>0, step:'3', title:lang==='es'?'Agrega seguro e impuestos':'Add insurance & taxes', desc:lang==='es'?'Estos costos fijos completan tu P&L':'These fixed costs complete your P&L', action:lang==='es'?'Agregar':'Add', onClick:()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'insurance',type:'fixed',frequency:'monthly',expCurrency:''});setModal('expense')}, color:'emerald'},
+            {done:valuations.length>0, step:'4', title:lang==='es'?'Valor de mercado':'Market value', desc:lang==='es'?'Para calcular equity, apreciación y Cap Rate':'For equity, appreciation and Cap Rate', action:lang==='es'?'Registrar':'Register', onClick:()=>setView('valuation'), color:'purple'},
+          ].map(s=><button key={s.step} onClick={s.onClick} className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all text-left ${s.done?'bg-slate-50 border-slate-100':s.highlight?'bg-blue-50 border-blue-200 hover:border-blue-400 shadow-sm':'bg-white border-slate-200 hover:border-blue-300 hover:shadow-sm'}`}>
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${s.done?'bg-emerald-100':'bg-'+s.color+'-50'}`}>{s.done?<CheckCircle size={18} className="text-emerald-500"/>:<span className={`text-sm font-extrabold text-${s.color}-500`}>{s.step}</span>}</div>
-            <div className="flex-1 min-w-0"><div className={`text-sm font-bold ${s.done?'text-slate-400 line-through':'text-slate-700'}`}>{s.title}</div><div className="text-xs text-slate-400 mt-0.5">{s.done?'Completado':s.desc}</div></div>
-            {!s.done&&<span className="text-xs font-bold text-blue-600 shrink-0">{s.action} →</span>}
+            <div className="flex-1 min-w-0"><div className={`text-sm font-bold ${s.done?'text-slate-400 line-through':'text-slate-700'}`}>{s.title}</div><div className="text-xs text-slate-400 mt-0.5">{s.done?(lang==='es'?'✓ Completado':'✓ Done'):s.desc}</div></div>
+            {!s.done&&<span className={`text-xs font-bold ${s.highlight?'text-white bg-blue-600 px-3 py-1.5 rounded-xl':'text-blue-600'} shrink-0`}>{s.action} →</span>}
           </button>)}
         </div>
-        <div className="mt-6 p-4 bg-blue-50 rounded-2xl border border-blue-100"><div className="flex items-start gap-3"><AlertTriangle size={16} className="text-blue-500 shrink-0 mt-0.5"/><div><div className="text-xs font-bold text-blue-700">Tip</div><div className="text-xs text-blue-600 mt-0.5">Los steps 2-4 son opcionales. Con solo subir los statements ya puedes ver revenue, occupancy y gastos operativos.</div></div></div></div>
+        <div className="mt-6 p-4 bg-blue-50 rounded-2xl border border-blue-100"><div className="flex items-start gap-3"><AlertTriangle size={16} className="text-blue-500 shrink-0 mt-0.5"/><div><div className="text-xs font-bold text-blue-700">Tip</div><div className="text-xs text-blue-600 mt-0.5">{lang==='es'?'Solo el paso 1 es obligatorio. Con los statements ya ves revenue, ocupación y gastos. Los demás mejoran el análisis.':'Only step 1 is required. With statements you can see revenue, occupancy and expenses. The rest improve the analysis.'}</div></div></div></div>
       </div>}
       <div className="hidden print-footer">OwnerDesk · {prop.name} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</div>
     </>}catch(e){console.error('Dashboard error:',e);return<div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 m-6"><h3 className="font-bold text-rose-700 mb-2">Error en el dashboard</h3><p className="text-sm text-rose-600 mb-3">{e.message}</p><p className="text-xs text-slate-400 mb-3">Stmts: {stmts.length} · Revenue: {revenue} · Annual: {annual.length}</p><button onClick={()=>setView('statements')} className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold">Ir a Statements</button></div>}})()}
