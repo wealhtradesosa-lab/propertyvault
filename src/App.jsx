@@ -53,6 +53,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const plan=isAdmin?'pro':userPlan;
   const canUse=(feature)=>{if(isAdmin)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio']};return(access[plan]||access.free).includes(feature);};
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');const [viewCur,setViewCur]=useState(null);
+  const [portData,setPortData]=useState(null);const [portLoading,setPortLoading]=useState(false);
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);
@@ -286,7 +287,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>partners.find(p=>p.id===id)?.name||id;const pCl=id=>partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
 
   if(loading)return<div className="min-h-screen bg-slate-50">
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 border-b border-slate-200 z-40 px-3 py-3 flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 rounded-xl animate-pulse"/><div className="flex-1"><div className="h-4 bg-slate-200 rounded-lg w-32 animate-pulse"/><div className="h-2.5 bg-slate-100 rounded w-20 mt-1.5 animate-pulse"/></div></div>
@@ -963,6 +964,103 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
       <div className="hidden print-footer">OwnerDesk · {prop.name} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</div>
     </>}catch(e){console.error('Dashboard error:',e);return<div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 m-6"><h3 className="font-bold text-rose-700 mb-2">Error en el dashboard</h3><p className="text-sm text-rose-600 mb-3">{e.message}</p><p className="text-xs text-slate-400 mb-3">Stmts: {stmts.length} · Revenue: {revenue} · Annual: {annual.length}</p><button onClick={()=>setView('statements')} className="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-bold">Ir a Statements</button></div>}})()}
+    {/* ═══ PORTFOLIO ═══ */}
+    {view==='portfolio'&&(()=>{
+      const loadPortfolio=async()=>{
+        setPortLoading(true);
+        const data=[];
+        for(const p of allProperties){
+          try{
+            const snap=await getDocs(collection(db,'properties',p.id,'statements'));
+            const stmts=snap.docs.map(d=>({...d.data(),id:d.id}));
+            const curYear=new Date().getFullYear();
+            const ytd=stmts.filter(s=>s.year===curYear);
+            const allRev=stmts.reduce((s,x)=>s+(x.revenue||0),0);
+            const allNet=stmts.reduce((s,x)=>s+(x.net||0),0);
+            const ytdRev=ytd.reduce((s,x)=>s+(x.revenue||0),0);
+            const ytdNet=ytd.reduce((s,x)=>s+(x.net||0),0);
+            const mort=p.mortgage||{};
+            const mortMonthly=mort.monthlyPayment||0;
+            const equity=(p.purchasePrice||0)-(mort.balance||0);
+            data.push({id:p.id,name:p.name||'Sin nombre',city:p.city||'',country:p.country||'US',currency:p.currency||'USD',totalStmts:stmts.length,allRev,allNet,ytdRev,ytdNet,ytdMonths:ytd.length,mortMonthly,balance:mort.balance||0,equity,purchasePrice:p.purchasePrice||0,rate:mort.rate||0});
+          }catch(e){data.push({id:p.id,name:p.name||'Sin nombre',city:p.city||'',error:e.message})}
+        }
+        setPortData(data);setPortLoading(false);
+      };
+      if(!portData&&!portLoading)loadPortfolio();
+      const totals=portData?{rev:portData.reduce((s,p)=>s+(p.allRev||0),0),net:portData.reduce((s,p)=>s+(p.allNet||0),0),ytdRev:portData.reduce((s,p)=>s+(p.ytdRev||0),0),ytdNet:portData.reduce((s,p)=>s+(p.ytdNet||0),0),equity:portData.reduce((s,p)=>s+(p.equity||0),0),mort:portData.reduce((s,p)=>s+(p.mortMonthly||0),0),debt:portData.reduce((s,p)=>s+(p.balance||0),0)}:null;
+      return <>
+      <h1 className="text-[22px] font-extrabold text-slate-800 mb-2">🏘️ {lang==='es'?'Portafolio Consolidado':'Consolidated Portfolio'}</h1>
+      <p className="text-sm text-slate-400 mb-5">{lang==='es'?`${allProperties.length} propiedades · Vista general de todo tu patrimonio inmobiliario`:`${allProperties.length} properties · Overview of your entire real estate portfolio`}</p>
+
+      {portLoading&&<div className="flex items-center gap-3 py-12 justify-center"><Loader2 size={20} className="animate-spin text-blue-500"/><span className="text-sm text-slate-400">{lang==='es'?'Cargando datos del portafolio...':'Loading portfolio data...'}</span></div>}
+
+      {portData&&totals&&<>
+        {/* KPIs */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
+          <KPI label={lang==='es'?'Revenue Total':'Total Revenue'} value={fm(totals.rev)} sub={`${portData.reduce((s,p)=>s+(p.totalStmts||0),0)} months`} color="blue"/>
+          <KPI label={lang==='es'?'Neto Total':'Total Net'} value={fm(totals.net)} sub={totals.rev>0?`${(totals.net/totals.rev*100).toFixed(0)}% margin`:''} color="green"/>
+          <KPI label={`YTD ${new Date().getFullYear()}`} value={fm(totals.ytdRev)} sub={fm(totals.ytdNet)+' net'} color="cyan"/>
+          <KPI label={lang==='es'?'Equity Total':'Total Equity'} value={fm(totals.equity)} color="emerald"/>
+          <KPI label={lang==='es'?'Deuda Total':'Total Debt'} value={fm(totals.debt)} sub={fm(totals.mort)+'/mo'} color="red"/>
+        </div>
+
+        {/* Property comparison table */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden mb-5">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead><tr className="bg-slate-50 border-b border-slate-200">
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Propiedad':'Property'}</th>
+                <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">Revenue</th>
+                <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">Net</th>
+                <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Margen':'Margin'}</th>
+                <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">YTD Rev</th>
+                <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Hipoteca':'Mortgage'}</th>
+                <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">Equity</th>
+                <th className="px-3 py-3"></th>
+              </tr></thead>
+              <tbody>{portData.map(p=>{const margin=p.allRev>0?(p.allNet/p.allRev*100):0;return<tr key={p.id} className={`border-b border-slate-50 hover:bg-blue-50/50 transition cursor-pointer ${p.id===propertyId?'bg-blue-50':''}`} onClick={()=>{onSwitchProperty(p.id);setView('dashboard')}}>
+                <td className="px-4 py-3"><div className="font-bold text-slate-800">{p.name}</div><div className="text-[10px] text-slate-400">{p.city}{p.country?` · ${p.country}`:''} · {p.totalStmts||0}m</div></td>
+                <td className="text-right px-3 py-3 font-semibold text-blue-600">{fm(p.allRev)}</td>
+                <td className="text-right px-3 py-3 font-semibold text-emerald-600">{fm(p.allNet)}</td>
+                <td className="text-right px-3 py-3"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${margin>=50?'bg-emerald-100 text-emerald-700':margin>=30?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{margin.toFixed(0)}%</span></td>
+                <td className="text-right px-3 py-3 font-semibold text-cyan-600">{fm(p.ytdRev)}</td>
+                <td className="text-right px-3 py-3 text-slate-500">{p.mortMonthly?fm(p.mortMonthly)+'/mo':'—'}</td>
+                <td className="text-right px-3 py-3 font-bold text-emerald-600">{p.equity>0?fm(p.equity):'—'}</td>
+                <td className="px-3 py-3"><span className="text-[10px] text-blue-500 font-bold">→</span></td>
+              </tr>})}
+              <tr className="bg-slate-800 text-white">
+                <td className="px-4 py-3 font-bold text-sm">TOTAL</td>
+                <td className="text-right px-3 py-3 font-bold">{fm(totals.rev)}</td>
+                <td className="text-right px-3 py-3 font-bold">{fm(totals.net)}</td>
+                <td className="text-right px-3 py-3"><span className="text-xs font-bold">{totals.rev>0?(totals.net/totals.rev*100).toFixed(0):0}%</span></td>
+                <td className="text-right px-3 py-3 font-bold">{fm(totals.ytdRev)}</td>
+                <td className="text-right px-3 py-3 font-bold">{fm(totals.mort)}/mo</td>
+                <td className="text-right px-3 py-3 font-bold">{fm(totals.equity)}</td>
+                <td className="px-3"></td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Revenue distribution */}
+        {portData.length>1&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
+          <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">{lang==='es'?'Distribución de Revenue':'Revenue Distribution'}</h3>
+          <div className="h-8 rounded-lg overflow-hidden flex mb-3">
+            {portData.filter(p=>p.allRev>0).map((p,i)=>{const pct=totals.rev>0?(p.allRev/totals.rev*100):0;return<div key={p.id} className="relative" style={{width:pct+'%',background:C[i%C.length]}}><div className="absolute inset-0 flex items-center justify-center"><span className="text-[8px] font-bold text-white truncate px-1">{pct.toFixed(0)}%</span></div></div>})}
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+            {portData.filter(p=>p.allRev>0).map((p,i)=><div key={p.id} className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-sm shrink-0" style={{background:C[i%C.length]}}/>
+              <span className="text-[11px] text-slate-600 truncate">{p.name}</span>
+              <span className="text-[11px] font-bold text-slate-800 ml-auto">{fm(p.allRev)}</span>
+            </div>)}
+          </div>
+        </div>}
+      </>}
+    </>})()}
+
     {/* ═══ PARTNERS ═══ */}
     {view==='partners'&&(()=>{
       // Calculate what each partner has put in and what they should have put based on ownership %
