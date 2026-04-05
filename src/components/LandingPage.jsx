@@ -40,10 +40,10 @@ export function LandingPage({onLogin}) {
             Sube el PDF de tu property manager. En 5 segundos sabes tu cash flow real, si la hipoteca se come la renta, cuántas noches necesitas para break-even, y qué le está costando dinero a tu inversión ahora mismo.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button onClick={()=>onLogin('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl hover:from-blue-700 hover:to-blue-600 transition-all shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5 backdrop-blur-sm">Descubre si estás perdiendo dinero</button>
+            <button onClick={()=>onLogin('register')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl hover:from-blue-700 hover:to-blue-600 transition-all shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5 backdrop-blur-sm">Prueba 14 días gratis — acceso completo</button>
             <button onClick={()=>scroll('features')} className="px-8 py-4 bg-black/30 backdrop-blur-md border border-white/15 text-white/80 text-base font-semibold rounded-2xl hover:bg-black/40 transition">Ver qué analiza ↓</button>
           </div>
-          <p className="text-xs text-white/30 mt-4 drop-shadow">1 propiedad gratis · Sin tarjeta · Resultados en 30 segundos</p>
+          <p className="text-xs text-white/30 mt-4 drop-shadow">14 días gratis con acceso completo · Sin tarjeta · Resultados en 30 segundos</p>
         </div>
       </div>
       <div className="relative z-10 px-6 pb-12 -mt-2">
@@ -131,17 +131,17 @@ export function LandingPage({onLogin}) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* FREE */}
           <div className="bg-white/[0.03] border border-white/8 rounded-3xl p-8 hover:border-white/15 transition-all">
-            <div className="text-xs font-extrabold text-white/30 uppercase tracking-widest mb-2">Free</div>
-            <div className="flex items-baseline gap-1 mb-1"><span className="text-3xl md:text-5xl font-black">$0</span><span className="text-white/30 text-sm">/siempre</span></div>
-            <p className="text-sm text-white/30 mb-6 mt-3">Analiza 1 propiedad. Descubre tu cash flow real.</p>
-            <button onClick={()=>onLogin('register')} className="w-full py-3.5 bg-white/5 border border-white/10 rounded-xl text-sm font-bold text-white/60 hover:bg-white/10 hover:text-white transition">Empezar Gratis</button>
-            <div className="mt-6 pt-5 border-t border-white/5 space-y-3 text-[13px] text-white/40">
-              <div className="flex gap-2"><span className="text-amber-400">①</span>1 propiedad</div>
-              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Dashboard básico</div>
-              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Carga de PDFs</div>
-              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Gastos e ingresos</div>
-              <div className="flex gap-2"><span className="text-amber-400">⑫</span>Últimos 12 meses</div>
-              <div className="flex gap-2 text-white/15"><span>—</span>Sin insights ni métricas STR</div>
+            <div className="text-xs font-extrabold text-emerald-400 uppercase tracking-widest mb-2">🎁 Free Trial</div>
+            <div className="flex items-baseline gap-1 mb-1"><span className="text-3xl md:text-5xl font-black">$0</span><span className="text-white/30 text-sm">/14 días</span></div>
+            <p className="text-sm text-white/30 mb-6 mt-3">14 días de acceso Pro completo. Sin tarjeta.</p>
+            <button onClick={()=>onLogin('register')} className="w-full py-3.5 bg-white/5 border border-white/10 rounded-xl text-sm font-bold text-white/60 hover:bg-white/10 hover:text-white transition">Empezar 14 días gratis</button>
+            <div className="mt-6 pt-5 border-t border-white/5 space-y-3 text-[13px] text-white/50">
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Todo incluido por 14 días</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Dashboard completo</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Carga de PDFs ilimitada</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Insights & recomendaciones</div>
+              <div className="flex gap-2"><span className="text-emerald-400">✓</span>Hipoteca, socios, reportes</div>
+              <div className="flex gap-2 text-white/30"><span className="text-amber-400">→</span>Después: 1 propiedad, dashboard básico</div>
             </div>
           </div>
           {/* STARTER */}
@@ -190,7 +190,7 @@ export function LandingPage({onLogin}) {
       <div className="max-w-2xl mx-auto">
         <h2 className="text-2xl font-extrabold text-center mb-10">Preguntas Frecuentes</h2>
         {[
-          ['¿Puedo empezar gratis?','Sí. El plan Free es para siempre, sin tarjeta de crédito. Incluye 1 propiedad con dashboard básico y carga de PDFs.'],
+          ['¿Puedo empezar gratis?','Sí. Al registrarte obtienes 14 días de acceso Pro completo, sin tarjeta de crédito. Después pasas al plan Free (1 propiedad, dashboard básico). Puedes elegir un plan pago en cualquier momento.'],
           ['¿Qué statements soportan?','PDFs de property managers como IHM, Vacasa, Evolve, y otros formatos estándar de owner statement. El parser extrae todo automáticamente.'],
           ['¿Mis datos están seguros?','Tus datos están encriptados con Firebase/Google Cloud. Solo tú y tus socios invitados tienen acceso. No vendemos datos.'],
           ['¿Puedo cancelar cuando quiera?','Sí, cancela en cualquier momento. Mantienes acceso hasta el fin del periodo pagado. Tus datos pasan al plan Free.'],
@@ -202,8 +202,8 @@ export function LandingPage({onLogin}) {
     {/* Final CTA */}
     <section className="py-20 px-6 text-center">
       <h2 className="text-3xl md:text-4xl font-extrabold mb-4">Tu propiedad genera dinero.<br/>¿Pero cuánto te queda realmente?</h2>
-      <p className="text-white/30 mb-8 max-w-md mx-auto">Sube un statement. 30 segundos. Si los números no te sorprenden, no has perdido nada.</p>
-      <button onClick={()=>onLogin('register')} className="px-10 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5 transition-all">Sube tu statement ahora — es gratis</button>
+      <p className="text-white/30 mb-8 max-w-md mx-auto">14 días con acceso completo. Sin tarjeta. Sube tu primer statement y descubre la verdad sobre tu inversión.</p>
+      <button onClick={()=>onLogin('register')} className="px-10 py-4 bg-gradient-to-r from-blue-600 to-blue-500 text-white text-base font-bold rounded-2xl shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/40 hover:-translate-y-0.5 transition-all">Empieza tu trial de 14 días gratis</button>
     </section>
 
     {/* Footer */}
