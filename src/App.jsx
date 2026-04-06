@@ -784,9 +784,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               return <div className="text-center">
                 <div className="text-3xl font-black text-slate-800">{beNights}</div>
                 <div className="text-[10px] text-slate-400">{t('nightsPerMo')}</div>
-                <div className="text-xs text-slate-500 mt-1">Total monthly costs: {dFm(beMo)}</div>
-                <div className="text-xs text-slate-500">ADR actual: {dFm(adr)}/noche</div>
-                {avgNMo>0&&<div className={`text-xs font-bold mt-2 px-3 py-1 rounded-full inline-block ${surplus>=0?'bg-emerald-100 text-emerald-700':'bg-rose-100 text-rose-700'}`}>{surplus>=0?`+${surplus} ${t('nightsSurplus')}`:`${Math.abs(surplus)} ${t('nightsDeficit')}`}</div>}
+                <div className="text-xs text-slate-500 mt-1">{lang==='es'?'Costos mensuales totales:':'Total monthly costs:'} {dFm(beMo)}</div>
+                <div className="text-xs text-slate-500">ADR {lang==='es'?'actual':'actual'}: {dFm(adr)}/{lang==='es'?'noche':'night'}</div>
+                {avgNMo>0&&<div className={`text-xs font-bold mt-2 px-3 py-1 rounded-full inline-block ${surplus>=0?'bg-emerald-100 text-emerald-700':'bg-rose-100 text-rose-700'}`}>{surplus>=0?'+':''}{surplus>=0?surplus:Math.abs(surplus)} {surplus>=0?t('nightsSurplus'):t('nightsDeficit')}</div>}
               </div>;
             })()}
           </div>
