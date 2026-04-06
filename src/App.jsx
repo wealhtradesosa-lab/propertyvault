@@ -72,7 +72,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const notify=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),4000)};
   const [valForm,setValForm]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setValForm(x=>({...x,[k]:v})),[]);
   const [repairForm,setRepairForm]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRepairForm(x=>({...x,[k]:v})),[]);
-  const [incForm,setIncForm]=useState({date:'',amount:'',source:'direct',concept:'',currency:'USD'});const uif=useCallback((k,v)=>setIncForm(x=>({...x,[k]:v})),[]);
+  const [incForm,setIncForm]=useState({date:'',amount:'',source:'direct',concept:'',currency:'USD',nights:''});const uif=useCallback((k,v)=>setIncForm(x=>({...x,[k]:v})),[]);
   const [taskForm,setTaskForm]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30'});const ut=useCallback((k,v)=>setTaskForm(x=>({...x,[k]:v})),[]);
   const [settingsForm,setSettingsForm]=useState(null);
   const [editPartners,setEditPartners]=useState(null);
@@ -82,7 +82,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [expenseForm,setExpenseForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});const [editId,setEditId]=useState(null);
   const [nf,setNf]=useState({date:'',month:'',grossAmount:''});
   const [contribForm,setContribForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});
-  const [stmtForm,setStmtForm]=useState({year:new Date().getFullYear(),month:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''});
+  const [stmtForm,setStmtForm]=useState({year:new Date().getFullYear(),month:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:'',nights:'',reservations:''});
   const ue=useCallback((k,v)=>setExpenseForm(x=>({...x,[k]:v})),[]);const un=useCallback((k,v)=>setNf(x=>({...x,[k]:v})),[]);
   const uc=useCallback((k,v)=>setContribForm(x=>({...x,[k]:v})),[]);const us=useCallback((k,v)=>setStmtForm(x=>({...x,[k]:v})),[]);
 
@@ -444,8 +444,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const fCapR=marketValue>0?(noiAnual/marketValue*100):0;
       const fCoc=totCont>0?(proyAnual/totCont*100):0;
       const fDscr=mMort>0?(noiAnual/(mMort*12)):0;
-      const fNights=fy?(fy.nights||0):fStmts.reduce((s,x)=>s+(x.nights||0),0);
-      const fRes=fy?(fy.reservations||0):fStmts.reduce((s,x)=>s+(x.reservations||0),0);
+      const directNights=fIncomeEntries.reduce((s,i)=>s+(i.nights||0),0);
+      const fNights=(fy?(fy.nights||0):fStmts.reduce((s,x)=>s+(x.nights||0),0))+directNights;
+      const fRes=(fy?(fy.reservations||0):fStmts.reduce((s,x)=>s+(x.reservations||0),0))+fIncomeEntries.length;
       const availNights=dashYear==='all'?(stmts.length>0?Math.round((stmts.length/12)*365):0):Math.round(n>=12?365:n*30.44);
       const occupancy=availNights>0&&fNights>0?Math.min(100,fNights/availNights*100):0;
       const adr=fNights>0?fRev/fNights:(n>0?fRev/(n*30):0);
@@ -501,8 +502,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-cyan-500 border border-slate-200 shadow-sm">
           <div className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">{t('occupancy')}</div>
           <div className="text-[9px] text-slate-400 -mt-0.5">{t('subOccupancy')}</div>
-          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{fNights>0?occupancy.toFixed(0)+'%':'—'}</div>
-          <div className="text-[10px] text-slate-400">{fNights>0?`${fNights} ${t('nights')} · ADR ${dFm(adr)}`:t('noData')}</div>
+          <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{occupancy>0?occupancy.toFixed(0)+'%':'0%'}</div>
+          <div className="text-[10px] text-slate-400">{fNights>0?`${fNights} ${t('nights')} · ADR ${dFm(adr)}`:`0 ${t('nights')}`}</div>
         </div>
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
           <div className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">{t('cashOnCash')}{partial?' (ann.)':''}</div>
@@ -1191,7 +1192,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           {label:t('operatingExpenses'),r:true,render:r=>{const tc=(r.commission||0)+(r.duke||0)+(r.water||0)+(r.hoa||0)+(r.maintenance||0)+(r.vendor||0);return<span className="font-semibold text-rose-500">{sFm(tc)}</span>}},
           {label:'Neto',r:true,render:r=><span className="font-extrabold text-emerald-700">{sFm(r.net)}</span>},
           {label:'Margen',r:true,render:r=>{const m=r.revenue?(r.net/r.revenue*100):0;return<span className={`font-bold text-xs ${m<40?'text-rose-500':m<50?'text-amber-500':'text-emerald-500'}`}>{m.toFixed(0)}%</span>}},
-        ]} rows={paged} onDel={del} dc="statements" onEdit={r=>{setStmtForm({year:r.year,month:r.month,revenue:String(r.revenue||''),net:String(r.net||''),commission:String(r.commission||''),duke:String(r.duke||''),water:String(r.water||''),hoa:String(r.hoa||''),maintenance:String(r.maintenance||''),vendor:String(r.vendor||'')});setEditId(r.id);setModal('addStmt')}}/>
+        ]} rows={paged} onDel={del} dc="statements" onEdit={r=>{setStmtForm({year:r.year,month:r.month,revenue:String(r.revenue||''),net:String(r.net||''),commission:String(r.commission||''),duke:String(r.duke||''),water:String(r.water||''),hoa:String(r.hoa||''),maintenance:String(r.maintenance||''),vendor:String(r.vendor||''),nights:String(r.nights||''),reservations:String(r.reservations||'')});setEditId(r.id);setModal('addStmt')}}/>
 
         {/* Pagination */}
         {totalPages>1&&<div className="flex items-center justify-between mt-4">
@@ -1257,7 +1258,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ INCOME (powered by statements) ═══ */}
     {view==='income'&&<>
-      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">💰 {t('income')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><button onClick={()=>{setIncForm({date:new Date().toISOString().split('T')[0],amount:'',source:'direct',concept:'',currency:'USD'});setEditId(null);setModal('addIncome')}} className="px-4 py-2.5 bg-emerald-600 text-white text-xs rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {lang==='es'?'Reserva Directa':'Direct Booking'}</button></div>
+      <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">💰 {t('income')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><button onClick={()=>{setIncForm({date:new Date().toISOString().split('T')[0],amount:'',source:'direct',concept:'',currency:'USD',nights:''});setEditId(null);setModal('addIncome')}} className="px-4 py-2.5 bg-emerald-600 text-white text-xs rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {lang==='es'?'Reserva Directa':'Direct Booking'}</button></div>
 
       {/* Direct bookings */}
       {income.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-5">
@@ -1267,10 +1268,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           {label:lang==='es'?'Fuente':'Source',render:r=><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.source==='direct'?'bg-emerald-100 text-emerald-700':r.source==='booking'?'bg-blue-100 text-blue-700':r.source==='vrbo'?'bg-purple-100 text-purple-700':'bg-slate-100 text-slate-600'}`}>{r.source==='direct'?(lang==='es'?'Directa':'Direct'):r.source==='booking'?'Booking.com':r.source==='vrbo'?'VRBO':r.source||'Other'}</span>},
           {label:lang==='es'?'Concepto':'Concept',key:'concept',cls:'text-slate-600'},
           {label:lang==='es'?'Monto':'Amount',r:true,render:r=><span className="font-bold text-emerald-600">{gFm(r.amount)} <span className="text-[9px] text-slate-400">{r.currency||'USD'}</span></span>},
-        ]} rows={[...income].sort((a,b)=>(b.date||'').localeCompare(a.date||''))} onDel={del} dc="income" onEdit={r=>{setIncForm({date:r.date||'',amount:String(r.amount||''),source:r.source||'direct',concept:r.concept||'',currency:r.currency||'USD'});setEditId(r.id);setModal('addIncome')}}/>
+          {label:lang==='es'?'Noches':'Nights',r:true,render:r=>r.nights?<span className="text-slate-600">{r.nights}</span>:<span className="text-slate-300">—</span>},
+        ]} rows={[...income].sort((a,b)=>(b.date||'').localeCompare(a.date||''))} onDel={del} dc="income" onEdit={r=>{setIncForm({date:r.date||'',amount:String(r.amount||''),source:r.source||'direct',concept:r.concept||'',currency:r.currency||'USD',nights:String(r.nights||'')});setEditId(r.id);setModal('addIncome')}}/>
         <div className="bg-emerald-50 rounded-xl p-3 mt-3 flex justify-between items-center text-xs border border-emerald-100">
           <span className="text-emerald-600 font-semibold">{lang==='es'?'Total Ingresos Directos':'Total Direct Income'}</span>
-          <span className="font-bold text-emerald-700">{gFm(income.reduce((s,i)=>s+(i.amount||0),0))}</span>
+          <div className="flex gap-4"><span className="font-bold text-emerald-700">{gFm(income.reduce((s,i)=>s+(i.amount||0),0))}</span><span className="text-slate-500">{income.reduce((s,i)=>s+(i.nights||0),0)} {lang==='es'?'noches':'nights'}</span></div>
         </div>
       </div>}
 
@@ -1891,7 +1893,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     </Mdl>}
 
     {/* Direct Booking / Additional Income Modal */}
-    {modal==='addIncome'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Ingreso':'✏️ Edit Income'):(lang==='es'?'💰 Registrar Ingreso Directo':'💰 Register Direct Income')} grad="from-emerald-500 to-emerald-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{const data={date:incForm.date,amount:parseFloat(incForm.amount)||0,source:incForm.source,concept:incForm.concept,currency:incForm.currency};if(editId){update('income',editId,data)}else{save('income',data)}}} disabled={!incForm.amount||!incForm.date} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
+    {modal==='addIncome'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Ingreso':'✏️ Edit Income'):(lang==='es'?'💰 Registrar Ingreso Directo':'💰 Register Direct Income')} grad="from-emerald-500 to-emerald-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{const data={date:incForm.date,amount:parseFloat(incForm.amount)||0,source:incForm.source,concept:incForm.concept,currency:incForm.currency,nights:parseInt(incForm.nights)||0};if(editId){update('income',editId,data)}else{save('income',data)}}} disabled={!incForm.amount||!incForm.date} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
       <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-3 text-[11px] text-emerald-700">💡 {lang==='es'?'Los ingresos directos se suman automáticamente al Revenue Bruto del dashboard en el mes correspondiente.':'Direct income auto-adds to Gross Revenue in the dashboard for the corresponding month.'}</div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <Inp label={lang==='es'?'Fecha del ingreso':'Income date'} value={incForm.date} onChange={v=>uif('date',v)} type="date" required/>
@@ -1905,17 +1907,19 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           ['other',lang==='es'?'📦 Otro':'📦 Other'],
         ].map(([v,l])=><button key={v} type="button" onClick={()=>uif('source',v)} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${incForm.source===v?'border-emerald-500 bg-emerald-50 text-emerald-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div>
       </div>
-      <Inp label={lang==='es'?'Concepto':'Concept'} value={incForm.concept} onChange={v=>uif('concept',v)} placeholder={lang==='es'?'Ej: Reserva directa familia García, 5 noches':'e.g. Direct booking García family, 5 nights'}/>
+      <Inp label={lang==='es'?'Concepto':'Concept'} value={incForm.concept} onChange={v=>uif('concept',v)} placeholder={lang==='es'?'Ej: Reserva directa familia García':'e.g. Direct booking García family'}/>
+      <Inp label={lang==='es'?'Noches':'Nights'} value={incForm.nights} onChange={v=>uif('nights',v)} type="number" placeholder={lang==='es'?'Ej: 5':'e.g. 5'}/>
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Moneda':'Currency'}</label>
         <div className="grid grid-cols-3 gap-1">{[['USD','🇺🇸 USD'],['COP','🇨🇴 COP'],['EUR','🇪🇺 EUR']].map(([v,l])=><button key={v} type="button" onClick={()=>uif('currency',v)} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${(incForm.currency||'USD')===v?'border-emerald-500 bg-emerald-50 text-emerald-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div>
       </div>
     </Mdl>}
 
-    {modal==='addStmt'&&<Mdl title={editId?'✏️ Editar Statement':'Statement Manual'} grad="from-slate-700 to-slate-800" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={()=>{const yr=parseInt(stmtForm.year),mo=parseInt(stmtForm.month);const data={year:yr,month:mo,revenue:parseFloat(stmtForm.revenue)||0,net:parseFloat(stmtForm.net)||0,commission:parseFloat(stmtForm.commission)||0,duke:parseFloat(stmtForm.duke)||0,water:parseFloat(stmtForm.water)||0,hoa:parseFloat(stmtForm.hoa)||0,maintenance:parseFloat(stmtForm.maintenance)||0,vendor:parseFloat(stmtForm.vendor)||0};if(editId){update('statements',editId,data)}else{if(stmts.find(s=>s.year===yr&&s.month===mo)){notify(`Ya existe statement para ${M[mo-1]} ${yr}`,"error");return;}save('statements',data);setStmtForm(x=>({...x,month:x.month<12?x.month+1:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:''}))}}} disabled={!stmtForm.revenue} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
+    {modal==='addStmt'&&<Mdl title={editId?'✏️ Editar Statement':'Statement Manual'} grad="from-slate-700 to-slate-800" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={()=>{const yr=parseInt(stmtForm.year),mo=parseInt(stmtForm.month);const data={year:yr,month:mo,revenue:parseFloat(stmtForm.revenue)||0,net:parseFloat(stmtForm.net)||0,commission:parseFloat(stmtForm.commission)||0,duke:parseFloat(stmtForm.duke)||0,water:parseFloat(stmtForm.water)||0,hoa:parseFloat(stmtForm.hoa)||0,maintenance:parseFloat(stmtForm.maintenance)||0,vendor:parseFloat(stmtForm.vendor)||0,nights:parseInt(stmtForm.nights)||0,reservations:parseInt(stmtForm.reservations)||0};if(editId){update('statements',editId,data)}else{if(stmts.find(s=>s.year===yr&&s.month===mo)){notify(`Ya existe statement para ${M[mo-1]} ${yr}`,"error");return;}save('statements',data);setStmtForm(x=>({...x,month:x.month<12?x.month+1:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:'',nights:'',reservations:''}))}}} disabled={!stmtForm.revenue} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Año" value={stmtForm.year} onChange={v=>us('year',v)} type="number" disabled={!!editId}/><Sel label="Mes" value={stmtForm.month} onChange={v=>us('month',v)} options={M.map((m,i)=>({v:i+1,l:m}))}/></div>
       <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100"><div className="text-[10px] font-black text-emerald-700 uppercase mb-3">Revenue</div><Inp label="Revenue Total" value={stmtForm.revenue} onChange={v=>us('revenue',v)} prefix="$" type="number" required error={stmtForm.revenue&&parseFloat(stmtForm.revenue)<=0?'Enter revenue for the period':''}/></div>
       <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100"><div className="text-[10px] font-black text-rose-700 uppercase mb-3">Expenses</div><div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="PM Commission" value={stmtForm.commission} onChange={v=>us('commission',v)} prefix="$" type="number"/><Inp label="Electricity" value={stmtForm.duke} onChange={v=>us('duke',v)} prefix="$" type="number"/><Inp label="Water" value={stmtForm.water} onChange={v=>us('water',v)} prefix="$" type="number"/><Inp label="HOA" value={stmtForm.hoa} onChange={v=>us('hoa',v)} prefix="$" type="number"/><Inp label="Maintenance" value={stmtForm.maintenance} onChange={v=>us('maintenance',v)} prefix="$" type="number"/><Inp label="Vendor/Other" value={stmtForm.vendor} onChange={v=>us('vendor',v)} prefix="$" type="number"/></div></div>
       <Inp label="Net al Owner" value={stmtForm.net} onChange={v=>us('net',v)} prefix="$" type="number"/>
+      <div className="bg-cyan-50 rounded-2xl p-4 border border-cyan-100"><div className="text-[10px] font-black text-cyan-700 uppercase mb-3">{lang==='es'?'Ocupación':'Occupancy'}</div><div className="grid grid-cols-2 gap-3"><Inp label={lang==='es'?'Noches ocupadas':'Nights booked'} value={stmtForm.nights} onChange={v=>us('nights',v)} type="number" placeholder="Ej: 22"/><Inp label={lang==='es'?'Reservaciones':'Reservations'} value={stmtForm.reservations} onChange={v=>us('reservations',v)} type="number" placeholder="Ej: 5"/></div></div>
     </Mdl>}
 
     {/* Mortgage statement parsed results */}
@@ -2019,7 +2023,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           </div>
           <div className="text-[10px] text-purple-500 mt-2 ml-13 pl-[52px]">{lang==='es'?'→ NO afecta el P&L — solo registra quién pagó':'→ Does NOT affect P&L — only tracks who paid'}</div>
         </button>
-        <button onClick={()=>{setIncForm({date:new Date().toISOString().split('T')[0],amount:'',source:'direct',concept:'',currency:'USD'});setModal('addIncome')}} className="text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 transition group">
+        <button onClick={()=>{setIncForm({date:new Date().toISOString().split('T')[0],amount:'',source:'direct',concept:'',currency:'USD',nights:''});setModal('addIncome')}} className="text-left p-4 rounded-2xl border-2 border-slate-200 hover:border-emerald-400 hover:bg-emerald-50 transition group">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-600 text-lg group-hover:bg-emerald-200 transition">🏠</div>
             <div>
