@@ -1,5 +1,6 @@
 // ═══ CONSTANTS & HELPERS ═══
 export const ADMIN_EMAILS=['santiagososa1@me.com','crestrepoz@gmail.com','management@hostu.biz'];
+export const VIP_EMAILS=['rmedina@ihmvacations.com'];
 export const C=['#2563EB','#059669','#F59E0B','#7C3AED','#DC2626','#0891B2','#DB2777','#65A30D'];
 export const M=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
