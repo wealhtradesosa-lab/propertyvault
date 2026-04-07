@@ -7,11 +7,18 @@ const monthAbbrev = {Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:1
 
 function extractDate(text) {
   const full = text.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i);
-  if (full) return { year: parseInt(full[2]), month: monthNames[full[1]] };
+  if (full) return { year: parseInt(full[2]), month: monthNames[full[1].charAt(0).toUpperCase()+full[1].slice(1).toLowerCase()] };
   const abbr = text.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\s+(\d{4})/i);
-  if (abbr) return { year: parseInt(abbr[2]), month: monthAbbrev[abbr[1].slice(0,3)] };
-  const slashed = text.match(/(\d{1,2})\/(\d{4})/);
+  if (abbr) return { year: parseInt(abbr[2]), month: monthAbbrev[abbr[1].charAt(0).toUpperCase()+abbr[1].slice(1,3).toLowerCase()] };
+  const mesesFull={enero:1,febrero:2,marzo:3,abril:4,mayo:5,junio:6,julio:7,agosto:8,septiembre:9,octubre:10,noviembre:11,diciembre:12};
+  const spanishFull = text.match(/(enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(?:de\s+)?(\d{4})/i);
+  if (spanishFull) return { year: parseInt(spanishFull[2]), month: mesesFull[spanishFull[1].toLowerCase()] };
+  const slashed = text.match(/(1[0-2]|0?[1-9])\/(\d{4})/);
   if (slashed) return { year: parseInt(slashed[2]), month: parseInt(slashed[1]) };
+  const iso = text.match(/(\d{4})-(1[0-2]|0[1-9])/);
+  if (iso) return { year: parseInt(iso[1]), month: parseInt(iso[2]) };
+  const stmtDate = text.match(/(?:Statement|Report|Billing)\s*Date\s*:?\s*(\d{1,2})\/\d{1,2}\/(\d{4})/i);
+  if (stmtDate) return { year: parseInt(stmtDate[2]), month: parseInt(stmtDate[1]) };
   return null;
 }
 
@@ -117,8 +124,49 @@ function parseVrbo(t) {
 
 function parseGeneric(t) {
   const d = extractDate(t);
-  if (!d) return { error: 'No se pudo identificar el formato ni la fecha. Usa "Ingresar manualmente".' };
-  return result({ ...d, revenue: grabAny(t, ['Rental Income','Room Charge','Revenue','Total Income','Gross Revenue','Gross Income','Booking Revenue','Accommodation']), commission: grabAny(t, ['Commission','Management Fee','Service Fee','PM Fee','Platform Fee']), duke: grabAny(t, ['Electric','Electricity','Duke Energy','Power','FPL','TECO']), water: grabAny(t, ['Water','Sewer','Toho','Water/Sewer']), hoa: grabAny(t, ['HOA','Association','Community Fee']), maintenance: grabAny(t, ['Maintenance','Repairs','Repair']), vendor: grabAny(t, ['Cleaning','Housekeeping','Turnover']), net: grabAny(t, ['Payment due','Payments To Owner','ACH Payment','Ending balance','Net to Owner','Owner Payout','Net Proceeds','Host Payout','Total Payout','Net Payment','Amount Due']), nights: nights(t), reservations: reservations(t), format: 'Generic' });
+  if (!d) return { error: 'No se pudo identificar la fecha. Usa "Ingresar manualmente".' };
+
+  // MASSIVE label lists — English + Spanish + abbreviations + variations
+  const revLabels = ['Rental Income','Room Charge','Revenue','Total Income','Gross Revenue','Gross Income','Booking Revenue','Accommodation','Nightly Revenue','Rental Revenue','Gross Rental','Total Revenue','Room Revenue','Accommodation Revenue','Rental Earnings','Total Earnings','Ingreso Bruto','Ingreso por Renta','Ingresos','Renta Total','Ingreso Total','Total Ingresos','Booking Income','Lodging Revenue','Guest Payment','Total Rent','Rent Collected','Rent Revenue','Owner Revenue','Property Revenue','Gross Rent','Total Collections','Receipts','Rental Receipts','Collected Rent','Proceeds','Gross Proceeds'];
+  const commLabels = ['Commission','Management Fee','Service Fee','PM Fee','Platform Fee','Manager Fee','Admin Fee','Property Management','Mgmt Fee','PM Commission','Manager Commission','Monthly Fee','Comisión','Comision','Fee de Administración','Cargo Administrativo','Honorarios','Administration Fee','Company Fee','Agency Fee','Listing Fee','Booking Fee','Channel Fee','Host Fee','OTA Commission'];
+  const elecLabels = ['Electric','Electricity','Duke Energy','Power','FPL','TECO','Electricidad','Energía','Energia','Luz','Servicio Eléctrico','Utility','Energy','Electric Bill','Power Bill','EPM','Codensa','Enel','CFE'];
+  const waterLabels = ['Water','Sewer','Toho','Water/Sewer','Agua','Acueducto','Alcantarillado','Water Bill','Water Utility','EPM Agua','Servicio de Agua'];
+  const hoaLabels = ['HOA','Association','Community Fee','Cuota de Administración','Administración','Admin','Condo Fee','Strata','Body Corporate','Common Area','Cuota Mensual','Monthly Assessment','Assessment','Owners Association'];
+  const maintLabels = ['Maintenance','Repairs','Repair','Mantenimiento','Reparación','Reparaciones','Fix','Handyman','Plumbing','HVAC','Landscaping','Pool Maintenance','Jardinería','Fumigación','Pest Control'];
+  const vendLabels = ['Cleaning','Housekeeping','Turnover','Limpieza','Aseo','Laundry','Lavandería','Supplies','Amenities','Guest Supplies','Linen','Linens','Towels','Consumables'];
+  const netLabels = ['Payment due','Payments To Owner','ACH Payment','Ending balance','Net to Owner','Owner Payout','Net Proceeds','Host Payout','Total Payout','Net Payment','Amount Due','Owner Payment','Disbursement','Owner Disbursement','Net Owner','Pago al Propietario','Pago Neto','Transferencia','Deposito','Depósito','Wire Transfer','Direct Deposit','Owner Net','Net Income','Owner Draw','Distribution','Remittance','Balance Due','Owner Balance','Net Rent','Pay to Owner','Payout'];
+
+  const revenue = grabAny(t, revLabels);
+  const commission = grabAny(t, commLabels);
+  const duke = grabAny(t, elecLabels);
+  const water = grabAny(t, waterLabels);
+  const hoa = grabAny(t, hoaLabels);
+  const maintenance = grabAny(t, maintLabels);
+  const vendor = grabAny(t, vendLabels);
+  let net = grabAny(t, netLabels);
+
+  // SMART FALLBACK: if we found nothing, scan for the largest dollar amounts
+  if (revenue === 0 && net === 0) {
+    const amounts = [];
+    const rx = /\$\s*([\d,]+\.\d{2})/g;
+    let m;
+    while ((m = rx.exec(t)) !== null) {
+      const v = parseFloat(m[1].replace(/,/g, ''));
+      if (v > 10 && v < 500000) amounts.push(v);
+    }
+    if (amounts.length >= 2) {
+      amounts.sort((a, b) => b - a);
+      // Assume largest = revenue, smallest positive at end = net
+      return result({ ...d, revenue: amounts[0], net: amounts[amounts.length - 1], format: 'Generic (auto-detected)' });
+    }
+  }
+
+  // If we found revenue but no net, estimate
+  if (revenue > 0 && net === 0) {
+    net = Math.max(0, revenue - commission - duke - water - hoa - maintenance - vendor);
+  }
+
+  return result({ ...d, revenue, commission, duke, water, hoa, maintenance, vendor, net, nights: nights(t), reservations: reservations(t), format: 'Generic' });
 }
 
 // ═══ DETECTORS ═══

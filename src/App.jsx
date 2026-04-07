@@ -176,6 +176,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         }
 
         const fmt=results[0]?.format||'Unknown';
+        const isGeneric=fmt.startsWith('Generic');
         if(results.length>1){
           log[log.length-1]={file:f.name,status:saved>0?'ok':'dup',msg:`[${fmt}] ${saved} months importados${skipped>0?' · '+skipped+' omitidos (duplicados)':''}`};
         } else {
@@ -184,7 +185,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           if(!r.commission)missing.push('Commission');if(!r.net)missing.push('Net');
           let msg=`[${fmt}] ${M[r.month-1]} ${r.year} — Rev: ${fm(r.revenue)} | Net: ${fm(r.net)} | ${r.nights||0} nights`;
           if(missing.length)msg+=` ⚠️ Sin: ${missing.join(', ')}`;
-          log[log.length-1]={file:f.name,status:missing.length?'warn':'ok',msg};
+          if(isGeneric)msg+=` — ⚠️ ${lang==='es'?'Formato no reconocido. Verifica los datos.':'Unknown format. Please verify data.'}`;
+          log[log.length-1]={file:f.name,status:isGeneric?'warn':missing.length?'warn':'ok',msg};
         }
         setUploadLog([...log]);
       }catch(e){log[log.length-1]={file:f.name,status:'error',msg:'Error: '+(e.message||String(e))};setUploadLog([...log]);}
