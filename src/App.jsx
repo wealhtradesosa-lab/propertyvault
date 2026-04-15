@@ -55,6 +55,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes']};return(access[plan]||access.free).includes(feature);};
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');const [viewCur,setViewCur]=useState(null);
   const [portData,setPortData]=useState(null);const [portLoading,setPortLoading]=useState(false);
+  const [taxYear,setTaxYear]=useState(new Date().getFullYear()-1);const [landRatio,setLandRatio]=useState(20);const [taxRate,setTaxRate]=useState(24);
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [parsedPreview,setParsedPreview]=useState(null);
@@ -1677,9 +1678,6 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ TAX CENTER ═══ */}
     {view==='taxes'&&(()=>{
-      const [taxYear,setTaxYear]=useState(new Date().getFullYear()-1);
-      const [landRatio,setLandRatio]=useState(20);
-      const [taxRate,setTaxRate]=useState(24);
       const taxCountry='US';
       const yrData=annual.find(y=>y.year===taxYear);
       const yrStmts=stmts.filter(s=>s.year===taxYear);
