@@ -1748,7 +1748,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">{lang==='es'?'% Terreno':'Land %'}</label><input type="number" value={landRatio} onChange={e=>setLandRatio(parseInt(e.target.value)||20)} className="w-16 px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-center"/></div>
         <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">{lang==='es'?'Tasa Marginal':'Tax Bracket'}</label>
           <select value={taxRate} onChange={e=>setTaxRate(parseInt(e.target.value))} className="px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold bg-white">
-            {[{v:10,l:'10%'},{v:12,l:'12%'},{v:22,l:'22%'},{v:24,l:'24%'},{v:32,l:'32%'},{v:35,l:'35%'},{v:37,l:'37%'}]}.map(b=><option key={b.v} value={b.v}>{b.l}</option>)}
+            {[{v:10,l:'10%'},{v:12,l:'12%'},{v:22,l:'22%'},{v:24,l:'24%'},{v:32,l:'32%'},{v:35,l:'35%'},{v:37,l:'37%'}].map(b=><option key={b.v} value={b.v}>{b.l}</option>)}
           </select></div>
         
       </div>
