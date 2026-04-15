@@ -185,44 +185,35 @@ function parseIHMAnnual(t) {
     return months[key];
   };
 
-  const lines = t.split(/\n/);
+  // Use GLOBAL regex on full text — pdf.js joins all text per page into one line
+  // 1. Find all reservation headers → nights + reservations
+  const resRx = /-\s*(\d{1,2})\/\d{1,2}\/(\d{4})\)\s*(\d+)\s*Night/gi;
+  let rm;
+  while ((rm = resRx.exec(t)) !== null) {
+    const mo = parseInt(rm[1]), yr = parseInt(rm[2]);
+    if (mo >= 1 && mo <= 12) { const m = getMonth(yr, mo); m.nights += parseInt(rm[3]) || 0; m.reservations++; }
+  }
 
-  for (const line of lines) {
-    // Reservation header: "Reservation #37159626: Jessica Burnett (12/29/2024 - 01/02/2025) 4 Nights"
-    const endMatch = line.match(/-\s*(\d{1,2})\/\d{1,2}\/(\d{4})\)\s*(\d+)\s*Night/i);
-    if (endMatch) {
-      const resMonth = parseInt(endMatch[1]);
-      const resYear = parseInt(endMatch[2]);
-      if (resMonth >= 1 && resMonth <= 12) {
-        const m = getMonth(resYear, resMonth);
-        m.nights += parseInt(endMatch[3]) || 0;
-        m.reservations++;
-      }
-      continue;
-    }
-
-    // Dated line items: "MM/DD/YYYY Description $X,XXX.XX"
-    const dated = line.match(/(\d{1,2})\/\d{1,2}\/(\d{4})\s+(.+?)\s+\$?([\d,]+\.\d{2})/);
-    if (dated) {
-      const mo = parseInt(dated[1]);
-      const lineYear = parseInt(dated[2]);
-      const desc = dated[3];
-      const amt = parseFloat(dated[4].replace(/,/g, ''));
-      if (mo < 1 || mo > 12) continue;
-
-      const m = getMonth(lineYear, mo);
-      if (/room\s*charge/i.test(desc)) { m.revenue += amt; }
-      else if (/pool\s*heat/i.test(desc)) { m.pool += amt; m.revenue += amt; }
-      else if (/commission\s*charge/i.test(desc)) { m.commission += amt; }
-      else if (/owner\s*cleaning/i.test(desc)) { m.vendor += amt; }
-      else if (/duke\s*energy|duke\s*monthly/i.test(desc)) { m.duke += amt; }
-      else if (/toho\s*water|toho\s*monthly/i.test(desc)) { m.water += amt; }
-      else if (/hoa|montly\s*dues|monthly\s*dues/i.test(desc)) { m.hoa += amt; }
-      else if (/maintenance\s*fee/i.test(desc)) { m.maintenance += amt; }
-      else if (/ach\s*payment/i.test(desc)) { m.net += amt; }
-      else if (/spectrum|linen|towel|cleaning|rug|filter|license|dbpr|tax\s*collector/i.test(desc)) { m.vendor += amt; }
-      else { m.vendor += amt; }
-    }
+  // 2. Find all dated $ entries: "MM/DD/YYYY Label $X,XXX.XX"
+  // Description must start with a letter (skips reservation date ranges like "- 01/02/2025)")
+  const entryRx = /(\d{1,2})\/\d{1,2}\/(\d{4})\s+([A-Za-z][\w\s,./]*?)\s+\$([\d,]+\.\d{2})/g;
+  let em;
+  while ((em = entryRx.exec(t)) !== null) {
+    const mo = parseInt(em[1]), yr = parseInt(em[2]);
+    const desc = em[3].trim(), amt = parseFloat(em[4].replace(/,/g, ''));
+    if (mo < 1 || mo > 12 || amt <= 0) continue;
+    const m = getMonth(yr, mo);
+    if (/room\s*charge/i.test(desc)) { m.revenue += amt; }
+    else if (/pool\s*heat/i.test(desc)) { m.pool += amt; m.revenue += amt; }
+    else if (/commission\s*charge/i.test(desc)) { m.commission += amt; }
+    else if (/owner\s*cleaning/i.test(desc)) { m.vendor += amt; }
+    else if (/duke/i.test(desc)) { m.duke += amt; }
+    else if (/toho/i.test(desc)) { m.water += amt; }
+    else if (/hoa|dues/i.test(desc)) { m.hoa += amt; }
+    else if (/maintenance\s*fee/i.test(desc)) { m.maintenance += amt; }
+    else if (/ach\s*payment/i.test(desc)) { m.net += amt; }
+    else if (/spectrum|linen|towel|cleaning|rug|filter|license|dbpr|tax\s*collector|jandy|ring\s*replacement/i.test(desc)) { m.vendor += amt; }
+    else { m.vendor += amt; }
   }
 
   // Build results — all months with activity, sorted by date
