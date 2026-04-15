@@ -244,7 +244,7 @@ function parseIHMAnnual(t) {
 }
 
 const detectors = [
-  { name: 'IHMAnnual', test: t => /Annual\s+Statement\s+for\s+\d{4}/i.test(t) && /Insight\s*hospitality|IHM/i.test(t), parse: parseIHMAnnual },
+  { name: 'IHMAnnual', test: t => /Annual\s+Statement\s+for\s+\d{4}/i.test(t) && (/Insight\s*hospitality|IHM|Room\s*Charge[\s\S]*Commission\s*Charge[\s\S]*Vendor\s*Bills[\s\S]*ACH\s*Payment|Maintenance\s*Fee\s*to\s*Owner[\s\S]*ACH\s*Payment/i.test(t)), parse: parseIHMAnnual },
   { name: 'IHM', test: t => /Year:\s*\d{4}\s*Period:\s*\d+/.test(t), parse: parseIHM },
   { name: 'HostU', test: t => /Host\s*U/i.test(t) || /PMC commission/i.test(t), parse: parseHostU },
   { name: 'Vacasa', test: t => /Vacasa/i.test(t), parse: parseVacasa },
@@ -475,6 +475,10 @@ export async function parsePDF(file) {
   // Check for annual reports first (return array)
   if (/Airbnb/i.test(fullText) && /Informe de ganancias|Earnings Report|Período del informe/i.test(fullText)) {
     const annual = parseAirbnbAnnual(fullText);
+    if (Array.isArray(annual) && annual.length > 0) return annual;
+  }
+  if (/Annual\s+Statement\s+for\s+\d{4}/i.test(fullText) && /Room\s*Charge/i.test(fullText) && /Commission\s*Charge/i.test(fullText)) {
+    const annual = parseIHMAnnual(fullText);
     if (Array.isArray(annual) && annual.length > 0) return annual;
   }
 
