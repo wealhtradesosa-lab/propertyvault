@@ -372,14 +372,7 @@ function grabMort(text, label) {
 }
 
 export async function parseMortgageStatement(file) {
-  const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
-  let fullText = '';
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    fullText += content.items.map(it => it.str).join(' ') + '\n';
-  }
+  const { fullText } = await extractPDFText(file);
   if (fullText.trim().length < 30) return { error: 'PDF empty or unreadable' };
 
   const result = {
@@ -501,15 +494,34 @@ export async function parseMortgageStatement(file) {
 }
 
 // ═══ MAIN EXPORT ═══
-export async function parsePDF(file) {
+// Extract text preserving line structure using y-coordinates
+async function extractPDFText(file) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
   let fullText = '';
   for (let i = 1; i <= pdf.numPages; i++) {
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    fullText += content.items.map(it => it.str).join(' ') + '\n';
+    // Group items by y-coordinate (same y = same line in PDF)
+    const lineMap = {};
+    content.items.forEach(item => {
+      if (!item.str.trim()) return;
+      const y = Math.round(item.transform[5]); // ty = vertical position
+      if (!lineMap[y]) lineMap[y] = [];
+      lineMap[y].push({ x: item.transform[4], text: item.str });
+    });
+    // Sort lines top-to-bottom (highest y first), items left-to-right
+    const sortedYs = Object.keys(lineMap).map(Number).sort((a, b) => b - a);
+    for (const y of sortedYs) {
+      const line = lineMap[y].sort((a, b) => a.x - b.x).map(item => item.text).join(' ');
+      fullText += line + '\n';
+    }
   }
+  return { pdf, fullText };
+}
+
+export async function parsePDF(file) {
+  const { fullText } = await extractPDFText(file);
   if (fullText.trim().length < 30) return { error: 'PDF vacío o no se pudo leer' };
 
   // ─── ANNUAL REPORTS (return arrays) ───
