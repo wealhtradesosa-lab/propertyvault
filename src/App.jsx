@@ -1699,6 +1699,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       // ── DEDUCTIONS from Expenses module ──
       const expBySchedule={insurance:0,taxes:0,repairs:0,travel:0,professional:0,supplies:0,advertising:0,other:0};
+      const taxSource={insurance:'expenses',taxes:'expenses'}; // track source
       const allYrExp=[...yrExpenses,...expenses.filter(e=>{const f=e.frequency||'once';return f==='monthly'||f==='annual'})];
       const seen=new Set();
       allYrExp.forEach(e=>{
@@ -1706,15 +1707,19 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         const cat=e.category||'';const amt=e.amount||0;
         const freq=e.frequency||'once';
         const annualized=freq==='monthly'?amt*12:freq==='annual'?amt:amt;
-        if(cat==='insurance')expBySchedule.insurance+=annualized;
-        else if(cat==='taxes'||cat==='predial'||cat==='property_tax')expBySchedule.taxes+=annualized;
+        if(cat==='insurance'&&!mort.includesInsurance)expBySchedule.insurance+=annualized;
+        else if((cat==='taxes'||cat==='predial'||cat==='property_tax')&&!mort.includesTaxes)expBySchedule.taxes+=annualized;
         else if(cat==='repair'||cat==='repairs')expBySchedule.repairs+=annualized;
         else if(cat==='travel')expBySchedule.travel+=annualized;
         else if(cat==='professional'||cat==='legal'||cat==='accounting')expBySchedule.professional+=annualized;
         else if(cat==='supplies'||cat==='furnishing')expBySchedule.supplies+=annualized;
         else if(cat==='advertising'||cat==='marketing')expBySchedule.advertising+=annualized;
-        else if(!['mortgage_pay','hoa','electricity','water','commission'].includes(cat))expBySchedule.other+=annualized;
+        else if(!['mortgage_pay','hoa','electricity','water','commission','insurance','taxes','predial','property_tax'].includes(cat))expBySchedule.other+=annualized;
       });
+
+      // Override with escrow amounts when taxes/insurance are in mortgage
+      if(mort.includesTaxes&&mort.taxEscrow>0){expBySchedule.taxes=(mort.taxEscrow||0)*12;taxSource.taxes='escrow';}
+      if(mort.includesInsurance&&mort.insuranceEscrow>0){expBySchedule.insurance=(mort.insuranceEscrow||0)*12;taxSource.insurance='escrow';}
 
       // ── MORTGAGE INTEREST ──
       const annualInterest=mort.interest?(mort.interest*12):mort.balance&&mort.rate?(mort.balance*(mort.rate/100)):0;
@@ -1793,9 +1798,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           {annualInterest>0&&<><div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{lang==='es'?'Hipoteca':'Mortgage'}</div>
           <Row label={lang==='es'?'Interés Hipotecario':'Mortgage Interest'} value={annualInterest} indent icon="🏦" sub={mort.rate?`${mort.rate}% rate`:''}/></>}
 
-          {(expBySchedule.insurance>0||expBySchedule.taxes>0)&&<><div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{lang==='es'?'De Gastos Registrados':'From Recorded Expenses'}</div>
-          {expBySchedule.insurance>0&&<Row label={lang==='es'?'Seguro':'Insurance'} value={expBySchedule.insurance} indent icon="🛡️"/>}
-          {expBySchedule.taxes>0&&<Row label={lang==='es'?'Impuesto Predial':'Property Taxes'} value={expBySchedule.taxes} indent icon="🏛️"/>}
+          {(expBySchedule.insurance>0||expBySchedule.taxes>0||expBySchedule.repairs>0||expBySchedule.travel>0||expBySchedule.professional>0||expBySchedule.supplies>0||expBySchedule.advertising>0||expBySchedule.other>0)&&<><div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{lang==='es'?'Otros Gastos Deducibles':'Other Deductible Expenses'}</div>
+          {expBySchedule.taxes>0&&<Row label={lang==='es'?'Impuesto Predial':'Property Taxes'} value={expBySchedule.taxes} indent icon="🏛️" sub={taxSource.taxes==='escrow'?(lang==='es'?'vía escrow hipoteca':'via mortgage escrow'):''}/>}
+          {expBySchedule.insurance>0&&<Row label={lang==='es'?'Seguro':'Insurance'} value={expBySchedule.insurance} indent icon="🛡️" sub={taxSource.insurance==='escrow'?(lang==='es'?'vía escrow hipoteca':'via mortgage escrow'):''}/>}
           {expBySchedule.repairs>0&&<Row label={lang==='es'?'Reparaciones':'Repairs'} value={expBySchedule.repairs} indent icon="🔨"/>}
           {expBySchedule.travel>0&&<Row label={lang==='es'?'Viajes a propiedad':'Travel to property'} value={expBySchedule.travel} indent icon="✈️"/>}
           {expBySchedule.professional>0&&<Row label={lang==='es'?'Profesionales (CPA/Legal)':'Professional (CPA/Legal)'} value={expBySchedule.professional} indent icon="📋"/>}
@@ -1829,8 +1834,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         const missing=[];
         if(!yrData||yrData.n===0)missing.push(lang==='es'?'No hay statements para este año':'No statements for this year');
         if(annualInterest===0&&mort.balance>0)missing.push(lang==='es'?'Interés hipotecario: configura tasa en Mortgage':'Mortgage interest: configure rate in Mortgage');
-        if(expBySchedule.insurance===0)missing.push(lang==='es'?'Seguro: regístralo en Gastos':'Insurance: register in Expenses');
-        if(expBySchedule.taxes===0)missing.push(lang==='es'?'Impuesto predial: regístralo en Gastos':'Property tax: register in Expenses');
+        if(expBySchedule.insurance===0&&!mort.includesInsurance)missing.push(lang==='es'?'Seguro: regístralo en Gastos o configura escrow en Hipoteca':'Insurance: register in Expenses or configure escrow in Mortgage');
+        if(expBySchedule.taxes===0&&!mort.includesTaxes)missing.push(lang==='es'?'Impuesto predial: regístralo en Gastos o configura escrow en Hipoteca':'Property tax: register in Expenses or configure escrow in Mortgage');
         if(purchasePrice===0)missing.push(lang==='es'?'Precio de compra: configúralo en Settings':'Purchase price: set in Settings');
         return missing.length>0?<div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
           <div className="text-xs font-bold text-amber-700 mb-2">💡 {lang==='es'?'Para mejorar tu estimación fiscal:':'To improve your tax estimate:'}</div>
