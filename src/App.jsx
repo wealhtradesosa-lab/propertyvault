@@ -2049,7 +2049,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <label className="block border-2 border-dashed border-blue-300 rounded-2xl p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
         <Upload size={32} className="text-blue-400 mx-auto mb-2"/>
         <div className="text-sm font-semibold text-blue-600">Haz clic aquí para seleccionar PDFs</div>
-        <div className="text-xs text-slate-400 mt-1">Soporta múltiples archivos</div>
+        <div className="text-xs text-slate-400 mt-1">Soporta múltiples archivos</div><div className="text-[8px] text-slate-300 mt-1">v2.4</div>
         <input type="file" accept=".pdf" multiple className="hidden" onChange={async e=>{
           const arr=[...e.target.files];
           e.target.value='';
