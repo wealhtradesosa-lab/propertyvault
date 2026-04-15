@@ -57,6 +57,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [portData,setPortData]=useState(null);const [portLoading,setPortLoading]=useState(false);
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
+  const [parsedPreview,setParsedPreview]=useState(null);
   const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);
   const [dark,setDark]=useState(()=>{try{return localStorage.getItem('od-dark')==='1'}catch{return false}});
   const [lang,setLang]=useState(()=>{try{return localStorage.getItem('od-lang')||(prop.country&&!['US','GB'].includes(prop.country)?'es':'en')}catch{return 'en'}});
@@ -144,12 +145,13 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     const fileArr=Array.from(files);
     if(fileArr.length>15){notify(`Máximo 15 PDFs. Seleccionaste ${fileArr.length}`,'error');return;}
     const log=[];
-    const uploaded=new Set();
     let existingPeriods=new Set();
     try{
       const freshSnap=await getDocs(collection(db,'properties',propertyId,'statements'));
       existingPeriods=new Set(freshSnap.docs.map(d=>{const s=d.data();return s.year+'-'+s.month}));
     }catch(e){/* ignore */}
+
+    const allParsed=[];
 
     for(let fi=0; fi<fileArr.length; fi++){
       const f=fileArr[fi];
@@ -158,41 +160,34 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       try{
         const {parsePDF:pPDF}=await loadParsers();const rawResult=await pPDF(f);
         if(rawResult.error){log[log.length-1]={file:f.name,status:'error',msg:rawResult.error};setUploadLog([...log]);continue;}
-
-        // Normalize: single result → array, annual report already returns array
         const results=Array.isArray(rawResult)?rawResult:[rawResult];
-        let saved=0,skipped=0;
-
-        for(const r of results){
-          const key=r.year+'-'+r.month;
-          if(existingPeriods.has(key)||uploaded.has(key)){skipped++;continue;}
-          if(r.revenue<=0&&r.net<=0){skipped++;continue;}
-
-          const {_debug, ...stmtData} = r;
-          await addDoc(collection(db,'properties',propertyId,'statements'),{...stmtData,createdAt:serverTimestamp()});
-          uploaded.add(key);
-          existingPeriods.add(key);
-          saved++;
-        }
-
         const fmt=results[0]?.format||'Unknown';
-        const isGeneric=fmt.startsWith('Generic');
-        if(results.length>1){
-          const years=[...new Set(results.map(r=>r.year))].sort();
-          const yearLabel=years.length>1?years.join('-'):String(years[0]);
-          log[log.length-1]={file:f.name,status:saved>0?'ok':'dup',msg:`[${fmt}] ${yearLabel} · ${saved} months importados${skipped>0?' · '+skipped+' omitidos (duplicados)':''}${fmt.includes('Annual')?' · ℹ️ '+(lang==='es'?'Fuente: reporte anual':'Source: annual report'):''}`};
-        } else {
-          const r=results[0];
-          const missing=[];
-          if(!r.commission)missing.push('Commission');if(!r.net)missing.push('Net');
-          let msg=`[${fmt}] ${M[r.month-1]} ${r.year} — Rev: ${fm(r.revenue)} | Net: ${fm(r.net)} | ${r.nights||0} nights`;
-          if(missing.length)msg+=` ⚠️ Sin: ${missing.join(', ')}`;
-          if(isGeneric)msg+=` — ⚠️ ${lang==='es'?'Formato no reconocido. Verifica los datos.':'Unknown format. Please verify data.'}`;
-          log[log.length-1]={file:f.name,status:isGeneric?'warn':missing.length?'warn':'ok',msg};
-        }
+        results.forEach(r=>{
+          const key=r.year+'-'+r.month;
+          const isDup=existingPeriods.has(key);
+          allParsed.push({...r,_file:f.name,_format:fmt,_dup:isDup,_include:!isDup&&(r.revenue>0||r.net>0)});
+        });
+        log[log.length-1]={file:f.name,status:'ok',msg:`[${fmt}] ${results.length} ${results.length>1?'meses encontrados':'mes encontrado'}`};
         setUploadLog([...log]);
       }catch(e){log[log.length-1]={file:f.name,status:'error',msg:'Error: '+(e.message||String(e))};setUploadLog([...log]);}
     }
+
+    if(allParsed.length>0){
+      setParsedPreview({results:allParsed,existingPeriods});
+      setModal('reviewParsed');
+    }
+  };
+
+  const saveParsedResults=async()=>{
+    if(!parsedPreview)return;
+    const toSave=parsedPreview.results.filter(r=>r._include);
+    let saved=0;
+    for(const r of toSave){
+      const {_file,_format,_dup,_include,...stmtData}=r;
+      try{await addDoc(collection(db,'properties',propertyId,'statements'),{...stmtData,createdAt:serverTimestamp()});saved++;}catch(e){/* skip */}
+    }
+    notify(lang==='es'?`${saved} statements guardados`:`${saved} statements saved`,'success');
+    setParsedPreview(null);setModal(null);
   };
 
   // ═══ CALCULATIONS ═══
@@ -2071,6 +2066,58 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <button onClick={()=>{setModal('addStmt')}} className="w-full py-2.5 bg-slate-100 text-slate-600 rounded-xl font-semibold text-xs hover:bg-slate-200 transition flex items-center justify-center gap-2"><Plus size={14}/>O ingresar manualmente</button>
       </div>
     </Mdl>}
+
+    {/* ═══ REVIEW PARSED STATEMENTS ═══ */}
+    {modal==='reviewParsed'&&parsedPreview&&(()=>{
+      const rows=parsedPreview.results;
+      const included=rows.filter(r=>r._include);
+      const totRev=included.reduce((s,r)=>s+(r.revenue||0),0);
+      const totNet=included.reduce((s,r)=>s+(r.net||0),0);
+      const totNights=included.reduce((s,r)=>s+(r.nights||0),0);
+      const updateRow=(idx,field,val)=>{const next=[...rows];next[idx]={...next[idx],[field]:val};setParsedPreview({...parsedPreview,results:next})};
+      const toggleRow=(idx)=>{const next=[...rows];next[idx]={...next[idx],_include:!next[idx]._include};setParsedPreview({...parsedPreview,results:next})};
+      const fmt=rows[0]?._format||'Unknown';
+      return <Mdl wide title={`📋 ${lang==='es'?'Revisar y Aprobar':'Review & Approve'}`} grad="from-emerald-500 to-blue-500" onClose={()=>{setParsedPreview(null);setModal(null)}} footer={<><button onClick={()=>{setParsedPreview(null);setModal('upload')}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Volver':'Back'}</button><button onClick={saveParsedResults} disabled={included.length===0} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{lang==='es'?`Guardar ${included.length} statements`:`Save ${included.length} statements`}</button></>}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2"><span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-1 rounded-lg">{fmt}</span><span className="text-[10px] text-slate-400">{rows.length} {lang==='es'?'meses detectados':'months detected'}</span></div>
+          <button onClick={()=>{const allOn=rows.every(r=>r._include||r._dup);const next=rows.map(r=>({...r,_include:r._dup?false:!allOn}));setParsedPreview({...parsedPreview,results:next})}} className="text-[10px] text-blue-500 font-bold">{rows.every(r=>r._include||r._dup)?(lang==='es'?'Deseleccionar todo':'Deselect all'):(lang==='es'?'Seleccionar todo':'Select all')}</button>
+        </div>
+        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 mb-3 text-[11px] text-emerald-700">💡 {lang==='es'?'Revisa los datos. Puedes editar cualquier campo haciendo clic. Desmarca los meses que no quieras guardar.':'Review the data. Click any field to edit. Uncheck months you don\'t want to save.'}</div>
+        <div className="overflow-x-auto -mx-2 max-h-[350px] overflow-y-auto">
+          <table className="w-full text-[11px]">
+            <thead><tr className="bg-slate-100 sticky top-0 z-10">
+              <th className="px-1 py-2 w-6"></th>
+              <th className="px-2 py-2 text-left font-bold text-slate-500">{lang==='es'?'Mes':'Month'}</th>
+              <th className="px-2 py-2 text-right font-bold text-slate-500">Revenue</th>
+              <th className="px-2 py-2 text-right font-bold text-slate-500">{lang==='es'?'Comisión':'Commission'}</th>
+              <th className="px-2 py-2 text-right font-bold text-slate-500 hidden sm:table-cell">Duke</th>
+              <th className="px-2 py-2 text-right font-bold text-slate-500 hidden sm:table-cell">Water</th>
+              <th className="px-2 py-2 text-right font-bold text-slate-500">Net</th>
+              <th className="px-2 py-2 text-right font-bold text-slate-500">{lang==='es'?'Noches':'Nights'}</th>
+            </tr></thead>
+            <tbody>{rows.map((r,i)=><tr key={i} className={`border-b border-slate-50 ${r._dup?'opacity-40':r._include?'':'opacity-50 bg-slate-50'}`}>
+              <td className="px-1 py-1.5 text-center"><input type="checkbox" checked={r._include} onChange={()=>toggleRow(i)} disabled={r._dup} className="w-3.5 h-3.5 accent-emerald-500"/></td>
+              <td className="px-2 py-1.5"><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>{r._dup&&<span className="ml-1 text-[9px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full font-bold">{lang==='es'?'YA EXISTE':'EXISTS'}</span>}</td>
+              <td className="px-1 py-1"><input type="number" value={r.revenue||''} onChange={e=>updateRow(i,'revenue',parseFloat(e.target.value)||0)} className="w-20 text-right text-[11px] font-semibold text-blue-600 bg-transparent border border-transparent hover:border-blue-200 focus:border-blue-400 rounded px-1 py-0.5 outline-none"/></td>
+              <td className="px-1 py-1"><input type="number" value={r.commission||''} onChange={e=>updateRow(i,'commission',parseFloat(e.target.value)||0)} className="w-16 text-right text-[11px] text-rose-500 bg-transparent border border-transparent hover:border-rose-200 focus:border-rose-400 rounded px-1 py-0.5 outline-none"/></td>
+              <td className="px-1 py-1 hidden sm:table-cell"><input type="number" value={r.duke||''} onChange={e=>updateRow(i,'duke',parseFloat(e.target.value)||0)} className="w-14 text-right text-[11px] text-slate-500 bg-transparent border border-transparent hover:border-slate-200 focus:border-slate-400 rounded px-1 py-0.5 outline-none"/></td>
+              <td className="px-1 py-1 hidden sm:table-cell"><input type="number" value={r.water||''} onChange={e=>updateRow(i,'water',parseFloat(e.target.value)||0)} className="w-14 text-right text-[11px] text-slate-500 bg-transparent border border-transparent hover:border-slate-200 focus:border-slate-400 rounded px-1 py-0.5 outline-none"/></td>
+              <td className="px-1 py-1"><input type="number" value={r.net||''} onChange={e=>updateRow(i,'net',parseFloat(e.target.value)||0)} className="w-20 text-right text-[11px] font-semibold text-emerald-600 bg-transparent border border-transparent hover:border-emerald-200 focus:border-emerald-400 rounded px-1 py-0.5 outline-none"/></td>
+              <td className="px-1 py-1"><input type="number" value={r.nights||''} onChange={e=>updateRow(i,'nights',parseInt(e.target.value)||0)} className="w-10 text-right text-[11px] text-slate-500 bg-transparent border border-transparent hover:border-slate-200 focus:border-slate-400 rounded px-1 py-0.5 outline-none"/></td>
+            </tr>)}</tbody>
+            <tfoot><tr className="bg-slate-800 text-white font-bold">
+              <td className="px-1 py-2"></td>
+              <td className="px-2 py-2">TOTAL ({included.length})</td>
+              <td className="px-2 py-2 text-right">{fm(totRev)}</td>
+              <td className="px-2 py-2 text-right">{fm(included.reduce((s,r)=>s+(r.commission||0),0))}</td>
+              <td className="px-2 py-2 text-right hidden sm:table-cell">{fm(included.reduce((s,r)=>s+(r.duke||0),0))}</td>
+              <td className="px-2 py-2 text-right hidden sm:table-cell">{fm(included.reduce((s,r)=>s+(r.water||0),0))}</td>
+              <td className="px-2 py-2 text-right">{fm(totNet)}</td>
+              <td className="px-2 py-2 text-right">{totNights}</td>
+            </tr></tfoot>
+          </table>
+        </div>
+      </Mdl>})()}
 
     {/* Toast notification */}
     {toast&&<div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] px-5 py-3 rounded-2xl shadow-2xl text-sm font-semibold flex items-center gap-2 animate-slide-in ${toast.type==='error'?'bg-rose-600 text-white':'bg-slate-800 text-white'}`} style={{animation:'slide-up 0.3s ease-out'}} onClick={()=>setToast(null)}>

@@ -23,10 +23,10 @@ export function PPick({partners,selected,onChange}) {
   </div>;
 }
 
-export function Mdl({title,grad='from-blue-600 to-blue-700',onClose,children,footer}) {
+export function Mdl({title,grad='from-blue-600 to-blue-700',onClose,children,footer,wide}) {
   return <div className="fixed inset-0 z-50 flex justify-end" onClick={e=>e.target===e.currentTarget&&onClose()}>
     <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={onClose}/>
-    <div className="relative w-full md:max-w-md bg-white shadow-2xl flex flex-col animate-slide-in max-h-screen">
+    <div className={`relative w-full ${wide?'md:max-w-2xl':'md:max-w-md'} bg-white shadow-2xl flex flex-col animate-slide-in max-h-screen`}>
       <div className={`bg-gradient-to-r ${grad} text-white px-5 py-4 flex justify-between items-center shrink-0`}><span className="font-bold text-sm">{title}</span><button onClick={onClose} aria-label="Cerrar" className="hover:bg-white/20 active:bg-white/30 p-2 rounded-lg transition"><X size={18}/></button></div>
       <div className="flex-1 overflow-y-auto p-5 space-y-4 overscroll-contain">{children}</div>
       {footer&&<div className="shrink-0 p-4 bg-slate-50 border-t flex gap-2 safe-area-pb">{footer}</div>}
