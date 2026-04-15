@@ -3,7 +3,7 @@ import { db, auth } from './firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where, updateDoc, getDocs, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart, Line, LineChart } from 'recharts';
-import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer, MessageSquare, Send, Moon, Sun } from 'lucide-react';
+import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer, MessageSquare, Send, Moon, Sun, Calculator } from 'lucide-react';
 
 import { ADMIN_EMAILS, VIP_EMAILS, C, M, fm, fmCurrency, fmDate, pct, CATS, getCats, getTerms, COUNTRIES, CURRENCY_LIST, US_STATES as US, PROPERTY_TYPES as PT } from './lib/constants';
 import { createT } from './lib/i18n';
@@ -52,7 +52,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [trialDays,setTrialDays]=useState(0);const [isTrial,setIsTrial]=useState(false);
   useEffect(()=>{if(isAdmin||isVIP){if(isVIP)setUserPlan('pro');return;}const ref=doc(db,'users',userEmail.toLowerCase());const unsub=onSnapshot(ref,async(snap)=>{if(snap.exists()){const d=snap.data();if((d.status==='active'||d.status==='past_due')&&d.plan&&d.plan!=='free'){setUserPlan(d.plan);setIsTrial(false);setTrialDays(0);return;}if(d.trialStartDate){const start=d.trialStartDate.toDate?d.trialStartDate.toDate():new Date(d.trialStartDate);const elapsed=Math.floor((Date.now()-start.getTime())/(1000*60*60*24));const remaining=14-elapsed;if(remaining>0){setUserPlan('pro');setIsTrial(true);setTrialDays(remaining)}else{setUserPlan('free');setIsTrial(false);setTrialDays(0)}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}},()=>{});return()=>unsub()},[userEmail,isAdmin,isVIP]);
   const plan=isAdmin?'pro':userPlan;
-  const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio']};return(access[plan]||access.free).includes(feature);};
+  const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes']};return(access[plan]||access.free).includes(feature);};
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');const [viewCur,setViewCur]=useState(null);
   const [portData,setPortData]=useState(null);const [portLoading,setPortLoading]=useState(false);
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
@@ -287,7 +287,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>partners.find(p=>p.id===id)?.name||id;const pCl=id=>partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},{id:'taxes',icon:<Calculator size={18}/>,l:lang==='es'?'Tax Center':'Tax Center'},{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
 
   if(loading)return<div className="min-h-screen bg-slate-50">
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 border-b border-slate-200 z-40 px-3 py-3 flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 rounded-xl animate-pulse"/><div className="flex-1"><div className="h-4 bg-slate-200 rounded-lg w-32 animate-pulse"/><div className="h-2.5 bg-slate-100 rounded w-20 mt-1.5 animate-pulse"/></div></div>
@@ -1675,6 +1675,178 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>})()}
     </>}
 
+    {/* ═══ TAX CENTER ═══ */}
+    {view==='taxes'&&(()=>{
+      const [taxYear,setTaxYear]=useState(new Date().getFullYear()-1);
+      const [landRatio,setLandRatio]=useState(20);
+      const [taxRate,setTaxRate]=useState(24);
+      const [taxCountry,setTaxCountry]=useState(propCountry||'US');
+      const yrData=annual.find(y=>y.year===taxYear);
+      const yrStmts=stmts.filter(s=>s.year===taxYear);
+      const yrExpenses=expenses.filter(e=>{const d=e.date||'';return d.startsWith(String(taxYear))});
+
+      // ── INCOME ──
+      const grossRental=yrData?.revenue||0;
+      const directIncome=income.filter(i=>(i.date||'').startsWith(String(taxYear))).reduce((s,i)=>s+(i.amount||0),0);
+      const totalIncome=grossRental+directIncome;
+
+      // ── DEDUCTIONS from PM Statements ──
+      const pmCommission=yrData?.commission||0;
+      const utilities=(yrData?.duke||0)+(yrData?.water||0);
+      const hoaTotal=yrData?.hoa||0;
+      const pmMaintenance=yrData?.maintenance||0;
+      const vendorBills=yrData?.vendor||0;
+
+      // ── DEDUCTIONS from Expenses module ──
+      const expBySchedule={insurance:0,taxes:0,repairs:0,travel:0,professional:0,supplies:0,advertising:0,other:0};
+      const allYrExp=[...yrExpenses,...expenses.filter(e=>{const f=e.frequency||'once';return f==='monthly'||f==='annual'})];
+      const seen=new Set();
+      allYrExp.forEach(e=>{
+        if(seen.has(e.id))return;seen.add(e.id);
+        const cat=e.category||'';const amt=e.amount||0;
+        const freq=e.frequency||'once';
+        const annualized=freq==='monthly'?amt*12:freq==='annual'?amt:amt;
+        if(cat==='insurance')expBySchedule.insurance+=annualized;
+        else if(cat==='taxes'||cat==='predial'||cat==='property_tax')expBySchedule.taxes+=annualized;
+        else if(cat==='repair'||cat==='repairs')expBySchedule.repairs+=annualized;
+        else if(cat==='travel')expBySchedule.travel+=annualized;
+        else if(cat==='professional'||cat==='legal'||cat==='accounting')expBySchedule.professional+=annualized;
+        else if(cat==='supplies'||cat==='furnishing')expBySchedule.supplies+=annualized;
+        else if(cat==='advertising'||cat==='marketing')expBySchedule.advertising+=annualized;
+        else if(!['mortgage_pay','hoa','electricity','water','commission'].includes(cat))expBySchedule.other+=annualized;
+      });
+
+      // ── MORTGAGE INTEREST ──
+      const annualInterest=mort.interest?(mort.interest*12):mort.balance&&mort.rate?(mort.balance*(mort.rate/100)):0;
+
+      // ── DEPRECIATION ──
+      const purchasePrice=prop.purchasePrice||0;
+      const buildingValue=purchasePrice*((100-landRatio)/100);
+      const annualDepr=taxCountry==='US'?buildingValue/27.5:(taxCountry==='CO'?buildingValue/20:buildingValue/27.5);
+
+      // ── TOTALS ──
+      const totalDeductions=pmCommission+utilities+hoaTotal+pmMaintenance+vendorBills+expBySchedule.insurance+expBySchedule.taxes+expBySchedule.repairs+expBySchedule.travel+expBySchedule.professional+expBySchedule.supplies+expBySchedule.advertising+expBySchedule.other+annualInterest+annualDepr;
+      const netTaxable=totalIncome-totalDeductions;
+      const estTax=netTaxable>0?netTaxable*(taxRate/100):0;
+      const estSavings=netTaxable<0?Math.abs(netTaxable)*(taxRate/100):0;
+
+      const Row=({label,value,sub,bold,color,indent,icon})=><div className={`flex justify-between items-center py-1.5 ${indent?'pl-6':''} ${bold?'font-bold':''}  ${color||''}`}>
+        <span className={`text-[12px] ${bold?'font-bold text-slate-800':'text-slate-500'} flex items-center gap-1.5`}>{icon&&<span className="text-xs">{icon}</span>}{label}</span>
+        <div className="text-right"><span className={`text-[12px] ${bold?'font-extrabold':'font-semibold'} ${color||'text-slate-700'}`}>{gFm(Math.abs(value))}</span>{sub&&<div className="text-[9px] text-slate-400">{sub}</div>}</div>
+      </div>;
+
+      return <>
+      <div className="flex justify-between items-center mb-2"><h1 className="text-[22px] font-extrabold text-slate-800">🧾 Tax Center <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1></div>
+      <p className="text-sm text-slate-400 mb-4">{lang==='es'?'Estimador fiscal basado en los datos de tu propiedad. No reemplaza a tu CPA.':'Tax estimator based on your property data. Does not replace your CPA.'}</p>
+
+      {/* Config bar */}
+      <div className="flex flex-wrap gap-3 mb-5">
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">{lang==='es'?'Año Fiscal':'Tax Year'}</label><select value={taxYear} onChange={e=>setTaxYear(parseInt(e.target.value))} className="px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold bg-white">{[...new Set(stmts.map(s=>s.year))].sort((a,b)=>b-a).map(y=><option key={y} value={y}>{y}</option>)}</select></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">{lang==='es'?'% Terreno':'Land %'}</label><input type="number" value={landRatio} onChange={e=>setLandRatio(parseInt(e.target.value)||20)} className="w-16 px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-center"/></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">{lang==='es'?'Tasa Marginal':'Tax Bracket'}</label>
+          <select value={taxRate} onChange={e=>setTaxRate(parseInt(e.target.value))} className="px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold bg-white">
+            {taxCountry==='US'?[{v:10,l:'10%'},{v:12,l:'12%'},{v:22,l:'22%'},{v:24,l:'24%'},{v:32,l:'32%'},{v:35,l:'35%'},{v:37,l:'37%'}]:[{v:0,l:'0%'},{v:19,l:'19%'},{v:28,l:'28%'},{v:33,l:'33%'},{v:35,l:'35%'},{v:39,l:'39%'}]}.map(b=><option key={b.v} value={b.v}>{b.l}</option>)}
+          </select></div>
+        <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">{lang==='es'?'País':'Country'}</label><select value={taxCountry} onChange={e=>setTaxCountry(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold bg-white"><option value="US">🇺🇸 US</option><option value="CO">🇨🇴 Colombia</option></select></div>
+      </div>
+
+      {/* Result banner */}
+      <div className={`rounded-2xl p-5 mb-5 ${netTaxable<0?'bg-gradient-to-r from-emerald-500 to-emerald-600':'bg-gradient-to-r from-amber-500 to-rose-500'} text-white`}>
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xs font-semibold text-white/70 uppercase">{taxYear} {lang==='es'?'Resultado Fiscal Estimado':'Estimated Tax Result'}</div>
+            <div className="text-2xl md:text-3xl font-black mt-1">{netTaxable<0?'📉':'📈'} {gFm(Math.abs(netTaxable))}</div>
+            <div className="text-sm font-semibold text-white/80 mt-1">{netTaxable<0?(lang==='es'?'PÉRDIDA FISCAL — deducible de otros ingresos':'TAX LOSS — deductible from other income'):(lang==='es'?'GANANCIA GRAVABLE':'TAXABLE GAIN')}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-white/60 uppercase">{netTaxable<0?(lang==='es'?'Ahorro estimado':'Est. savings'):(lang==='es'?'Impuesto estimado':'Est. tax')}</div>
+            <div className="text-xl font-black">{gFm(netTaxable<0?estSavings:estTax)}</div>
+            <div className="text-[10px] text-white/60">@ {taxRate}% {lang==='es'?'tasa marginal':'marginal rate'}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Schedule E */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
+        <h3 className="text-sm font-extrabold text-slate-800 mb-1 flex items-center gap-2"><Calculator size={16} className="text-blue-500"/>{taxCountry==='US'?'Schedule E — Supplemental Income':'Renta Cedular — Ingresos por Arrendamiento'}</h3>
+        <p className="text-[10px] text-slate-400 mb-4">{prop.name} · {taxYear} · {yrData?.n||0} {lang==='es'?'meses de datos':'months of data'}</p>
+
+        {/* INCOME */}
+        <div className="bg-blue-50 rounded-xl p-3 mb-3 border border-blue-100">
+          <div className="text-[10px] font-black text-blue-700 uppercase mb-2">{lang==='es'?'Ingresos':'Income'}</div>
+          <Row label={lang==='es'?'Ingreso por Renta (PM)':'Rental Income (PM)'} value={grossRental} icon="📄" sub={`${yrData?.n||0} months`}/>
+          {directIncome>0&&<Row label={lang==='es'?'Reservas Directas':'Direct Bookings'} value={directIncome} icon="🏠" indent/>}
+          <div className="border-t border-blue-200 mt-2 pt-2"><Row label={lang==='es'?'INGRESO BRUTO TOTAL':'TOTAL GROSS INCOME'} value={totalIncome} bold color="text-blue-700"/></div>
+        </div>
+
+        {/* DEDUCTIONS */}
+        <div className="bg-rose-50 rounded-xl p-3 mb-3 border border-rose-100">
+          <div className="text-[10px] font-black text-rose-700 uppercase mb-2">{lang==='es'?'Deducciones':'Deductions'}</div>
+
+          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-2 mb-1">{lang==='es'?'Del Property Manager':'From Property Manager'}</div>
+          <Row label={lang==='es'?'Comisiones PM':'PM Commission'} value={pmCommission} indent icon="👤" sub={totalIncome>0?`${(pmCommission/totalIncome*100).toFixed(1)}%`:''}/>
+          <Row label={lang==='es'?'Electricidad + Agua':'Utilities'} value={utilities} indent icon="⚡"/>
+          <Row label="HOA" value={hoaTotal} indent icon="🏘️"/>
+          <Row label={lang==='es'?'Mantenimiento':'Maintenance'} value={pmMaintenance} indent icon="🔧"/>
+          <Row label={lang==='es'?'Vendor/Limpieza':'Vendor/Cleaning'} value={vendorBills} indent icon="🧹"/>
+
+          {annualInterest>0&&<><div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{lang==='es'?'Hipoteca':'Mortgage'}</div>
+          <Row label={lang==='es'?'Interés Hipotecario':'Mortgage Interest'} value={annualInterest} indent icon="🏦" sub={mort.rate?`${mort.rate}% rate`:''}/></>}
+
+          {(expBySchedule.insurance>0||expBySchedule.taxes>0)&&<><div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{lang==='es'?'De Gastos Registrados':'From Recorded Expenses'}</div>
+          {expBySchedule.insurance>0&&<Row label={lang==='es'?'Seguro':'Insurance'} value={expBySchedule.insurance} indent icon="🛡️"/>}
+          {expBySchedule.taxes>0&&<Row label={lang==='es'?'Impuesto Predial':'Property Taxes'} value={expBySchedule.taxes} indent icon="🏛️"/>}
+          {expBySchedule.repairs>0&&<Row label={lang==='es'?'Reparaciones':'Repairs'} value={expBySchedule.repairs} indent icon="🔨"/>}
+          {expBySchedule.travel>0&&<Row label={lang==='es'?'Viajes a propiedad':'Travel to property'} value={expBySchedule.travel} indent icon="✈️"/>}
+          {expBySchedule.professional>0&&<Row label={lang==='es'?'Profesionales (CPA/Legal)':'Professional (CPA/Legal)'} value={expBySchedule.professional} indent icon="📋"/>}
+          {expBySchedule.supplies>0&&<Row label={lang==='es'?'Suministros':'Supplies'} value={expBySchedule.supplies} indent icon="📦"/>}
+          {expBySchedule.advertising>0&&<Row label="Advertising" value={expBySchedule.advertising} indent icon="📢"/>}
+          {expBySchedule.other>0&&<Row label={lang==='es'?'Otros gastos':'Other expenses'} value={expBySchedule.other} indent icon="📄"/>}</>}
+
+          <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{lang==='es'?'Depreciación':'Depreciation'}</div>
+          <Row label={lang==='es'?'Depreciación del inmueble':'Building Depreciation'} value={annualDepr} indent icon="📐" sub={`${gFm(buildingValue)} / ${taxCountry==='US'?'27.5':'20'} ${lang==='es'?'años':'yrs'} · ${lang==='es'?'Terreno':'Land'} ${landRatio}%`}/>
+
+          <div className="border-t border-rose-200 mt-3 pt-2"><Row label={lang==='es'?'TOTAL DEDUCCIONES':'TOTAL DEDUCTIONS'} value={totalDeductions} bold color="text-rose-700"/></div>
+        </div>
+
+        {/* NET */}
+        <div className={`${netTaxable<0?'bg-emerald-50 border-emerald-200':'bg-amber-50 border-amber-200'} rounded-xl p-4 border`}>
+          <div className="flex justify-between items-center">
+            <div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase">{taxCountry==='US'?'Line 21 — Net Rental Income/Loss':(lang==='es'?'Renta Líquida Gravable':'Net Taxable Rental Income')}</div>
+              <div className={`text-xl font-black mt-1 ${netTaxable<0?'text-emerald-700':'text-amber-700'}`}>{netTaxable<0?'(':''}{gFm(Math.abs(netTaxable))}{netTaxable<0?')':''}</div>
+            </div>
+            <div className="text-right">
+              <div className={`text-[10px] font-bold ${netTaxable<0?'text-emerald-600':'text-amber-600'}`}>{netTaxable<0?(lang==='es'?'PÉRDIDA':'LOSS'):(lang==='es'?'GANANCIA':'GAIN')}</div>
+              <div className="text-sm font-bold text-slate-500 mt-0.5">{netTaxable<0?`${lang==='es'?'Ahorro':'Savings'}: ${gFm(estSavings)}`:`Tax: ${gFm(estTax)}`}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Missing data hints */}
+      {(()=>{
+        const missing=[];
+        if(!yrData||yrData.n===0)missing.push(lang==='es'?'No hay statements para este año':'No statements for this year');
+        if(annualInterest===0&&mort.balance>0)missing.push(lang==='es'?'Interés hipotecario: configura tasa en Mortgage':'Mortgage interest: configure rate in Mortgage');
+        if(expBySchedule.insurance===0)missing.push(lang==='es'?'Seguro: regístralo en Gastos':'Insurance: register in Expenses');
+        if(expBySchedule.taxes===0)missing.push(lang==='es'?'Impuesto predial: regístralo en Gastos':'Property tax: register in Expenses');
+        if(purchasePrice===0)missing.push(lang==='es'?'Precio de compra: configúralo en Settings':'Purchase price: set in Settings');
+        return missing.length>0?<div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
+          <div className="text-xs font-bold text-amber-700 mb-2">💡 {lang==='es'?'Para mejorar tu estimación fiscal:':'To improve your tax estimate:'}</div>
+          <div className="space-y-1">{missing.map((m,i)=><div key={i} className="text-[11px] text-amber-600 flex items-start gap-2"><span className="text-amber-400">→</span>{m}</div>)}</div>
+        </div>:null;
+      })()}
+
+      {/* Disclaimer */}
+      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 text-[11px] text-slate-400">
+        <div className="font-bold text-slate-500 mb-1">⚠️ Disclaimer</div>
+        {lang==='es'
+          ?'Este es un estimador fiscal informativo basado en los datos registrados en OwnerDesk. NO constituye asesoría fiscal, legal ni contable. Consulta con un CPA o contador certificado antes de preparar tu declaración. Las leyes fiscales varían por jurisdicción y situación personal.'
+          :'This is an informational tax estimator based on data recorded in OwnerDesk. It does NOT constitute tax, legal, or accounting advice. Consult a licensed CPA before filing your return. Tax laws vary by jurisdiction and personal situation.'}
+      </div>
+    </>})()}
+
     {/* ═══ SUPPORT / TICKETS ═══ */}
     {view==='support'&&<SupportView/>}
 
@@ -2049,7 +2221,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <label className="block border-2 border-dashed border-blue-300 rounded-2xl p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
         <Upload size={32} className="text-blue-400 mx-auto mb-2"/>
         <div className="text-sm font-semibold text-blue-600">Haz clic aquí para seleccionar PDFs</div>
-        <div className="text-xs text-slate-400 mt-1">Soporta múltiples archivos</div><div className="text-[8px] text-slate-300 mt-1">v2.5</div>
+        <div className="text-xs text-slate-400 mt-1">Soporta múltiples archivos</div><div className="text-[8px] text-slate-300 mt-1">v2.6</div>
         <input type="file" accept=".pdf" multiple className="hidden" onChange={async e=>{
           const arr=[...e.target.files];
           e.target.value='';
