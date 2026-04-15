@@ -287,7 +287,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>partners.find(p=>p.id===id)?.name||id;const pCl=id=>partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},{id:'taxes',icon:<Calculator size={18}/>,l:lang==='es'?'Tax Center':'Tax Center'},{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[]),{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
 
   if(loading)return<div className="min-h-screen bg-slate-50">
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 border-b border-slate-200 z-40 px-3 py-3 flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 rounded-xl animate-pulse"/><div className="flex-1"><div className="h-4 bg-slate-200 rounded-lg w-32 animate-pulse"/><div className="h-2.5 bg-slate-100 rounded w-20 mt-1.5 animate-pulse"/></div></div>
@@ -1680,7 +1680,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const [taxYear,setTaxYear]=useState(new Date().getFullYear()-1);
       const [landRatio,setLandRatio]=useState(20);
       const [taxRate,setTaxRate]=useState(24);
-      const [taxCountry,setTaxCountry]=useState(propCountry||'US');
+      const taxCountry='US';
       const yrData=annual.find(y=>y.year===taxYear);
       const yrStmts=stmts.filter(s=>s.year===taxYear);
       const yrExpenses=expenses.filter(e=>{const d=e.date||'';return d.startsWith(String(taxYear))});
@@ -1722,7 +1722,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       // ── DEPRECIATION ──
       const purchasePrice=prop.purchasePrice||0;
       const buildingValue=purchasePrice*((100-landRatio)/100);
-      const annualDepr=taxCountry==='US'?buildingValue/27.5:(taxCountry==='CO'?buildingValue/20:buildingValue/27.5);
+      const annualDepr=buildingValue/27.5;
 
       // ── TOTALS ──
       const totalDeductions=pmCommission+utilities+hoaTotal+pmMaintenance+vendorBills+expBySchedule.insurance+expBySchedule.taxes+expBySchedule.repairs+expBySchedule.travel+expBySchedule.professional+expBySchedule.supplies+expBySchedule.advertising+expBySchedule.other+annualInterest+annualDepr;
@@ -1745,9 +1745,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">{lang==='es'?'% Terreno':'Land %'}</label><input type="number" value={landRatio} onChange={e=>setLandRatio(parseInt(e.target.value)||20)} className="w-16 px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold text-center"/></div>
         <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">{lang==='es'?'Tasa Marginal':'Tax Bracket'}</label>
           <select value={taxRate} onChange={e=>setTaxRate(parseInt(e.target.value))} className="px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold bg-white">
-            {taxCountry==='US'?[{v:10,l:'10%'},{v:12,l:'12%'},{v:22,l:'22%'},{v:24,l:'24%'},{v:32,l:'32%'},{v:35,l:'35%'},{v:37,l:'37%'}]:[{v:0,l:'0%'},{v:19,l:'19%'},{v:28,l:'28%'},{v:33,l:'33%'},{v:35,l:'35%'},{v:39,l:'39%'}]}.map(b=><option key={b.v} value={b.v}>{b.l}</option>)}
+            {[{v:10,l:'10%'},{v:12,l:'12%'},{v:22,l:'22%'},{v:24,l:'24%'},{v:32,l:'32%'},{v:35,l:'35%'},{v:37,l:'37%'}]}.map(b=><option key={b.v} value={b.v}>{b.l}</option>)}
           </select></div>
-        <div><label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">{lang==='es'?'País':'Country'}</label><select value={taxCountry} onChange={e=>setTaxCountry(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-xl text-sm font-semibold bg-white"><option value="US">🇺🇸 US</option><option value="CO">🇨🇴 Colombia</option></select></div>
+        
       </div>
 
       {/* Result banner */}
@@ -1768,7 +1768,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {/* Schedule E */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
-        <h3 className="text-sm font-extrabold text-slate-800 mb-1 flex items-center gap-2"><Calculator size={16} className="text-blue-500"/>{taxCountry==='US'?'Schedule E — Supplemental Income':'Renta Cedular — Ingresos por Arrendamiento'}</h3>
+        <h3 className="text-sm font-extrabold text-slate-800 mb-1 flex items-center gap-2"><Calculator size={16} className="text-blue-500"/>Schedule E — Supplemental Income</h3>
         <p className="text-[10px] text-slate-400 mb-4">{prop.name} · {taxYear} · {yrData?.n||0} {lang==='es'?'meses de datos':'months of data'}</p>
 
         {/* INCOME */}
@@ -1804,7 +1804,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           {expBySchedule.other>0&&<Row label={lang==='es'?'Otros gastos':'Other expenses'} value={expBySchedule.other} indent icon="📄"/>}</>}
 
           <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mt-3 mb-1">{lang==='es'?'Depreciación':'Depreciation'}</div>
-          <Row label={lang==='es'?'Depreciación del inmueble':'Building Depreciation'} value={annualDepr} indent icon="📐" sub={`${gFm(buildingValue)} / ${taxCountry==='US'?'27.5':'20'} ${lang==='es'?'años':'yrs'} · ${lang==='es'?'Terreno':'Land'} ${landRatio}%`}/>
+          <Row label={lang==='es'?'Depreciación del inmueble':'Building Depreciation'} value={annualDepr} indent icon="📐" sub={`${gFm(buildingValue)} / 27.5 ${lang==='es'?'años':'yrs'} · ${lang==='es'?'Terreno':'Land'} ${landRatio}%`}/>
 
           <div className="border-t border-rose-200 mt-3 pt-2"><Row label={lang==='es'?'TOTAL DEDUCCIONES':'TOTAL DEDUCTIONS'} value={totalDeductions} bold color="text-rose-700"/></div>
         </div>
@@ -1813,7 +1813,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className={`${netTaxable<0?'bg-emerald-50 border-emerald-200':'bg-amber-50 border-amber-200'} rounded-xl p-4 border`}>
           <div className="flex justify-between items-center">
             <div>
-              <div className="text-[10px] font-bold text-slate-500 uppercase">{taxCountry==='US'?'Line 21 — Net Rental Income/Loss':(lang==='es'?'Renta Líquida Gravable':'Net Taxable Rental Income')}</div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase">{'Line 21 — Net Rental Income/Loss'}</div>
               <div className={`text-xl font-black mt-1 ${netTaxable<0?'text-emerald-700':'text-amber-700'}`}>{netTaxable<0?'(':''}{gFm(Math.abs(netTaxable))}{netTaxable<0?')':''}</div>
             </div>
             <div className="text-right">
