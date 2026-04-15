@@ -178,7 +178,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         const fmt=results[0]?.format||'Unknown';
         const isGeneric=fmt.startsWith('Generic');
         if(results.length>1){
-          log[log.length-1]={file:f.name,status:saved>0?'ok':'dup',msg:`[${fmt}] ${saved} months importados${skipped>0?' · '+skipped+' omitidos (duplicados)':''}`};
+          const years=[...new Set(results.map(r=>r.year))].sort();
+          const yearLabel=years.length>1?years.join('-'):String(years[0]);
+          log[log.length-1]={file:f.name,status:saved>0?'ok':'dup',msg:`[${fmt}] ${yearLabel} · ${saved} months importados${skipped>0?' · '+skipped+' omitidos (duplicados)':''}${fmt.includes('Annual')?' · ℹ️ '+(lang==='es'?'Fuente: reporte anual':'Source: annual report'):''}`};
         } else {
           const r=results[0];
           const missing=[];
@@ -1172,6 +1174,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">📋 Statements <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/> <span className="text-sm font-semibold text-slate-400 ml-1">({stmts.length})</span></h1><div className="flex gap-2">
         {stmts.length>0&&<button onClick={async()=>{if(!confirm(`¿Eliminar los ${stmts.length} statements?`))return;for(const s of stmts)await deleteDoc(doc(db,'properties',propertyId,'statements',s.id))}} className="px-3 py-2.5 bg-rose-100 text-rose-600 text-xs rounded-xl font-bold hover:bg-rose-200 active:bg-rose-300 flex items-center gap-1.5"><Trash2 size={13}/></button>}
         <button onClick={()=>{setUploadLog([]);setModal('upload')}} className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-sm active:bg-blue-700"><Upload size={14}/> PDFs</button><button onClick={()=>setModal('addStmt')} className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-700 text-white text-xs rounded-xl font-bold flex items-center justify-center gap-1.5 shadow-sm active:bg-slate-800"><Plus size={14}/> Manual</button></div></div>
+
+      {stmts.some(s=>(s.format||'').includes('Annual')&&!s.nights)&&<div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-3 flex items-start gap-2 text-[11px] text-blue-700"><span>ℹ️</span><span>{lang==='es'?'Algunos meses provienen de un reporte anual. Es posible que datos como noches o reservaciones no estén disponibles para todos los meses. Puedes editarlos manualmente.':'Some months come from an annual report. Data like nights or reservations may not be available for all months. You can edit them manually.'}</span></div>}
 
       {/* Year filter + bulk delete per year */}
       {stmts.length>0&&<div className="flex items-center gap-1.5 md:gap-2 mb-4 overflow-x-auto pb-1 scrollbar-thin">

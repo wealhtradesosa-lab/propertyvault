@@ -60,7 +60,7 @@ function reservations(text) {
 
 function result(d) {
   const net = d.net || Math.max(0, (d.revenue||0) - (d.commission||0) - (d.duke||0) - (d.water||0) - (d.hoa||0) - (d.maintenance||0) - (d.vendor||0));
-  return { year:d.year, month:d.month, revenue:d.revenue||0, commission:d.commission||0, duke:d.duke||0, water:d.water||0, hoa:d.hoa||0, maintenance:d.maintenance||0, vendor:d.vendor||0, net, nights:d.nights||0, reservations:d.reservations||0, pool:d.pool||0, roomCharge:d.roomCharge||d.revenue||0, format:d.format };
+  return { year:d.year, month:d.month, revenue:d.revenue||0, commission:d.commission||0, duke:d.duke||0, water:d.water||0, hoa:d.hoa||0, maintenance:d.maintenance||0, vendor:d.vendor||0, net, nights:d.nights||0, reservations:d.reservations||0, pool:d.pool||0, roomCharge:d.roomCharge||d.revenue||0, format:d.format, ...(d.sourceType?{sourceType:d.sourceType}:{}) };
 }
 
 // ═══ FORMAT PARSERS ═══
@@ -175,32 +175,28 @@ function parseGeneric(t) {
 function parseIHMAnnual(t) {
   const yrMatch = t.match(/Annual\s+Statement\s+for\s+(\d{4})/i);
   if (!yrMatch) return { error: 'IHM Annual: no year found' };
-  const year = parseInt(yrMatch[1]);
+  const headerYear = parseInt(yrMatch[1]);
 
-  // Initialize 12 months
+  // Dynamic month map — keyed by "YYYY-M" to support cross-year data
   const months = {};
-  for (let m = 1; m <= 12; m++) months[m] = { revenue: 0, commission: 0, pool: 0, duke: 0, water: 0, hoa: 0, maintenance: 0, vendor: 0, nights: 0, reservations: 0, net: 0 };
+  const getMonth = (yr, mo) => {
+    const key = yr + '-' + mo;
+    if (!months[key]) months[key] = { year: yr, month: mo, revenue: 0, commission: 0, pool: 0, duke: 0, water: 0, hoa: 0, maintenance: 0, vendor: 0, nights: 0, reservations: 0, net: 0 };
+    return months[key];
+  };
 
-  // Parse each line for date + label + amount
   const lines = t.split(/\n/);
-  let currentResMonth = null;
 
   for (const line of lines) {
     // Reservation header: "Reservation #37159626: Jessica Burnett (12/29/2024 - 01/02/2025) 4 Nights"
-    const resHeader = line.match(/Reservation\s*#\d+:.*?(\d{1,2})\/(\d{1,2})\/(\d{4})\)\s*(\d+)\s*Night/i);
-    if (resHeader) {
-      // Use checkout month (end date is in the parenthetical, after the dash)
-      const endMatch = line.match(/-\s*(\d{1,2})\/\d{1,2}\/(\d{4})\)\s*(\d+)\s*Night/i);
-      if (endMatch) {
-        const resMonth = parseInt(endMatch[1]);
-        const resYear = parseInt(endMatch[2]);
-        if (resYear === year) {
-          currentResMonth = resMonth;
-          months[resMonth].nights += parseInt(endMatch[3]) || 0;
-          months[resMonth].reservations++;
-        } else {
-          currentResMonth = null; // reservation from prior year checkout
-        }
+    const endMatch = line.match(/-\s*(\d{1,2})\/\d{1,2}\/(\d{4})\)\s*(\d+)\s*Night/i);
+    if (endMatch) {
+      const resMonth = parseInt(endMatch[1]);
+      const resYear = parseInt(endMatch[2]);
+      if (resMonth >= 1 && resMonth <= 12) {
+        const m = getMonth(resYear, resMonth);
+        m.nights += parseInt(endMatch[3]) || 0;
+        m.reservations++;
       }
       continue;
     }
@@ -210,34 +206,34 @@ function parseIHMAnnual(t) {
     if (dated) {
       const mo = parseInt(dated[1]);
       const lineYear = parseInt(dated[2]);
-      const desc = dated[3].toLowerCase();
+      const desc = dated[3];
       const amt = parseFloat(dated[4].replace(/,/g, ''));
-      if (lineYear !== year || mo < 1 || mo > 12) continue;
+      if (mo < 1 || mo > 12) continue;
 
-      if (/room\s*charge/i.test(desc)) { months[mo].revenue += amt; }
-      else if (/pool\s*heat/i.test(desc)) { months[mo].pool += amt; months[mo].revenue += amt; }
-      else if (/commission\s*charge/i.test(desc)) { months[mo].commission += amt; }
-      else if (/owner\s*cleaning/i.test(desc)) { months[mo].vendor += amt; }
-      else if (/duke\s*energy|duke\s*monthly/i.test(desc)) { months[mo].duke += amt; }
-      else if (/toho\s*water|toho\s*monthly/i.test(desc)) { months[mo].water += amt; }
-      else if (/hoa|montly\s*dues|monthly\s*dues/i.test(desc)) { months[mo].hoa += amt; }
-      else if (/maintenance\s*fee/i.test(desc)) { months[mo].maintenance += amt; }
-      else if (/ach\s*payment/i.test(desc)) { months[mo].net += amt; }
-      else if (/spectrum|linen|towel|cleaning|rug|filter|license|dbpr|tax\s*collector/i.test(desc)) { months[mo].vendor += amt; }
-      else { months[mo].vendor += amt; } // catch-all for vendor bills
+      const m = getMonth(lineYear, mo);
+      if (/room\s*charge/i.test(desc)) { m.revenue += amt; }
+      else if (/pool\s*heat/i.test(desc)) { m.pool += amt; m.revenue += amt; }
+      else if (/commission\s*charge/i.test(desc)) { m.commission += amt; }
+      else if (/owner\s*cleaning/i.test(desc)) { m.vendor += amt; }
+      else if (/duke\s*energy|duke\s*monthly/i.test(desc)) { m.duke += amt; }
+      else if (/toho\s*water|toho\s*monthly/i.test(desc)) { m.water += amt; }
+      else if (/hoa|montly\s*dues|monthly\s*dues/i.test(desc)) { m.hoa += amt; }
+      else if (/maintenance\s*fee/i.test(desc)) { m.maintenance += amt; }
+      else if (/ach\s*payment/i.test(desc)) { m.net += amt; }
+      else if (/spectrum|linen|towel|cleaning|rug|filter|license|dbpr|tax\s*collector/i.test(desc)) { m.vendor += amt; }
+      else { m.vendor += amt; }
     }
   }
 
-  // Build results — only include months with activity
+  // Build results — all months with activity, sorted by date
   const results = [];
-  for (let m = 1; m <= 12; m++) {
-    const d = months[m];
+  for (const d of Object.values(months)) {
     if (d.revenue > 0 || d.net > 0 || d.duke > 0) {
-      // If no ACH payment recorded, calculate net
       if (d.net === 0) d.net = Math.max(0, d.revenue - d.commission - d.duke - d.water - d.hoa - d.maintenance - d.vendor);
-      results.push(result({ year, month: m, ...d, format: 'IHM Annual' }));
+      results.push(result({ ...d, sourceType: 'annual', format: 'IHM Annual' }));
     }
   }
+  results.sort((a, b) => a.year * 100 + a.month - b.year * 100 - b.month);
 
   if (results.length === 0) return { error: 'IHM Annual: no monthly data found' };
   return results;
