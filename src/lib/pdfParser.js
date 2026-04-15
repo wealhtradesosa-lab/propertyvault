@@ -195,8 +195,8 @@ function parseIHMAnnual(t) {
   }
 
   // 2. Find all dated $ entries: "MM/DD/YYYY Label $X,XXX.XX"
-  // Description must start with a letter (skips reservation date ranges like "- 01/02/2025)")
-  const entryRx = /(\d{1,2})\/\d{1,2}\/(\d{4})\s+([A-Za-z][\w\s,./]*?)\s+\$([\d,]+\.\d{2})/g;
+  // [^$]{1,100}? avoids catastrophic backtracking on long lines
+  const entryRx = /(\d{1,2})\/\d{1,2}\/(\d{4})\s+([A-Za-z][^$]{1,100}?)\s*\$\s*([\d,]+\.\d{2})/g;
   let em;
   while ((em = entryRx.exec(t)) !== null) {
     const mo = parseInt(em[1]), yr = parseInt(em[2]);
@@ -225,6 +225,59 @@ function parseIHMAnnual(t) {
     }
   }
   results.sort((a, b) => a.year * 100 + a.month - b.year * 100 - b.month);
+
+  // FALLBACK: If line parsing found 0 months, use ACH payments + Transaction Summary
+  if (results.length === 0) {
+    // Find ACH payments — these are always clear: "MM/DD/YYYY ACH Payment made to Owner $X,XXX.XX"
+    const achRx = /(\d{1,2})\/\d{1,2}\/(\d{4})\s+ACH\s+Payment[^$]*?\$\s*([\d,]+\.\d{2})/gi;
+    let am;
+    const achMonths = {};
+    while ((am = achRx.exec(t)) !== null) {
+      const mo = parseInt(am[1]), yr = parseInt(am[2]), amt = parseFloat(am[3].replace(/,/g, ''));
+      if (mo >= 1 && mo <= 12 && amt > 0) achMonths[yr + '-' + mo] = { year: yr, month: mo, net: amt };
+    }
+
+    // Get totals from Transaction Summary section (appears at end of PDF)
+    const summaryTotals = {};
+    const summaryIdx = t.search(/Transaction\s+Summary/i);
+    const summaryText = summaryIdx >= 0 ? t.slice(summaryIdx) : '';
+    if (summaryText) {
+      const sumLabels = [['Room Charge','revenue'],['Pool Heat','pool'],['Commission Charge','commission'],['Vendor Bills','vendor'],['HOA','hoa'],['Maintenance Fee','maintenance']];
+      for (const [label, field] of sumLabels) {
+        const rx = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[^$]{0,30}\\$-?([\\d,]+\\.\\d{2})', 'i');
+        const m = summaryText.match(rx);
+        if (m) summaryTotals[field] = parseFloat(m[1].replace(/,/g, ''));
+      }
+    }
+    summaryTotals.revenue = (summaryTotals.revenue || 0) + (summaryTotals.pool || 0);
+
+    const achEntries = Object.values(achMonths);
+    if (achEntries.length > 0) {
+      const totalACH = achEntries.reduce((s, a) => s + a.net, 0);
+      for (const a of achEntries) {
+        const pct = totalACH > 0 ? a.net / totalACH : 1 / achEntries.length;
+        results.push(result({
+          year: a.year, month: a.month, net: a.net,
+          revenue: Math.round((summaryTotals.revenue || 0) * pct * 100) / 100,
+          commission: Math.round((summaryTotals.commission || 0) * pct * 100) / 100,
+          duke: 0, water: 0,
+          hoa: Math.round((summaryTotals.hoa || 0) * pct * 100) / 100,
+          maintenance: Math.round((summaryTotals.maintenance || 0) * pct * 100) / 100,
+          vendor: Math.round((summaryTotals.vendor || 0) * pct * 100) / 100,
+          nights: 0, reservations: 0,
+          sourceType: 'annual', format: 'IHM Annual (summary)'
+        }));
+      }
+      results.sort((a, b) => a.year * 100 + a.month - b.year * 100 - b.month);
+
+      // Add nights from reservation headers
+      const totalNights = [...t.matchAll(/(\d+)\s*Night/gi)].reduce((s, m) => s + (parseInt(m[1]) || 0), 0);
+      if (totalNights > 0 && totalNights < 400) {
+        const totalRev = results.reduce((s, r) => s + r.revenue, 0);
+        results.forEach(r => { r.nights = totalRev > 0 ? Math.round(totalNights * (r.revenue / totalRev)) : Math.round(totalNights / results.length); });
+      }
+    }
+  }
 
   if (results.length === 0) return { error: 'IHM Annual: no monthly data found' };
   return results;
@@ -459,16 +512,30 @@ export async function parsePDF(file) {
   }
   if (fullText.trim().length < 30) return { error: 'PDF vacío o no se pudo leer' };
 
-  // Check for annual reports first (return array)
+  // ─── ANNUAL REPORTS (return arrays) ───
+  // Airbnb Annual
   if (/Airbnb/i.test(fullText) && /Informe de ganancias|Earnings Report|Período del informe/i.test(fullText)) {
     const annual = parseAirbnbAnnual(fullText);
     if (Array.isArray(annual) && annual.length > 0) return annual;
   }
-  if (/Annual\s+Statement\s+for\s+\d{4}/i.test(fullText) && /Room\s*Charge/i.test(fullText) && /Commission\s*Charge/i.test(fullText)) {
-    const annual = parseIHMAnnual(fullText);
-    if (Array.isArray(annual) && annual.length > 0) return annual;
+
+  // IHM Annual — detect by ANY of these signals
+  const isAnnual = /Annual\s+Statement/i.test(fullText);
+  const hasRoomCharge = /Room\s*Charge/i.test(fullText);
+  const hasCommission = /Commission\s*Charge/i.test(fullText);
+  const hasACH = /ACH\s*Payment/i.test(fullText);
+  const hasReservations = /Reservation\s*#/i.test(fullText);
+
+  if ((isAnnual && hasRoomCharge) || (isAnnual && hasACH) || (hasRoomCharge && hasCommission && hasReservations && hasACH)) {
+    try {
+      const annual = parseIHMAnnual(fullText);
+      if (Array.isArray(annual) && annual.length > 0) return annual;
+    } catch(e) {
+      // Fall through to other parsers
+    }
   }
 
+  // ─── MONTHLY STATEMENTS ───
   for (const d of detectors) { if (d.parse && d.test(fullText)) { const r = d.parse(fullText); if (!r.error) return r; } }
   return parseGeneric(fullText);
 }
