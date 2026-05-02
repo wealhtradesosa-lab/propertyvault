@@ -876,25 +876,35 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           const years=[...new Set(stmts.map(s=>s.year))].sort();
           const curYear=new Date().getFullYear();
           const colors=['#DC2626','#F59E0B','#059669','#8B5CF6','#EC4899','#0EA5E9'];
-          // Data in propCurrency — same pattern as monthly chart (mChart)
           const data=M.map((mName,mi)=>{
             const row={month:mName.slice(0,3)};
             years.forEach(y=>{
               const s=stmts.find(st=>st.year===y&&st.month===mi+1);
-              const rev=stmtToPC(s?.revenue||0);
-              const directForMonth=income.filter(inc=>{const d=inc.date||'';const [iy,im]=d.split('-').map(Number);return iy===y&&im===mi+1}).reduce((sum,inc)=>{const amt=inc.amount||0;const cur=inc.currency||'USD';if(cur===propCurrency)return sum+amt;if(cur==='USD'&&propCurrency!=='USD')return sum+amt*xRate;return sum+amt},0);
-              row[y]=rev+directForMonth;
+              const stmtRev=s?.revenue||0;
+              // Direct bookings — normalize to USD (statements are in USD)
+              const direct=income.filter(inc=>{const d=inc.date||'';const [iy,im]=d.split('-').map(Number);return iy===y&&im===mi+1}).reduce((sum,inc)=>{
+                const amt=inc.amount||0;const cur=inc.currency||'USD';
+                if(cur==='USD')return sum+amt;
+                if(cur==='COP'&&xRate>1)return sum+amt/xRate;
+                return sum+amt;
+              },0);
+              row[y]=stmtRev+direct;
             });
             return row;
           }).filter(row=>years.some(y=>row[y]>0));
+          const compactLabel=(v)=>{if(!v)return'$0';const abs=Math.abs(v);if(abs>=1000000)return'$'+(v/1000000).toFixed(1)+'M';if(abs>=1000)return'$'+(v/1000).toFixed(0)+'K';return'$'+v.toFixed(0)};
           return<ResponsiveContainer width="100%" height={220}>
             <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/>
               <XAxis dataKey="month" tick={{fontSize:10,fill:'#94a3b8'}}/>
-              <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>dFm(v)}/>
-              <Tooltip content={<Tip fmt={dFm}/>}/>
+              <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={compactLabel}/>
+              <Tooltip formatter={(v,name)=>['$'+Number(v).toLocaleString('en-US',{maximumFractionDigits:0}),name]}/>
               <Legend wrapperStyle={{fontSize:11}}/>
               {years.map((y,i)=><Line key={y} dataKey={String(y)} name={String(y)} stroke={y===curYear?'#2563EB':colors[i%colors.length]} strokeWidth={y===curYear?3.5:2} dot={{r:y===curYear?5:3,strokeWidth:y===curYear?2:0,fill:y===curYear?'#2563EB':colors[i%colors.length]}} opacity={1}/>)}
+            </LineChart>
+          </ResponsiveContainer>;
+            </LineChart>
+          </ResponsiveContainer>;
             </LineChart>
           </ResponsiveContainer>;
         })()}
