@@ -897,8 +897,6 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               {years.map((y,i)=><Line key={y} dataKey={String(y)} name={String(y)} stroke={y===curYear?'#2563EB':colors[i%colors.length]} strokeWidth={y===curYear?3.5:2} dot={{r:y===curYear?5:3,strokeWidth:y===curYear?2:0,fill:y===curYear?'#2563EB':colors[i%colors.length]}} opacity={1}/>)}
             </LineChart>
           </ResponsiveContainer>;
-            </LineChart>
-          </ResponsiveContainer>;
         })()}
       </div>}
 
