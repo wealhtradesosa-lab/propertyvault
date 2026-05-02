@@ -876,22 +876,31 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           const years=[...new Set(stmts.map(s=>s.year))].sort();
           const curYear=new Date().getFullYear();
           const colors=['#DC2626','#F59E0B','#059669','#8B5CF6','#EC4899','#0EA5E9'];
-          // Build data: [{month:'Ene', 2023: 4983, 2024: 7006, 2025: 3795, 2026: 7600}, ...]
+          // Keep data in STATEMENT CURRENCY (USD) — formatter handles view conversion
           const data=M.map((mName,mi)=>{
             const row={month:mName.slice(0,3)};
             years.forEach(y=>{
               const s=stmts.find(st=>st.year===y&&st.month===mi+1);
-              const directForMonth=income.filter(inc=>{const d=inc.date||'';const [iy,im]=d.split('-').map(Number);return iy===y&&im===mi+1}).reduce((sum,inc)=>sum+(inc.amount||0),0);
-              row[y]=stmtToPC((s?.revenue||0)+directForMonth);
+              const stmtRev=s?.revenue||0;
+              // Direct bookings: convert to statement currency (USD) if needed
+              const directForMonth=income.filter(inc=>{const d=inc.date||'';const [iy,im]=d.split('-').map(Number);return iy===y&&im===mi+1}).reduce((sum,inc)=>{
+                const amt=inc.amount||0;const cur=inc.currency||'USD';
+                if(cur==='USD')return sum+amt;
+                if(cur!=='USD'&&propCurrency!=='USD')return sum+amt/xRate; // COP→USD
+                return sum+amt;
+              },0);
+              row[y]=stmtRev+directForMonth;
             });
             return row;
           }).filter(row=>years.some(y=>row[y]>0));
+          const compactFm=(v)=>{const cv=dConv(stmtToPC(v));const abs=Math.abs(cv);if(abs>=1000000)return fmCurrency(cv/1000000,gVc).replace(/\.00$/,'')+'M';if(abs>=1000)return fmCurrency(cv/1000,gVc).replace(/\.00$/,'')+'K';return fmCurrency(cv,gVc)};
+          const tipFm=(v)=>dFm(stmtToPC(v));
           return<ResponsiveContainer width="100%" height={220}>
             <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/>
               <XAxis dataKey="month" tick={{fontSize:10,fill:'#94a3b8'}}/>
-              <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>dFm(v)}/>
-              <Tooltip content={<Tip fmt={dFm}/>}/>
+              <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={compactFm}/>
+              <Tooltip content={<Tip fmt={tipFm}/>}/>
               <Legend wrapperStyle={{fontSize:11}}/>
               {years.map((y,i)=><Line key={y} dataKey={String(y)} name={String(y)} stroke={y===curYear?'#2563EB':colors[i%colors.length]} strokeWidth={y===curYear?3.5:2} dot={{r:y===curYear?5:3,strokeWidth:y===curYear?2:0,fill:y===curYear?'#2563EB':colors[i%colors.length]}} opacity={1}/>)}
             </LineChart>
