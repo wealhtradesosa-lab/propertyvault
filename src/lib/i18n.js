@@ -110,7 +110,7 @@ const translations = {
     
     // Sections / Nav
     dashboard: 'Dashboard',
-    partnersCapital: 'Partners & Capital',
+    partnersCapital: 'Partners & Contributions',
     statements: 'Statements',
     expenses: 'Expenses',
     income: 'Income',
@@ -271,7 +271,7 @@ const translations = {
     annualizedProjection: 'Proyección anualizada',
     
     dashboard: 'Dashboard',
-    partnersCapital: 'Socios & Capital',
+    partnersCapital: 'Socios y Aportes',
     statements: 'Statements',
     expenses: 'Gastos',
     income: 'Ingresos',
