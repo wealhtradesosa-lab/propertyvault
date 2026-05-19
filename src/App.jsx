@@ -84,7 +84,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const partners=prop.partners||[];const mort=prop.mortgage||{};
   const [expenseForm,setExpenseForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});const [editId,setEditId]=useState(null);
   const [nf,setNf]=useState({date:'',month:'',grossAmount:''});
-  const [contribForm,setContribForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});
+  const [contribForm,setContribForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',purpose:'operations',payType:'capital',expCategory:'otros'});
   const [stmtForm,setStmtForm]=useState({year:new Date().getFullYear(),month:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:'',nights:'',reservations:''});
   const ue=useCallback((k,v)=>setExpenseForm(x=>({...x,[k]:v})),[]);const un=useCallback((k,v)=>setNf(x=>({...x,[k]:v})),[]);
   const uc=useCallback((k,v)=>setContribForm(x=>({...x,[k]:v})),[]);const us=useCallback((k,v)=>setStmtForm(x=>({...x,[k]:v})),[]);
@@ -2059,21 +2059,28 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'¿Quién pagó?':'Who paid?'}</label><PPick partners={partners} selected={expenseForm.paidBy} onChange={v=>ue('paidBy',v)}/></div>
     </Mdl>}
 
-    {modal==='contribution'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Aporte':'✏️ Edit Contribution'):(lang==='es'?'Aporte de Capital':'Capital Contribution')} grad="from-purple-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{const data={...contribForm,amount:parseFloat(contribForm.amount),type:'contribution',purpose:contribForm.purpose||'operations'};if(editId){update('contributions',editId,data)}else{save('contributions',data)}}} disabled={!contribForm.amount} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
-      <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 mb-3 text-[11px] text-blue-700">💡 {lang==='es'?'Los aportes de capital NO son gastos. No afectan el P&L. Solo registran quién puso dinero para cubrir la operación.':'Capital contributions are NOT expenses. They don\'t affect the P&L. They only track who put money in to cover operations.'}</div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label={lang==='es'?'Fecha':'Date'} value={contribForm.date} onChange={v=>uc('date',v)} type="date" required/><Inp label={lang==='es'?'Monto':'Amount'} value={contribForm.amount} onChange={v=>uc('amount',v)} prefix="$" type="number" required error={contribForm.amount&&parseFloat(contribForm.amount)<=0?(lang==='es'?'Monto debe ser mayor a 0':'Amount must be > 0'):''}/></div>
-      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'¿Para qué es este aporte?':'What is this contribution for?'}</label>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">{[
-          ['operations',lang==='es'?'🏠 Operación mensual':'🏠 Monthly operations'],
-          ['mortgage',lang==='es'?'🏦 Hipoteca':'🏦 Mortgage'],
-          ['insurance',lang==='es'?'🛡️ Seguro':'🛡️ Insurance'],
-          ['taxes',lang==='es'?'🏛️ Impuestos':'🏛️ Taxes'],
-          ['repair',lang==='es'?'🔧 Reparación':'🔧 Repair'],
-          ['other',lang==='es'?'📦 Otro':'📦 Other'],
-        ].map(([v,l])=><button key={v} type="button" onClick={()=>uc('purpose',v)} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${(contribForm.purpose||'operations')===v?'border-purple-500 bg-purple-50 text-purple-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div>
+    {modal==='contribution'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Registro':'✏️ Edit Record'):(lang==='es'?'💰 Registrar Pago de Socio':'💰 Register Partner Payment')} grad="from-purple-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{const amt=parseFloat(contribForm.amount);if(contribForm.payType==='expense'){save('expenses',{date:contribForm.date,concept:contribForm.concept,amount:amt,paidBy:contribForm.paidBy,category:contribForm.expCategory||'otros',type:'additional',frequency:'once',fromPartners:true})}else{const data={...contribForm,amount:amt,type:'contribution',purpose:contribForm.purpose||'operations'};if(editId){update('contributions',editId,data)}else{save('contributions',data)}}}} disabled={!contribForm.amount} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{lang==='es'?'Guardar':'Save'}</button></>}>
+      <div className="bg-purple-50 border border-purple-100 rounded-xl p-3 mb-3 text-[11px] text-purple-700">💡 {lang==='es'?'Registra cualquier pago que un socio haya hecho. Esto actualiza el balance automáticamente. Si es un gasto, también aparece en la sección de Gastos.':'Register any payment a partner made. Updates the balance automatically. If it\'s an expense, it also appears in Expenses.'}</div>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Tipo de pago':'Payment type'}</label>
+        <div className="grid grid-cols-2 gap-2 mb-3">{[
+          ['capital','💰',lang==='es'?'Aporte de Capital':'Capital Contribution',lang==='es'?'Inversión inicial, cuotas, aportes':'Initial investment, installments'],
+          ['expense','🧾',lang==='es'?'Pagó un Gasto':'Paid an Expense',lang==='es'?'Seguro, reparación, impuestos, etc.':'Insurance, repairs, taxes, etc.'],
+        ].map(([v,icon,l,sub])=><button key={v} type="button" onClick={()=>uc('payType',v)} className={`text-left p-3 rounded-xl border-2 transition ${(contribForm.payType||'capital')===v?'border-purple-500 bg-purple-50':'border-slate-200 hover:border-purple-300'}`}>
+          <div className="flex items-center gap-2"><span className="text-lg">{icon}</span><div><div className="text-sm font-bold text-slate-700">{l}</div><div className="text-[10px] text-slate-400">{sub}</div></div></div>
+        </button>)}</div>
       </div>
-      <Inp label={lang==='es'?'Nota (opcional)':'Note (optional)'} value={contribForm.concept} onChange={v=>uc('concept',v)} placeholder={lang==='es'?'Ej: Transferencia para cubrir déficit de marzo':'e.g. Transfer to cover March deficit'}/>
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Socio':'Partner'}</label><PPick partners={partners} selected={contribForm.paidBy} onChange={v=>uc('paidBy',v)} showProperty={false}/></div>
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <Inp label={lang==='es'?'Fecha':'Date'} value={contribForm.date} onChange={v=>uc('date',v)} type="date"/>
+        <Inp label={lang==='es'?'Monto':'Amount'} value={contribForm.amount} onChange={v=>uc('amount',v)} prefix="$" type="number"/>
+      </div>
+      {(contribForm.payType||'capital')==='expense'&&<div className="mt-3"><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Categoría del gasto':'Expense category'}</label>
+        <select value={contribForm.expCategory||'otros'} onChange={e=>uc('expCategory',e.target.value)} className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white">{propCats.map(c=><option key={c.v} value={c.v}>{c.l}</option>)}</select>
+      </div>}
+      {(contribForm.payType||'capital')==='capital'&&<div className="mt-3"><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Propósito':'Purpose'}</label>
+        <div className="grid grid-cols-3 gap-1.5">{[['operations',lang==='es'?'Operación':'Operations'],['mortgage',lang==='es'?'Hipoteca':'Mortgage'],['other','Otro']].map(([v,l])=><button key={v} type="button" onClick={()=>uc('purpose',v)} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${contribForm.purpose===v?'border-purple-500 bg-purple-50 text-purple-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div>
+      </div>}
+      <Inp label={lang==='es'?'Concepto':'Concept'} value={contribForm.concept} onChange={v=>uc('concept',v)} placeholder={lang==='es'?'Ej: Cuota 3 - cierre, Pago seguro anual':'e.g. Installment 3, Annual insurance payment'}/>
     </Mdl>}
 
     {/* Direct Booking / Additional Income Modal */}
