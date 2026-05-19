@@ -76,7 +76,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [valForm,setValForm]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setValForm(x=>({...x,[k]:v})),[]);
   const [repairForm,setRepairForm]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRepairForm(x=>({...x,[k]:v})),[]);
   const [incForm,setIncForm]=useState({date:'',amount:'',source:'direct',concept:'',currency:'USD',nights:''});const uif=useCallback((k,v)=>setIncForm(x=>({...x,[k]:v})),[]);
-  const [taskForm,setTaskForm]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30'});const ut=useCallback((k,v)=>setTaskForm(x=>({...x,[k]:v})),[]);
+  const [taskForm,setTaskForm]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30',paidBy:'property'});const ut=useCallback((k,v)=>setTaskForm(x=>({...x,[k]:v})),[]);
   const [settingsForm,setSettingsForm]=useState(null);
   const [editPartners,setEditPartners]=useState(null);
   const [mortConfig,setMortConfig]=useState({bal:'',rate:'',term:'30',pay:'',start:'',includesTaxes:false,includesInsurance:false});const [savingMort,setSavingMort]=useState(false);
@@ -133,7 +133,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     }
     await updateDoc(doc(db,'properties',propertyId,'tasks',task.id),{status:'pending',dueDate:nextDue||task.dueDate,lastPaid:today});
     if(task.amount&&parseFloat(task.amount)>0){
-      await addDoc(collection(db,'properties',propertyId,'expenses'),{date:today,concept:task.title+(task.notes?' — '+task.notes:''),amount:parseFloat(task.amount),category:catMap[task.title]||'otros',type:'fixed',paidBy:partners[0]?.id||'',createdAt:serverTimestamp()});
+      await addDoc(collection(db,'properties',propertyId,'expenses'),{date:today,concept:task.title+(task.notes?' — '+task.notes:''),amount:parseFloat(task.amount),category:catMap[task.title]||'otros',type:'fixed',paidBy:task.paidBy||'property',createdAt:serverTimestamp()});
       notify(task.title+' pagado · próximo: '+(nextDue?fmDate(nextDue):'—'));
     } else { notify(task.title+' marcado como pagado') }
   };
@@ -1575,7 +1575,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {view==='pipeline'&&<>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
         <div><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">📋 Obligaciones <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><p className="text-xs text-slate-400 mt-1">Registra aquí tus pagos recurrentes. Al marcar "Pagado" el gasto se registra automáticamente.</p></div>
-        <button onClick={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30'});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 active:bg-indigo-800 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Agregar</button>
+        <button onClick={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30',paidBy:'property'});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 active:bg-indigo-800 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Agregar</button>
       </div>
 
       {/* Smart suggestions based on statements */}
@@ -1616,7 +1616,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
           <div className="text-[10px] font-bold text-amber-700 uppercase mb-2">Probablemente debes pagar tú:</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {suggestions.map(o=><button key={o.title} onClick={()=>{setTaskForm({title:o.title,dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:o.freq,payer:'owner',reminderDays:o.freq==='monthly'?'7':'30'});setEditId(null);setModal('task')}} className="flex items-center gap-3 p-3 rounded-xl border transition text-left bg-amber-50 border-amber-200 hover:bg-amber-100 active:bg-amber-200">
+            {suggestions.map(o=><button key={o.title} onClick={()=>{setTaskForm({title:o.title,dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:o.freq,payer:'owner',reminderDays:o.freq==='monthly'?'7':'30',paidBy:'property'});setEditId(null);setModal('task')}} className="flex items-center gap-3 p-3 rounded-xl border transition text-left bg-amber-50 border-amber-200 hover:bg-amber-100 active:bg-amber-200">
               <span className="text-lg">{o.icon}</span>
               <div>
                 <span className="text-xs font-bold text-slate-700">{o.title}</span>
@@ -1676,7 +1676,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </div>
             <div className="flex items-center gap-1 shrink-0">
               <button onClick={()=>markPaid(t)} className={`px-3 py-2 rounded-xl text-[11px] font-bold transition ${isOverdue?'bg-rose-500 text-white hover:bg-rose-600':isSoon?'bg-amber-500 text-white hover:bg-amber-600':'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'}`}>Pagar ✓</button>
-              <button onClick={()=>{setTaskForm({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||'',amount:String(t.amount||''),frequency:t.frequency||'annual',payer:t.payer||'owner',reminderDays:String(t.reminderDays||'30')});setEditId(t.id);setModal('task')}} className="p-2 text-slate-300 hover:text-blue-500 rounded-xl hover:bg-blue-50 transition"><Pencil size={14}/></button>
+              <button onClick={()=>{setTaskForm({title:t.title||'',dueDate:t.dueDate||'',priority:t.priority||'medium',status:t.status||'pending',notes:t.notes||'',amount:String(t.amount||''),frequency:t.frequency||'annual',payer:t.payer||'owner',reminderDays:String(t.reminderDays||'30'),paidBy:t.paidBy||'property'});setEditId(t.id);setModal('task')}} className="p-2 text-slate-300 hover:text-blue-500 rounded-xl hover:bg-blue-50 transition"><Pencil size={14}/></button>
               <button onClick={()=>del('tasks',t.id)} className="p-2 text-slate-300 hover:text-red-500 rounded-xl hover:bg-red-50 transition"><Trash2 size={14}/></button>
             </div>
           </div>})}
@@ -2176,6 +2176,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <Inp label="Próximo pago" value={taskForm.dueDate} onChange={v=>ut('dueDate',v)} type="date"/>
         <Sel label="Recordar antes de" value={taskForm.reminderDays} onChange={v=>ut('reminderDays',v)} options={[{v:'3',l:'3 días antes'},{v:'7',l:'1 semana antes'},{v:'15',l:'15 días antes'},{v:'30',l:'1 mes antes'},{v:'60',l:'2 months antes'}]}/>
       </div>}
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'¿Quién paga esta obligación?':'Who pays this obligation?'}</label><PPick partners={partners} selected={taskForm.paidBy||'property'} onChange={v=>ut('paidBy',v)}/></div>
       <Inp label="Notas (opcional)" value={taskForm.notes} onChange={v=>ut('notes',v)} placeholder="Ej: Póliza #12345, County Tax"/>
     </Mdl>}
 
