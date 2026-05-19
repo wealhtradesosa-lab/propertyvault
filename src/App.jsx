@@ -1095,7 +1095,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       });
 
       return <>
-      <div className="flex justify-between items-center mb-4"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">👥 {t('partnersCapital')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});setModal('contribution')}} className="px-4 py-2.5 bg-purple-600 text-white text-xs rounded-xl font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {t('capital')}</button></div>
+      <div className="flex justify-between items-center mb-4"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">👥 {t('partnersCapital')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:'',amount:'',paidBy:partners[0]?.id||'',purpose:'operations',payType:'capital',expCategory:'otros'});setModal('contribution')}} className="px-4 py-2.5 bg-purple-600 text-white text-xs rounded-xl font-bold hover:bg-purple-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {lang==='es'?'Registrar Pago':'Register Payment'}</button></div>
 
       {/* Instructional card — how capital vs expenses work */}
       <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 mb-5">
