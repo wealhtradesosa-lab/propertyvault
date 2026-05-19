@@ -287,7 +287,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sNE=useMemo(()=>mortCalc(0,0),[mortCalc]);
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
-  const pN=id=>partners.find(p=>p.id===id)?.name||id;const pCl=id=>partners.find(p=>p.id===id)?.color||'#94a3b8';
+  const pN=id=>id==='property'?'🏠 La Propiedad':partners.find(p=>p.id===id)?.name||id;const pCl=id=>id==='property'?'#6B7280':partners.find(p=>p.id===id)?.color||'#94a3b8';
   const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[]),{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
 
   if(loading)return<div className="min-h-screen bg-slate-50">
@@ -2073,7 +2073,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         ].map(([v,l])=><button key={v} type="button" onClick={()=>uc('purpose',v)} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${(contribForm.purpose||'operations')===v?'border-purple-500 bg-purple-50 text-purple-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div>
       </div>
       <Inp label={lang==='es'?'Nota (opcional)':'Note (optional)'} value={contribForm.concept} onChange={v=>uc('concept',v)} placeholder={lang==='es'?'Ej: Transferencia para cubrir déficit de marzo':'e.g. Transfer to cover March deficit'}/>
-      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Socio':'Partner'}</label><PPick partners={partners} selected={contribForm.paidBy} onChange={v=>uc('paidBy',v)}/></div>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Socio':'Partner'}</label><PPick partners={partners} selected={contribForm.paidBy} onChange={v=>uc('paidBy',v)} showProperty={false}/></div>
     </Mdl>}
 
     {/* Direct Booking / Additional Income Modal */}

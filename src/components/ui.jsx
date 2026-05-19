@@ -17,9 +17,10 @@ export function Sel({label,value,onChange,options,className=''}) {
     </select><ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/></div></div>;
 }
 
-export function PPick({partners,selected,onChange}) {
-  return <div className="grid gap-2" style={{gridTemplateColumns:`repeat(${Math.min(partners.length,4)},1fr)`}}>
-    {partners.map((p,i)=><button key={p.id} type="button" onClick={()=>onChange(p.id)} className={`relative py-3 rounded-xl border-2 font-semibold text-sm transition-all ${selected===p.id?'border-blue-500 bg-blue-50 text-blue-700 shadow-sm':'border-slate-200 text-slate-500 hover:border-slate-300'}`}><span className="absolute top-1.5 left-2.5 w-2 h-2 rounded-full" style={{background:p.color||C[i]}}/>{p.name||'Socio'}</button>)}
+export function PPick({partners,selected,onChange,showProperty=true}) {
+  const items = showProperty ? [...partners, {id:'property',name:'🏠 La Propiedad',color:'#6B7280'}] : partners;
+  return <div className="grid gap-2" style={{gridTemplateColumns:`repeat(${Math.min(items.length,4)},1fr)`}}>
+    {items.map((p,i)=><button key={p.id} type="button" onClick={()=>onChange(p.id)} className={`relative py-3 rounded-xl border-2 font-semibold text-sm transition-all ${selected===p.id?(p.id==='property'?'border-slate-500 bg-slate-50 text-slate-700 shadow-sm':'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'):'border-slate-200 text-slate-500 hover:border-slate-300'}`}>{p.id!=='property'&&<span className="absolute top-1.5 left-2.5 w-2 h-2 rounded-full" style={{background:p.color||C[i]}}/>}{p.name||'Socio'}</button>)}
   </div>;
 }
 
