@@ -52,14 +52,15 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [trialDays,setTrialDays]=useState(0);const [isTrial,setIsTrial]=useState(false);
   useEffect(()=>{if(isAdmin||isVIP){if(isVIP)setUserPlan('pro');return;}const ref=doc(db,'users',userEmail.toLowerCase());const unsub=onSnapshot(ref,async(snap)=>{if(snap.exists()){const d=snap.data();if((d.status==='active'||d.status==='past_due')&&d.plan&&d.plan!=='free'){setUserPlan(d.plan);setIsTrial(false);setTrialDays(0);return;}if(d.trialStartDate){const start=d.trialStartDate.toDate?d.trialStartDate.toDate():new Date(d.trialStartDate);const elapsed=Math.floor((Date.now()-start.getTime())/(1000*60*60*24));const remaining=14-elapsed;if(remaining>0){setUserPlan('pro');setIsTrial(true);setTrialDays(remaining)}else{setUserPlan('free');setIsTrial(false);setTrialDays(0)}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}},()=>{});return()=>unsub()},[userEmail,isAdmin,isVIP]);
   const plan=isAdmin?'pro':userPlan;
-  const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes']};return(access[plan]||access.free).includes(feature);};
+  const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes','tenants']};return(access[plan]||access.free).includes(feature);};
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');const [viewCur,setViewCur]=useState(null);
   const [portData,setPortData]=useState(null);const [portLoading,setPortLoading]=useState(false);
   const [taxYear,setTaxYear]=useState(new Date().getFullYear()-1);const [landRatio,setLandRatio]=useState(20);const [taxRate,setTaxRate]=useState(24);
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [parsedPreview,setParsedPreview]=useState(null);
-  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);
+  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);const [tenants,setTenants]=useState([]);
+  const [tenantForm,setTenantForm]=useState({name:'',idNumber:'',phone:'',email:'',unit:'',monthlyRent:'',deposit:'',startDate:'',endDate:'',incrementPct:'3',status:'active',notes:''});const utn=useCallback((k,v)=>setTenantForm(x=>({...x,[k]:v})),[]);
   const [dark,setDark]=useState(()=>{try{return localStorage.getItem('od-dark')==='1'}catch{return false}});
   const [lang,setLang]=useState(()=>{try{return localStorage.getItem('od-lang')||(prop.country&&!['US','GB'].includes(prop.country)?'es':'en')}catch{return 'en'}});
   const t=createT(lang);
@@ -91,7 +92,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   useEffect(()=>{const b=`properties/${propertyId}`,u=[];
     const L=(s,fn)=>{u.push(onSnapshot(collection(db,b,s),snap=>{const docs=snap.docs.map(d=>({id:d.id,...d.data()}));docs.sort((a,b)=>{const ta=a.createdAt?.toMillis?.()||0,tb=b.createdAt?.toMillis?.()||0;return tb-ta});fn(docs)}))};
-    L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
+    L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);L('tenants',setTenants);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
   // Reset forms when switching property
   useEffect(()=>{setSettingsForm(null);setEditPartners(null);setView('dashboard');setDashYear('all');setEditId(null);setModal(null)},[propertyId]);
 
@@ -288,7 +289,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>id==='property'?'🏠 La Propiedad':partners.find(p=>p.id===id)?.name||id;const pCl=id=>id==='property'?'#6B7280':partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[]),{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'tenants',icon:<UserPlus size={18}/>,l:lang==='es'?'Inquilinos':'Tenants'},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[]),{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
 
   if(loading)return<div className="min-h-screen bg-slate-50">
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 border-b border-slate-200 z-40 px-3 py-3 flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 rounded-xl animate-pulse"/><div className="flex-1"><div className="h-4 bg-slate-200 rounded-lg w-32 animate-pulse"/><div className="h-2.5 bg-slate-100 rounded w-20 mt-1.5 animate-pulse"/></div></div>
@@ -1857,6 +1858,89 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>
     </>})()}
 
+    {/* ═══ TENANTS & CONTRACTS ═══ */}
+    {view==='tenants'&&(()=>{
+      const today=new Date().toISOString().split('T')[0];
+      const in30=new Date(Date.now()+30*24*60*60*1000).toISOString().split('T')[0];
+      const activeTenants=tenants.filter(t=>t.status==='active');
+      const expiringTenants=tenants.filter(t=>t.status==='active'&&t.endDate&&t.endDate<=in30&&t.endDate>=today);
+      const expiredTenants=tenants.filter(t=>t.status==='active'&&t.endDate&&t.endDate<today);
+      const totalRent=activeTenants.reduce((s,t)=>s+(parseFloat(t.monthlyRent)||0),0);
+      const daysUntil=(d)=>{if(!d)return 999;return Math.ceil((new Date(d+'T00:00:00')-new Date(today+'T00:00:00'))/(1000*60*60*24))};
+      const statusBadge=(t)=>{
+        if(t.status==='terminated')return<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500">{lang==='es'?'Terminado':'Terminated'}</span>;
+        if(!t.endDate)return<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{lang==='es'?'Activo':'Active'}</span>;
+        const d=daysUntil(t.endDate);
+        if(d<0)return<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">{lang==='es'?'Vencido':'Expired'}</span>;
+        if(d<=30)return<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{lang==='es'?`Vence en ${d}d`:`Expires in ${d}d`}</span>;
+        return<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{lang==='es'?'Activo':'Active'}</span>;
+      };
+      const generateLetter=(tenant,type)=>{
+        const increment=parseFloat(tenant.incrementPct)||3;
+        const newRent=Math.round((parseFloat(tenant.monthlyRent)||0)*(1+increment/100));
+        const propName=prop.name||prop.address||'la propiedad';
+        const date=new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+        if(type==='renewal'){
+          return `${date}\n\nSeñor(a): ${tenant.name}\n${tenant.unit?'Unidad: '+tenant.unit+'\n':''}${propName}\n\nAsunto: Renovación de contrato de arrendamiento\n\nCordial saludo,\n\nMe permito informarle que su contrato de arrendamiento vence el ${fmDate(tenant.endDate)}. Es nuestro deseo renovar el contrato por un período adicional de 12 meses, con un incremento del ${increment}% sobre el canon actual.\n\nCanon actual: $${(parseFloat(tenant.monthlyRent)||0).toLocaleString()}\nNuevo canon: $${newRent.toLocaleString()} (incremento del ${increment}%)\nVigencia: A partir del ${fmDate(tenant.endDate)}\n\nAgradezco confirmar su aceptación antes del vencimiento del contrato actual.\n\nAtentamente,\n${userEmail}`;
+        } else {
+          return `${date}\n\nSeñor(a): ${tenant.name}\n${tenant.unit?'Unidad: '+tenant.unit+'\n':''}${propName}\n\nAsunto: Terminación de contrato de arrendamiento\n\nCordial saludo,\n\nDe conformidad con la ley y las cláusulas del contrato vigente, me permito comunicarle la decisión de NO renovar el contrato de arrendamiento que vence el ${fmDate(tenant.endDate)}.\n\nLe solicito la entrega del inmueble a más tardar en la fecha de vencimiento, en las mismas condiciones en que fue recibido.\n\nDetalles de devolución del depósito:\nDepósito: $${(parseFloat(tenant.deposit)||0).toLocaleString()}\nSe devolverá previo descuento de servicios pendientes y reparaciones locativas.\n\nAtentamente,\n${userEmail}`;
+        }
+      };
+      return <>
+      <div className="flex justify-between items-center mb-2"><h1 className="text-[22px] font-extrabold text-slate-800">👥 {lang==='es'?'Inquilinos y Contratos':'Tenants & Contracts'}</h1><button onClick={()=>{setTenantForm({name:'',idNumber:'',phone:'',email:'',unit:'',monthlyRent:'',deposit:'',startDate:'',endDate:'',incrementPct:'3',status:'active',notes:''});setEditId(null);setModal('tenant')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {lang==='es'?'Agregar Inquilino':'Add Tenant'}</button></div>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <KPI label={lang==='es'?'Inquilinos Activos':'Active Tenants'} value={activeTenants.length} color="blue"/>
+        <KPI label={lang==='es'?'Canon Mensual Total':'Total Monthly Rent'} value={gFm(totalRent)} color="green"/>
+        <KPI label={lang==='es'?'Por Vencer (30d)':'Expiring (30d)'} value={expiringTenants.length} color={expiringTenants.length>0?'amber':'green'}/>
+        <KPI label={lang==='es'?'Vencidos':'Expired'} value={expiredTenants.length} color={expiredTenants.length>0?'red':'green'}/>
+      </div>
+
+      {/* Expiration alerts */}
+      {(expiringTenants.length>0||expiredTenants.length>0)&&<div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
+        <div className="text-xs font-bold text-amber-700 mb-2">⚠️ {lang==='es'?'Contratos que requieren atención:':'Contracts requiring attention:'}</div>
+        {[...expiredTenants,...expiringTenants].map(t=><div key={t.id} className="flex items-center justify-between py-2 border-b border-amber-100 last:border-0">
+          <div><span className="text-sm font-bold text-slate-700">{t.name}</span> <span className="text-xs text-slate-400">{t.unit||''}</span> {statusBadge(t)}</div>
+          <div className="flex gap-2">
+            <button onClick={()=>{const txt=generateLetter(t,'renewal');navigator.clipboard.writeText(txt);notify(lang==='es'?'Carta de renovación copiada':'Renewal letter copied')}} className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg hover:bg-emerald-100">📄 {lang==='es'?'Renovar':'Renew'}</button>
+            <button onClick={()=>{const txt=generateLetter(t,'termination');navigator.clipboard.writeText(txt);notify(lang==='es'?'Carta de terminación copiada':'Termination letter copied')}} className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-lg hover:bg-rose-100">📄 {lang==='es'?'Terminar':'Terminate'}</button>
+          </div>
+        </div>)}
+      </div>}
+
+      {/* Tenant list */}
+      {tenants.length>0?<div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="overflow-x-auto"><table className="w-full text-sm">
+          <thead><tr className="bg-slate-50 border-b border-slate-200">
+            <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Inquilino':'Tenant'}</th>
+            <th className="text-left px-3 py-3 text-[10px] font-bold text-slate-500 uppercase hidden sm:table-cell">{lang==='es'?'Unidad':'Unit'}</th>
+            <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Canon':'Rent'}</th>
+            <th className="text-center px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Contrato':'Contract'}</th>
+            <th className="text-center px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Estado':'Status'}</th>
+            <th className="px-3 py-3"></th>
+          </tr></thead>
+          <tbody>{[...tenants].sort((a,b)=>daysUntil(a.endDate)-daysUntil(b.endDate)).map(t=><tr key={t.id} className="border-b border-slate-50 hover:bg-blue-50/50 transition">
+            <td className="px-4 py-3"><div className="font-bold text-slate-800">{t.name}</div><div className="text-[10px] text-slate-400">{t.phone||t.email||''}</div></td>
+            <td className="px-3 py-3 text-slate-600 hidden sm:table-cell">{t.unit||'—'}</td>
+            <td className="px-3 py-3 text-right font-semibold text-emerald-600">{gFm(t.monthlyRent||0)}<div className="text-[9px] text-slate-400">+{t.incrementPct||3}%/{lang==='es'?'año':'yr'}</div></td>
+            <td className="px-3 py-3 text-center text-[11px] text-slate-500">{t.startDate?fmDate(t.startDate):''}{t.endDate?' → '+fmDate(t.endDate):''}</td>
+            <td className="px-3 py-3 text-center">{statusBadge(t)}</td>
+            <td className="px-3 py-3"><div className="flex gap-1"><button onClick={()=>{setTenantForm({name:t.name||'',idNumber:t.idNumber||'',phone:t.phone||'',email:t.email||'',unit:t.unit||'',monthlyRent:String(t.monthlyRent||''),deposit:String(t.deposit||''),startDate:t.startDate||'',endDate:t.endDate||'',incrementPct:String(t.incrementPct||'3'),status:t.status||'active',notes:t.notes||''});setEditId(t.id);setModal('tenant')}} className="p-1.5 text-slate-300 hover:text-blue-500 rounded-lg hover:bg-blue-50"><Pencil size={13}/></button><button onClick={()=>del('tenants',t.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-lg hover:bg-rose-50"><Trash2 size={13}/></button></div></td>
+          </tr>)}</tbody>
+        </table></div>
+        <div className="bg-slate-800 text-white p-3 flex justify-between text-xs font-bold">
+          <span>TOTAL: {activeTenants.length} {lang==='es'?'activos':'active'}</span>
+          <span>{lang==='es'?'Canon mensual':'Monthly rent'}: {gFm(totalRent)}</span>
+        </div>
+      </div>
+      :<div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-6 text-center">
+        <div className="text-3xl mb-3">👥</div>
+        <div className="text-sm font-bold text-indigo-700 mb-1">{lang==='es'?'No hay inquilinos registrados':'No tenants registered'}</div>
+        <div className="text-xs text-indigo-500">{lang==='es'?'Agrega tu primer inquilino con su contrato y canon mensual.':'Add your first tenant with contract and monthly rent.'}</div>
+      </div>}
+    </>})()}
+
     {/* ═══ SUPPORT / TICKETS ═══ */}
     {view==='support'&&<SupportView/>}
 
@@ -2178,6 +2262,36 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
       <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'¿Quién paga esta obligación?':'Who pays this obligation?'}</label><PPick partners={partners} selected={taskForm.paidBy||'property'} onChange={v=>ut('paidBy',v)}/></div>
       <Inp label="Notas (opcional)" value={taskForm.notes} onChange={v=>ut('notes',v)} placeholder="Ej: Póliza #12345, County Tax"/>
+    </Mdl>}
+
+    {/* ═══ TENANT MODAL ═══ */}
+    {modal==='tenant'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Inquilino':'✏️ Edit Tenant'):(lang==='es'?'👥 Nuevo Inquilino':'👥 New Tenant')} grad="from-indigo-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{const data={...tenantForm,monthlyRent:parseFloat(tenantForm.monthlyRent)||0,deposit:parseFloat(tenantForm.deposit)||0,incrementPct:parseFloat(tenantForm.incrementPct)||3};if(editId){update('tenants',editId,data)}else{save('tenants',data)}}} disabled={!tenantForm.name||!tenantForm.monthlyRent} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
+      <div className="grid grid-cols-2 gap-3">
+        <Inp label={lang==='es'?'Nombre completo':'Full name'} value={tenantForm.name} onChange={v=>utn('name',v)} placeholder="Juan Pérez"/>
+        <Inp label={lang==='es'?'Cédula / ID':'ID Number'} value={tenantForm.idNumber} onChange={v=>utn('idNumber',v)} placeholder="1.234.567.890"/>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Inp label={lang==='es'?'Teléfono':'Phone'} value={tenantForm.phone} onChange={v=>utn('phone',v)} placeholder="+57 300 123 4567"/>
+        <Inp label="Email" value={tenantForm.email} onChange={v=>utn('email',v)} placeholder="juan@email.com"/>
+      </div>
+      <Inp label={lang==='es'?'Unidad / Local / Apto':'Unit / Space'} value={tenantForm.unit} onChange={v=>utn('unit',v)} placeholder={lang==='es'?'Ej: Apto 301, Local 2, Bodega A':'e.g. Apt 301, Unit 2'}/>
+      <div className="grid grid-cols-3 gap-3">
+        <Inp label={lang==='es'?'Canon Mensual':'Monthly Rent'} value={tenantForm.monthlyRent} onChange={v=>utn('monthlyRent',v)} prefix="$" type="number"/>
+        <Inp label={lang==='es'?'Depósito':'Deposit'} value={tenantForm.deposit} onChange={v=>utn('deposit',v)} prefix="$" type="number"/>
+        <Inp label={lang==='es'?'Incremento Anual %':'Annual Increase %'} value={tenantForm.incrementPct} onChange={v=>utn('incrementPct',v)} type="number" placeholder="3%"/>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Inp label={lang==='es'?'Inicio Contrato':'Contract Start'} value={tenantForm.startDate} onChange={v=>utn('startDate',v)} type="date"/>
+        <Inp label={lang==='es'?'Fin Contrato':'Contract End'} value={tenantForm.endDate} onChange={v=>utn('endDate',v)} type="date"/>
+      </div>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Estado':'Status'}</label>
+        <div className="grid grid-cols-3 gap-2">{[
+          ['active','🟢',lang==='es'?'Activo':'Active'],
+          ['terminated','🔴',lang==='es'?'Terminado':'Terminated'],
+          ['pending','🟡',lang==='es'?'Pendiente':'Pending'],
+        ].map(([v,icon,l])=><button key={v} type="button" onClick={()=>utn('status',v)} className={`py-2 rounded-xl border-2 text-xs font-medium transition ${tenantForm.status===v?'border-indigo-500 bg-indigo-50 text-indigo-700':'border-slate-200 text-slate-500'}`}>{icon} {l}</button>)}</div>
+      </div>
+      <Inp label={lang==='es'?'Notas':'Notes'} value={tenantForm.notes} onChange={v=>utn('notes',v)} placeholder={lang==='es'?'Ej: Tiene mascota, estacionamiento incluido':'e.g. Has pet, parking included'}/>
     </Mdl>}
 
     {modal==='valuation'&&<Mdl title={editId?'✏️ Editar Appreciation':'📈 Registrar Market Value'} grad="from-emerald-600 to-teal-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={()=>{const data={date:valForm.date,value:parseFloat(valForm.value)||0,source:valForm.source,notes:valForm.notes};if(editId){update('valuations',editId,data)}else{save('valuations',data)}}} disabled={!valForm.value} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
