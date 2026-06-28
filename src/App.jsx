@@ -53,16 +53,17 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [trialDays,setTrialDays]=useState(0);const [isTrial,setIsTrial]=useState(false);
   useEffect(()=>{if(isAdmin||isVIP){if(isVIP)setUserPlan('pro');return;}const ref=doc(db,'users',userEmail.toLowerCase());const unsub=onSnapshot(ref,async(snap)=>{if(snap.exists()){const d=snap.data();if((d.status==='active'||d.status==='past_due')&&d.plan&&d.plan!=='free'){setUserPlan(d.plan);setIsTrial(false);setTrialDays(0);return;}if(d.trialStartDate){const start=d.trialStartDate.toDate?d.trialStartDate.toDate():new Date(d.trialStartDate);const elapsed=Math.floor((Date.now()-start.getTime())/(1000*60*60*24));const remaining=14-elapsed;if(remaining>0){setUserPlan('pro');setIsTrial(true);setTrialDays(remaining)}else{setUserPlan('free');setIsTrial(false);setTrialDays(0)}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}},()=>{});return()=>unsub()},[userEmail,isAdmin,isVIP]);
   const plan=isAdmin?'pro':userPlan;
-  const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes','tenants','documents']};return(access[plan]||access.free).includes(feature);};
+  const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes','tenants','documents','providers']};return(access[plan]||access.free).includes(feature);};
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');const [viewCur,setViewCur]=useState(null);
   const [portData,setPortData]=useState(null);const [portLoading,setPortLoading]=useState(false);
   const [taxYear,setTaxYear]=useState(new Date().getFullYear()-1);const [landRatio,setLandRatio]=useState(20);const [taxRate,setTaxRate]=useState(24);
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [parsedPreview,setParsedPreview]=useState(null);
-  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);const [tenants,setTenants]=useState([]);const [documents,setDocuments]=useState([]);
+  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);const [tenants,setTenants]=useState([]);const [documents,setDocuments]=useState([]);const [providers,setProviders]=useState([]);
   const [tenantForm,setTenantForm]=useState({name:'',idNumber:'',phone:'',email:'',unit:'',monthlyRent:'',deposit:'',startDate:'',endDate:'',incrementPct:'3',status:'active',notes:''});const utn=useCallback((k,v)=>setTenantForm(x=>({...x,[k]:v})),[]);
   const [uploadingDoc,setUploadingDoc]=useState(false);const [docForm,setDocForm]=useState({type:'escritura',name:'',notes:'',fields:{}});const [showDocForm,setShowDocForm]=useState(false);const [extractedText,setExtractedText]=useState('');
+  const [provForm,setProvForm]=useState({name:'',service:'plumbing',phone:'',email:'',rating:'5',notes:''});
   const [dark,setDark]=useState(()=>{try{return localStorage.getItem('od-dark')==='1'}catch{return false}});
   const [lang,setLang]=useState(()=>{try{return localStorage.getItem('od-lang')||(prop.country&&!['US','GB'].includes(prop.country)?'es':'en')}catch{return 'en'}});
   const t=createT(lang);
@@ -94,7 +95,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   useEffect(()=>{const b=`properties/${propertyId}`,u=[];
     const L=(s,fn)=>{u.push(onSnapshot(collection(db,b,s),snap=>{const docs=snap.docs.map(d=>({id:d.id,...d.data()}));docs.sort((a,b)=>{const ta=a.createdAt?.toMillis?.()||0,tb=b.createdAt?.toMillis?.()||0;return tb-ta});fn(docs)}))};
-    L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);L('tenants',setTenants);L('documents',setDocuments);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
+    L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);L('tenants',setTenants);L('documents',setDocuments);L('providers',setProviders);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
   // Reset forms when switching property
   useEffect(()=>{setSettingsForm(null);setEditPartners(null);setView('dashboard');setDashYear('all');setEditId(null);setModal(null)},[propertyId]);
 
@@ -291,7 +292,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>id==='property'?'🏠 La Propiedad':partners.find(p=>p.id===id)?.name||id;const pCl=id=>id==='property'?'#6B7280':partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'tenants',icon:<UserPlus size={18}/>,l:lang==='es'?'Inquilinos':'Tenants'},{id:'documents',icon:<FileText size={18}/>,l:lang==='es'?'Documentos':'Documents'},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[]),{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'tenants',icon:<UserPlus size={18}/>,l:lang==='es'?'Inquilinos':'Tenants'},{id:'documents',icon:<FileText size={18}/>,l:lang==='es'?'Documentos':'Documents'},{id:'providers',icon:<Building2 size={18}/>,l:lang==='es'?'Proveedores':'Providers'},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:lang==='es'?'Recordatorios':'Reminders'},{id:'reports',icon:<Target size={18}/>,l:t('reports')},...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[]),{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
 
   if(loading)return<div className="min-h-screen bg-slate-50">
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 border-b border-slate-200 z-40 px-3 py-3 flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 rounded-xl animate-pulse"/><div className="flex-1"><div className="h-4 bg-slate-200 rounded-lg w-32 animate-pulse"/><div className="h-2.5 bg-slate-100 rounded w-20 mt-1.5 animate-pulse"/></div></div>
@@ -1576,10 +1577,19 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ PIPELINE ═══ */}
     {view==='pipeline'&&<>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
-        <div><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">📋 Obligaciones <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><p className="text-xs text-slate-400 mt-1">Registra aquí tus pagos recurrentes. Al marcar "Pagado" el gasto se registra automáticamente.</p></div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
+        <div><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🔔 {lang==='es'?'Recordatorios y Obligaciones':'Reminders & Obligations'} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><p className="text-xs text-slate-400 mt-1">{lang==='es'?'Pagos recurrentes, vencimientos de contratos y recordatorios. Al marcar "Pagado" el gasto se registra automáticamente.':'Recurring payments, contract expirations, and reminders.'}</p></div>
         <button onClick={()=>{setTaskForm({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30',paidBy:'property'});setEditId(null);setModal('task')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 active:bg-indigo-800 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> Agregar</button>
       </div>
+
+      {/* Tenant contract alerts */}
+      {(()=>{const today=new Date().toISOString().split('T')[0];const in30=new Date(Date.now()+30*24*60*60*1000).toISOString().split('T')[0];const expiring=tenants.filter(t=>t.status==='active'&&t.endDate&&t.endDate<=in30);return expiring.length>0?<div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
+        <div className="text-xs font-bold text-amber-700 mb-2">📋 {lang==='es'?'Contratos de inquilinos por vencer:':'Tenant contracts expiring:'}</div>
+        {expiring.map(t=>{const d=Math.ceil((new Date(t.endDate+'T00:00:00')-new Date(today+'T00:00:00'))/(1000*60*60*24));return <div key={t.id} className="flex items-center justify-between py-1.5 text-sm">
+          <span><span className="font-bold text-slate-700">{t.name}</span> <span className="text-slate-400">{t.unit||''}</span></span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${d<0?'bg-rose-100 text-rose-700':'bg-amber-100 text-amber-700'}`}>{d<0?`Vencido hace ${Math.abs(d)}d`:`Vence en ${d}d`}</span>
+        </div>})}
+      </div>:null})()}
 
       {/* Smart suggestions based on statements */}
       {(()=>{
@@ -2069,6 +2079,37 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
     </>})()}
 
+    {/* ═══ PROVIDERS ═══ */}
+    {view==='providers'&&(()=>{
+      const services=[{v:'plumbing',l:'🔧 Plomería'},{v:'electrical',l:'⚡ Electricidad'},{v:'painting',l:'🎨 Pintura'},{v:'cleaning',l:'🧹 Aseo'},{v:'locksmith',l:'🔑 Cerrajería'},{v:'pest',l:'🐛 Fumigación'},{v:'gas',l:'🔥 Gas'},{v:'ac',l:'❄️ A/C'},{v:'construction',l:'🏗️ Obra'},{v:'legal',l:'⚖️ Legal'},{v:'accounting',l:'📊 Contabilidad'},{v:'other',l:'📦 Otro'}];
+      const stars=(n)=>'⭐'.repeat(Math.min(n||0,5));
+      return <>
+      <div className="flex justify-between items-center mb-2"><h1 className="text-[22px] font-extrabold text-slate-800">🏗️ {lang==='es'?'Proveedores':'Providers'}</h1><button onClick={()=>{setProvForm({name:'',service:'plumbing',phone:'',email:'',rating:'5',notes:''});setEditId(null);setModal('provider')}} className="px-4 py-2.5 bg-orange-600 text-white text-xs rounded-xl font-bold hover:bg-orange-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {lang==='es'?'Agregar':'Add'}</button></div>
+
+      {providers.length>0?<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {providers.map(p=>{const svc=services.find(s=>s.v===p.service);return <div key={p.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition">
+          <div className="flex justify-between items-start">
+            <div>
+              <div className="text-sm font-bold text-slate-800">{p.name}</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">{svc?.l||p.service} · {stars(p.rating)}</div>
+              {p.phone&&<div className="text-xs text-blue-600 mt-1">📞 {p.phone}</div>}
+              {p.email&&<div className="text-xs text-slate-500">✉️ {p.email}</div>}
+              {p.notes&&<div className="text-[10px] text-slate-400 mt-1">📝 {p.notes}</div>}
+            </div>
+            <div className="flex gap-1">
+              <button onClick={()=>{setProvForm({name:p.name||'',service:p.service||'plumbing',phone:p.phone||'',email:p.email||'',rating:String(p.rating||5),notes:p.notes||''});setEditId(p.id);setModal('provider')}} className="p-1.5 text-slate-300 hover:text-blue-500 rounded-lg hover:bg-blue-50"><Pencil size={13}/></button>
+              <button onClick={()=>del('providers',p.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-lg hover:bg-rose-50"><Trash2 size={13}/></button>
+            </div>
+          </div>
+        </div>})}
+      </div>
+      :<div className="bg-orange-50 border border-orange-200 rounded-2xl p-6 text-center">
+        <div className="text-3xl mb-3">🏗️</div>
+        <div className="text-sm font-bold text-orange-700">{lang==='es'?'No hay proveedores registrados':'No providers registered'}</div>
+        <div className="text-xs text-orange-500 mt-1">{lang==='es'?'Agrega plomeros, electricistas, pintores y más.':'Add plumbers, electricians, painters and more.'}</div>
+      </div>}
+    </>})()}
+
     {/* ═══ SUPPORT / TICKETS ═══ */}
     {view==='support'&&<SupportView/>}
 
@@ -2420,6 +2461,20 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         ].map(([v,icon,l])=><button key={v} type="button" onClick={()=>utn('status',v)} className={`py-2 rounded-xl border-2 text-xs font-medium transition ${tenantForm.status===v?'border-indigo-500 bg-indigo-50 text-indigo-700':'border-slate-200 text-slate-500'}`}>{icon} {l}</button>)}</div>
       </div>
       <Inp label={lang==='es'?'Notas':'Notes'} value={tenantForm.notes} onChange={v=>utn('notes',v)} placeholder={lang==='es'?'Ej: Tiene mascota, estacionamiento incluido':'e.g. Has pet, parking included'}/>
+    </Mdl>}
+
+    {/* ═══ PROVIDER MODAL ═══ */}
+    {modal==='provider'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Proveedor':'✏️ Edit Provider'):(lang==='es'?'🏗️ Nuevo Proveedor':'🏗️ New Provider')} grad="from-orange-500 to-orange-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{const data={...provForm,rating:parseInt(provForm.rating)||5};if(editId){update('providers',editId,data)}else{save('providers',data)}}} disabled={!provForm.name} className="flex-1 py-2.5 bg-orange-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
+      <Inp label={lang==='es'?'Nombre / Empresa':'Name / Company'} value={provForm.name} onChange={v=>setProvForm(f=>({...f,name:v}))} placeholder="Ej: Juan Plomería, ElectroServicios"/>
+      <Sel label={lang==='es'?'Tipo de Servicio':'Service Type'} value={provForm.service} onChange={v=>setProvForm(f=>({...f,service:v}))} options={[{v:'plumbing',l:'🔧 Plomería'},{v:'electrical',l:'⚡ Electricidad'},{v:'painting',l:'🎨 Pintura'},{v:'cleaning',l:'🧹 Aseo'},{v:'locksmith',l:'🔑 Cerrajería'},{v:'pest',l:'🐛 Fumigación'},{v:'gas',l:'🔥 Gas'},{v:'ac',l:'❄️ A/C'},{v:'construction',l:'🏗️ Obra'},{v:'legal',l:'⚖️ Legal'},{v:'accounting',l:'📊 Contabilidad'},{v:'other',l:'📦 Otro'}]}/>
+      <div className="grid grid-cols-2 gap-3">
+        <Inp label={lang==='es'?'Teléfono':'Phone'} value={provForm.phone} onChange={v=>setProvForm(f=>({...f,phone:v}))} placeholder="+57 300 123 4567"/>
+        <Inp label="Email" value={provForm.email} onChange={v=>setProvForm(f=>({...f,email:v}))} placeholder="proveedor@email.com"/>
+      </div>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Calificación':'Rating'}</label>
+        <div className="flex gap-2">{[1,2,3,4,5].map(n=><button key={n} type="button" onClick={()=>setProvForm(f=>({...f,rating:String(n)}))} className={`text-xl transition ${parseInt(provForm.rating)>=n?'opacity-100':'opacity-30'}`}>⭐</button>)}</div>
+      </div>
+      <Inp label={lang==='es'?'Notas':'Notes'} value={provForm.notes} onChange={v=>setProvForm(f=>({...f,notes:v}))} placeholder={lang==='es'?'Ej: Muy puntual, cobra barato, disponible fines de semana':'e.g. Very punctual, affordable, available weekends'}/>
     </Mdl>}
 
     {modal==='valuation'&&<Mdl title={editId?'✏️ Editar Appreciation':'📈 Registrar Market Value'} grad="from-emerald-600 to-teal-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={()=>{const data={date:valForm.date,value:parseFloat(valForm.value)||0,source:valForm.source,notes:valForm.notes};if(editId){update('valuations',editId,data)}else{save('valuations',data)}}} disabled={!valForm.value} className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
