@@ -1960,9 +1960,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         {v:'tradicion',l:'📋 Certificado de Tradición',fields:['matricula','circulo','propietarios','gravamenes','estado','fechaExpedicion']},
         {v:'predial',l:'🏛️ Predial',fields:['avaluoCatastral','impuestoAnual','direccion','destino','estrato']},
         {v:'contrato',l:'📑 Contrato Arriendo',fields:['inquilino','canon','fechaInicio','fechaFin','deposito']},
+        {v:'poliza',l:'🛡️ Póliza de Seguro',fields:['aseguradora','numPoliza','tipoCobertura','valorAsegurado','prima','deducible','vigenciaInicio','vigenciaFin','coberturas']},
         {v:'otro',l:'📄 Otro Documento',fields:['descripcion']},
       ];
-      const fieldLabels={numEscritura:'Nº Escritura',notaria:'Notaría',fechaRegistro:'Fecha Registro',area:'Área (m²)',linderos:'Linderos',propietarios:'Propietarios',matricula:'Matrícula Inmobiliaria',circulo:'Círculo Registral',gravamenes:'Gravámenes / Hipotecas',estado:'Estado',fechaExpedicion:'Fecha Expedición',avaluoCatastral:'Avalúo Catastral',impuestoAnual:'Impuesto Anual',direccion:'Dirección',destino:'Destino Económico',estrato:'Estrato',inquilino:'Inquilino',canon:'Canon Mensual',fechaInicio:'Fecha Inicio',fechaFin:'Fecha Fin',deposito:'Depósito',descripcion:'Descripción'};
+      const fieldLabels={numEscritura:'Nº Escritura',notaria:'Notaría',fechaRegistro:'Fecha Registro',area:'Área (m²)',linderos:'Linderos',propietarios:'Propietarios',matricula:'Matrícula Inmobiliaria',circulo:'Círculo Registral',gravamenes:'Gravámenes / Hipotecas',estado:'Estado',fechaExpedicion:'Fecha Expedición',avaluoCatastral:'Avalúo Catastral',impuestoAnual:'Impuesto Anual',direccion:'Dirección',destino:'Destino Económico',estrato:'Estrato',inquilino:'Inquilino',canon:'Canon Mensual',fechaInicio:'Fecha Inicio',fechaFin:'Fecha Fin',deposito:'Depósito',descripcion:'Descripción',aseguradora:'Aseguradora',numPoliza:'Nº Póliza',tipoCobertura:'Tipo de Cobertura',valorAsegurado:'Valor Asegurado',prima:'Prima (Anual)',deducible:'Deducible',vigenciaInicio:'Vigencia Desde',vigenciaFin:'Vigencia Hasta',coberturas:'Coberturas Incluidas'};
 
       const extractFields=(text,type)=>{
         const f={};
@@ -1980,6 +1981,31 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           const av=text.match(/[Aa]val[uú]o\s*(?:[Cc]atastral)?\s*[:\$]?\s*([\d.,]+)/);if(av)f.avaluoCatastral=av[1];
           const im=text.match(/[Ii]mpuesto\s*(?:[Aa]nual|[Pp]redial)?\s*[:\$]?\s*([\d.,]+)/);if(im)f.impuestoAnual=im[1];
           const es=text.match(/[Ee]strato\s*[:\-]?\s*(\d)/);if(es)f.estrato=es[1];
+        } else if(type==='poliza'){
+          const aseg=text.match(/(?:aseguradora|insurance|company|compañía)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ][\w\s.,&]+?)(?:\n|$|pol[ií]z)/i);if(aseg)f.aseguradora=aseg[1].trim();
+          const pol=text.match(/(?:p[oó]liza|policy)\s*(?:n[oú]m(?:ero)?|no?|#)?\s*[:\-.]?\s*([\w\d-]+)/i);if(pol)f.numPoliza=pol[1];
+          const cob=text.match(/(?:coverage|cobertura|tipo)\s*[:\-]?\s*([\w\s,]+?)(?:\n|$)/i);if(cob)f.tipoCobertura=cob[1].trim();
+          // Values — look for dollar/peso amounts near keywords
+          const va=text.match(/(?:dwelling|valor\s*asegurado|coverage\s*a|sum\s*assured|insured\s*value)[^$\d]*?\$?\s*([\d,]+(?:\.\d{2})?)/i);if(va)f.valorAsegurado='$'+va[1];
+          const pr=text.match(/(?:premium|prima)[^$\d]*?\$?\s*([\d,]+(?:\.\d{2})?)/i);if(pr)f.prima='$'+pr[1];
+          const ded=text.match(/(?:deductible|deducible)[^$\d]*?\$?\s*([\d,]+(?:\.\d{2})?)/i);if(ded)f.deducible='$'+ded[1];
+          // Dates
+          const vi=text.match(/(?:effective|vigencia|from|desde|inception)\s*[:\-]?\s*(\d{1,2}[\s/.-]\d{1,2}[\s/.-]\d{2,4})/i);if(vi)f.vigenciaInicio=vi[1];
+          const vf=text.match(/(?:expir(?:ation|es?)|hasta|to|vence|through)\s*[:\-]?\s*(\d{1,2}[\s/.-]\d{1,2}[\s/.-]\d{2,4})/i);if(vf)f.vigenciaFin=vf[1];
+          // Coverage list — find common insurance coverages
+          const coverages=[];
+          if(/dwelling|vivienda|estructura/i.test(text))coverages.push('🏠 Dwelling/Estructura');
+          if(/liability|responsabilidad/i.test(text))coverages.push('⚖️ Liability/Responsabilidad Civil');
+          if(/personal\s*property|contenido|enseres/i.test(text))coverages.push('📦 Personal Property/Contenido');
+          if(/loss\s*of\s*(?:use|rent)|lucro\s*cesante|pérdida\s*de\s*renta/i.test(text))coverages.push('💰 Loss of Rent/Lucro Cesante');
+          if(/flood|inundaci[oó]n/i.test(text))coverages.push('🌊 Flood/Inundación');
+          if(/wind|hurricane|hurac[aá]n|viento/i.test(text))coverages.push('🌪️ Wind/Hurricane');
+          if(/earthquake|terremoto|sismo/i.test(text))coverages.push('🌍 Earthquake/Terremoto');
+          if(/theft|robo|hurto/i.test(text))coverages.push('🔒 Theft/Robo');
+          if(/fire|incendio/i.test(text))coverages.push('🔥 Fire/Incendio');
+          if(/water\s*damage|daño\s*por\s*agua|tubería/i.test(text))coverages.push('💧 Water Damage');
+          if(/medical|m[eé]dic/i.test(text))coverages.push('🏥 Medical Payments');
+          if(coverages.length>0)f.coberturas=coverages.join('\n');
         }
         return f;
       };
@@ -2033,7 +2059,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {curType?.fields.map(fk=><div key={fk}>
             <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{fieldLabels[fk]||fk}</label>
-            {fk==='linderos'||fk==='gravamenes'||fk==='descripcion'?
+            {fk==='linderos'||fk==='gravamenes'||fk==='descripcion'||fk==='coberturas'?
               <textarea value={docForm.fields[fk]||''} onChange={e=>setDocForm(f=>({...f,fields:{...f.fields,[fk]:e.target.value}}))} rows={3} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white resize-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 outline-none"/>
               :<input value={docForm.fields[fk]||''} onChange={e=>setDocForm(f=>({...f,fields:{...f.fields,[fk]:e.target.value}}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 outline-none"/>
             }
