@@ -8,14 +8,15 @@ import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, L
 import { ADMIN_EMAILS, VIP_EMAILS, C, M, fm, fmCurrency, fmDate, pct, CATS, getCats, getTerms, COUNTRIES, CURRENCY_LIST, US_STATES as US, PROPERTY_TYPES as PT } from './lib/constants';
 import { createT } from './lib/i18n';
 // PDF parser loaded dynamically — delays 328KB pdf.js chunk until first upload
-let _parsePDF = null, _parseMortgage = null;
+let _parsePDF = null, _parseMortgage = null, _extractText = null;
 const loadParsers = async () => {
   if (!_parsePDF) {
     const mod = await import('./lib/pdfParser');
     _parsePDF = mod.parsePDF;
     _parseMortgage = mod.parseMortgageStatement;
+    _extractText = mod.extractPDFText;
   }
-  return { parsePDF: _parsePDF, parseMortgageStatement: _parseMortgage };
+  return { parsePDF: _parsePDF, parseMortgageStatement: _parseMortgage, extractPDFText: _extractText };
 };
 import { Inp, Sel, PPick, Mdl, Empty, Tbl, Tip, UpgradeBanner, KPI } from './components/ui';
 const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -1977,21 +1978,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         const file=e.target.files?.[0];if(!file)return;
         setUploadingDoc(true);
         try{
-          const {parsePDF:_}=await loadParsers();
-          const buf=await file.arrayBuffer();
-          const pdfjsLib=(await import('pdfjs-dist')).default||await import('pdfjs-dist');
-          const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
-          let text='';
-          for(let i=1;i<=pdf.numPages;i++){
-            const page=await pdf.getPage(i);const content=await page.getTextContent();
-            const lineMap={};
-            content.items.forEach(item=>{if(!item.str.trim())return;const y=Math.round(item.transform[5]);if(!lineMap[y])lineMap[y]=[];lineMap[y].push({x:item.transform[4],text:item.str})});
-            Object.keys(lineMap).map(Number).sort((a,b)=>b-a).forEach(y=>{text+=lineMap[y].sort((a,b)=>a.x-b.x).map(it=>it.text).join(' ')+'\n'});
-          }
+          const {extractPDFText}=await loadParsers();
+          const {fullText:text}=await extractPDFText(file);
           setExtractedText(text);
           const autoFields=extractFields(text,docForm.type);
           setDocForm(f=>({...f,name:file.name,fields:{...f.fields,...autoFields}}));
           setShowDocForm(true);
+          if(Object.keys(autoFields).length>0) notify(lang==='es'?`${Object.keys(autoFields).length} campos extraídos automáticamente`:`${Object.keys(autoFields).length} fields auto-extracted`);
+          else notify(lang==='es'?'PDF leído. Completa los campos manualmente.':'PDF read. Fill fields manually.','warn');
         }catch(err){notify('Error leyendo PDF: '+err.message,'error')}
         setUploadingDoc(false);
       };

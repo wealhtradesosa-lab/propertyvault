@@ -495,7 +495,7 @@ export async function parseMortgageStatement(file) {
 
 // ═══ MAIN EXPORT ═══
 // Extract text preserving line structure using y-coordinates
-async function extractPDFText(file) {
+export async function extractPDFText(file) {
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
   let fullText = '';
