@@ -3,7 +3,7 @@ import { db, auth } from './firebase';
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where, updateDoc, getDocs, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart, Line, LineChart } from 'recharts';
-import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer, MessageSquare, Send, Moon, Sun, Calculator } from 'lucide-react';
+import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer, MessageSquare, Send, Moon, Sun, Calculator, FileText } from 'lucide-react';
 
 import { ADMIN_EMAILS, VIP_EMAILS, C, M, fm, fmCurrency, fmDate, pct, CATS, getCats, getTerms, COUNTRIES, CURRENCY_LIST, US_STATES as US, PROPERTY_TYPES as PT } from './lib/constants';
 import { createT } from './lib/i18n';
@@ -52,15 +52,16 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [trialDays,setTrialDays]=useState(0);const [isTrial,setIsTrial]=useState(false);
   useEffect(()=>{if(isAdmin||isVIP){if(isVIP)setUserPlan('pro');return;}const ref=doc(db,'users',userEmail.toLowerCase());const unsub=onSnapshot(ref,async(snap)=>{if(snap.exists()){const d=snap.data();if((d.status==='active'||d.status==='past_due')&&d.plan&&d.plan!=='free'){setUserPlan(d.plan);setIsTrial(false);setTrialDays(0);return;}if(d.trialStartDate){const start=d.trialStartDate.toDate?d.trialStartDate.toDate():new Date(d.trialStartDate);const elapsed=Math.floor((Date.now()-start.getTime())/(1000*60*60*24));const remaining=14-elapsed;if(remaining>0){setUserPlan('pro');setIsTrial(true);setTrialDays(remaining)}else{setUserPlan('free');setIsTrial(false);setTrialDays(0)}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}},()=>{});return()=>unsub()},[userEmail,isAdmin,isVIP]);
   const plan=isAdmin?'pro':userPlan;
-  const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes','tenants']};return(access[plan]||access.free).includes(feature);};
+  const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes','tenants','documents']};return(access[plan]||access.free).includes(feature);};
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');const [viewCur,setViewCur]=useState(null);
   const [portData,setPortData]=useState(null);const [portLoading,setPortLoading]=useState(false);
   const [taxYear,setTaxYear]=useState(new Date().getFullYear()-1);const [landRatio,setLandRatio]=useState(20);const [taxRate,setTaxRate]=useState(24);
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [parsedPreview,setParsedPreview]=useState(null);
-  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);const [tenants,setTenants]=useState([]);
+  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);const [tenants,setTenants]=useState([]);const [documents,setDocuments]=useState([]);
   const [tenantForm,setTenantForm]=useState({name:'',idNumber:'',phone:'',email:'',unit:'',monthlyRent:'',deposit:'',startDate:'',endDate:'',incrementPct:'3',status:'active',notes:''});const utn=useCallback((k,v)=>setTenantForm(x=>({...x,[k]:v})),[]);
+  const [uploadingDoc,setUploadingDoc]=useState(false);const [docForm,setDocForm]=useState({type:'escritura',name:'',notes:'',fields:{}});const [showDocForm,setShowDocForm]=useState(false);const [extractedText,setExtractedText]=useState('');
   const [dark,setDark]=useState(()=>{try{return localStorage.getItem('od-dark')==='1'}catch{return false}});
   const [lang,setLang]=useState(()=>{try{return localStorage.getItem('od-lang')||(prop.country&&!['US','GB'].includes(prop.country)?'es':'en')}catch{return 'en'}});
   const t=createT(lang);
@@ -92,7 +93,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   useEffect(()=>{const b=`properties/${propertyId}`,u=[];
     const L=(s,fn)=>{u.push(onSnapshot(collection(db,b,s),snap=>{const docs=snap.docs.map(d=>({id:d.id,...d.data()}));docs.sort((a,b)=>{const ta=a.createdAt?.toMillis?.()||0,tb=b.createdAt?.toMillis?.()||0;return tb-ta});fn(docs)}))};
-    L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);L('tenants',setTenants);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
+    L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);L('tenants',setTenants);L('documents',setDocuments);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
   // Reset forms when switching property
   useEffect(()=>{setSettingsForm(null);setEditPartners(null);setView('dashboard');setDashYear('all');setEditId(null);setModal(null)},[propertyId]);
 
@@ -289,7 +290,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>id==='property'?'🏠 La Propiedad':partners.find(p=>p.id===id)?.name||id;const pCl=id=>id==='property'?'#6B7280':partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'tenants',icon:<UserPlus size={18}/>,l:lang==='es'?'Inquilinos':'Tenants'},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[]),{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'tenants',icon:<UserPlus size={18}/>,l:lang==='es'?'Inquilinos':'Tenants'},{id:'documents',icon:<FileText size={18}/>,l:lang==='es'?'Documentos':'Documents'},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:t('obligations')},{id:'reports',icon:<Target size={18}/>,l:t('reports')},...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[]),{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
 
   if(loading)return<div className="min-h-screen bg-slate-50">
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 border-b border-slate-200 z-40 px-3 py-3 flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 rounded-xl animate-pulse"/><div className="flex-1"><div className="h-4 bg-slate-200 rounded-lg w-32 animate-pulse"/><div className="h-2.5 bg-slate-100 rounded w-20 mt-1.5 animate-pulse"/></div></div>
@@ -1938,6 +1939,139 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="text-3xl mb-3">👥</div>
         <div className="text-sm font-bold text-indigo-700 mb-1">{lang==='es'?'No hay inquilinos registrados':'No tenants registered'}</div>
         <div className="text-xs text-indigo-500">{lang==='es'?'Agrega tu primer inquilino con su contrato y canon mensual.':'Add your first tenant with contract and monthly rent.'}</div>
+      </div>}
+    </>})()}
+
+    {/* ═══ DOCUMENTS ═══ */}
+    {view==='documents'&&(()=>{
+      const docTypes=[
+        {v:'escritura',l:'📜 Escritura',fields:['numEscritura','notaria','fechaRegistro','area','linderos','propietarios']},
+        {v:'tradicion',l:'📋 Certificado de Tradición',fields:['matricula','circulo','propietarios','gravamenes','estado','fechaExpedicion']},
+        {v:'predial',l:'🏛️ Predial',fields:['avaluoCatastral','impuestoAnual','direccion','destino','estrato']},
+        {v:'contrato',l:'📑 Contrato Arriendo',fields:['inquilino','canon','fechaInicio','fechaFin','deposito']},
+        {v:'otro',l:'📄 Otro Documento',fields:['descripcion']},
+      ];
+      const fieldLabels={numEscritura:'Nº Escritura',notaria:'Notaría',fechaRegistro:'Fecha Registro',area:'Área (m²)',linderos:'Linderos',propietarios:'Propietarios',matricula:'Matrícula Inmobiliaria',circulo:'Círculo Registral',gravamenes:'Gravámenes / Hipotecas',estado:'Estado',fechaExpedicion:'Fecha Expedición',avaluoCatastral:'Avalúo Catastral',impuestoAnual:'Impuesto Anual',direccion:'Dirección',destino:'Destino Económico',estrato:'Estrato',inquilino:'Inquilino',canon:'Canon Mensual',fechaInicio:'Fecha Inicio',fechaFin:'Fecha Fin',deposito:'Depósito',descripcion:'Descripción'};
+
+      const extractFields=(text,type)=>{
+        const f={};
+        if(type==='escritura'){
+          const ne=text.match(/[Ee]scritura\s*(?:[Nn]o?\.?|[Nn]úmero)?\s*(\d[\d.]*)/);if(ne)f.numEscritura=ne[1];
+          const nt=text.match(/[Nn]otar[ií]a\s*(\w[\w\s]*?)(?:\s+de\s+|\s+del\s+|\s*,)/i);if(nt)f.notaria=nt[1].trim();
+          const ar=text.match(/[Áá]rea\s*(?:construida|total|privada)?\s*(?:de)?\s*([\d.,]+)\s*(?:m2|m²|metros)/i);if(ar)f.area=ar[1];
+          const pr=text.match(/(?:propietari[oa]s?|otorgante|vendedor|comprador)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ\s,]+)/i);if(pr)f.propietarios=pr[1].trim().slice(0,100);
+        } else if(type==='tradicion'){
+          const mt=text.match(/[Mm]atr[ií]cula\s*(?:[Ii]nmobiliaria)?\s*(?:[Nn]o?\.?)?\s*([\d-]+)/);if(mt)f.matricula=mt[1];
+          const cr=text.match(/[Cc][ií]rculo\s*(?:[Rr]egistral)?\s*[:\-]?\s*(\w[\w\s]*?)(?:\n|,|\.|$)/);if(cr)f.circulo=cr[1].trim();
+          const hip=text.match(/[Hh]ipoteca|[Gg]rav[aá]men|[Ee]mbargo/i);f.estado=hip?'⚠️ Con anotaciones':'✅ Libre de gravámenes';
+          const fe=text.match(/(?:[Ff]echa\s*(?:de\s*)?[Ee]xpedici[oó]n)\s*[:\-]?\s*(\d{1,2}[\s/.-]\w+[\s/.-]\d{2,4})/i);if(fe)f.fechaExpedicion=fe[1];
+        } else if(type==='predial'){
+          const av=text.match(/[Aa]val[uú]o\s*(?:[Cc]atastral)?\s*[:\$]?\s*([\d.,]+)/);if(av)f.avaluoCatastral=av[1];
+          const im=text.match(/[Ii]mpuesto\s*(?:[Aa]nual|[Pp]redial)?\s*[:\$]?\s*([\d.,]+)/);if(im)f.impuestoAnual=im[1];
+          const es=text.match(/[Ee]strato\s*[:\-]?\s*(\d)/);if(es)f.estrato=es[1];
+        }
+        return f;
+      };
+
+      const handleDocUpload=async(e)=>{
+        const file=e.target.files?.[0];if(!file)return;
+        setUploadingDoc(true);
+        try{
+          const {parsePDF:_}=await loadParsers();
+          const buf=await file.arrayBuffer();
+          const pdfjsLib=(await import('pdfjs-dist')).default||await import('pdfjs-dist');
+          const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+          let text='';
+          for(let i=1;i<=pdf.numPages;i++){
+            const page=await pdf.getPage(i);const content=await page.getTextContent();
+            const lineMap={};
+            content.items.forEach(item=>{if(!item.str.trim())return;const y=Math.round(item.transform[5]);if(!lineMap[y])lineMap[y]=[];lineMap[y].push({x:item.transform[4],text:item.str})});
+            Object.keys(lineMap).map(Number).sort((a,b)=>b-a).forEach(y=>{text+=lineMap[y].sort((a,b)=>a.x-b.x).map(it=>it.text).join(' ')+'\n'});
+          }
+          setExtractedText(text);
+          const autoFields=extractFields(text,docForm.type);
+          setDocForm(f=>({...f,name:file.name,fields:{...f.fields,...autoFields}}));
+          setShowDocForm(true);
+        }catch(err){notify('Error leyendo PDF: '+err.message,'error')}
+        setUploadingDoc(false);
+      };
+
+      const saveDoc=async()=>{
+        await save('documents',{type:docForm.type,name:docForm.name,notes:docForm.notes,fields:docForm.fields,textPreview:(extractedText||'').slice(0,500),uploadDate:new Date().toISOString().split('T')[0]});
+        setShowDocForm(false);setDocForm({type:'escritura',name:'',notes:'',fields:{}});setExtractedText('');
+      };
+
+      const curType=docTypes.find(d=>d.v===docForm.type);
+
+      return <>
+      <div className="flex justify-between items-center mb-2"><h1 className="text-[22px] font-extrabold text-slate-800">📄 {lang==='es'?'Documentos de Propiedad':'Property Documents'}</h1></div>
+      <p className="text-sm text-slate-400 mb-5">{lang==='es'?'Sube escrituras, certificados de tradición, prediales y otros documentos. La IA extrae los datos clave automáticamente.':'Upload deeds, title certificates, property tax records. AI extracts key data automatically.'}</p>
+
+      {/* Upload area */}
+      {!showDocForm&&<div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-6 mb-5 text-center">
+        <div className="mb-4"><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-2">{lang==='es'?'Tipo de Documento':'Document Type'}</label>
+          <div className="flex flex-wrap gap-2 justify-center">{docTypes.map(dt=><button key={dt.v} onClick={()=>setDocForm(f=>({...f,type:dt.v}))} className={`px-3 py-2 rounded-xl border-2 text-xs font-semibold transition ${docForm.type===dt.v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500 hover:border-blue-300'}`}>{dt.l}</button>)}</div>
+        </div>
+        <label className="cursor-pointer inline-block">
+          <input type="file" accept=".pdf" onChange={handleDocUpload} className="hidden"/>
+          <div className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition inline-flex items-center gap-2">{uploadingDoc?<><Loader2 size={16} className="animate-spin"/>{lang==='es'?'Analizando...':'Analyzing...'}</>:<><Upload size={16}/>{lang==='es'?'Subir PDF':'Upload PDF'}</>}</div>
+        </label>
+        <div className="text-[10px] text-slate-400 mt-2">{lang==='es'?'El sistema extrae automáticamente los datos clave del documento':'The system automatically extracts key data from the document'}</div>
+      </div>}
+
+      {/* Document form (after upload) */}
+      {showDocForm&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">{curType?.l} <span className="text-[10px] text-slate-400">{docForm.name}</span></h3>
+          <button onClick={()=>{setShowDocForm(false);setExtractedText('')}} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
+        </div>
+        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-[11px] text-emerald-700">🤖 {lang==='es'?'Datos extraídos automáticamente. Verifica y corrige lo que sea necesario.':'Data extracted automatically. Verify and correct as needed.'}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {curType?.fields.map(fk=><div key={fk}>
+            <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{fieldLabels[fk]||fk}</label>
+            {fk==='linderos'||fk==='gravamenes'||fk==='descripcion'?
+              <textarea value={docForm.fields[fk]||''} onChange={e=>setDocForm(f=>({...f,fields:{...f.fields,[fk]:e.target.value}}))} rows={3} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white resize-none focus:border-blue-400 focus:ring-1 focus:ring-blue-100 outline-none"/>
+              :<input value={docForm.fields[fk]||''} onChange={e=>setDocForm(f=>({...f,fields:{...f.fields,[fk]:e.target.value}}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-100 outline-none"/>
+            }
+          </div>)}
+        </div>
+        <div className="mt-3"><label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{lang==='es'?'Notas':'Notes'}</label>
+          <input value={docForm.notes} onChange={e=>setDocForm(f=>({...f,notes:e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" placeholder={lang==='es'?'Notas adicionales...':'Additional notes...'}/>
+        </div>
+        <div className="flex gap-3 mt-4">
+          <button onClick={()=>{setShowDocForm(false);setExtractedText('')}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button>
+          <button onClick={saveDoc} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm">{lang==='es'?'Guardar Documento':'Save Document'}</button>
+        </div>
+      </div>}
+
+      {/* Document list */}
+      {documents.length>0?<div className="space-y-3">
+        {documents.sort((a,b)=>(b.uploadDate||'').localeCompare(a.uploadDate||'')).map(d=>{
+          const dt=docTypes.find(t=>t.v===d.type);
+          const isTradicion=d.type==='tradicion';
+          const daysSinceUpload=d.uploadDate?Math.floor((Date.now()-new Date(d.uploadDate+'T00:00:00'))/(1000*60*60*24)):999;
+          return <div key={d.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition">
+            <div className="flex justify-between items-start">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-bold text-slate-800">{dt?.l||d.type}</span>
+                  {isTradicion&&daysSinceUpload>30&&<span className="text-[9px] font-bold bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full">⚠️ {lang==='es'?'Vencido (+30 días)':'Expired (+30 days)'}</span>}
+                  {d.fields?.estado&&<span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${d.fields.estado.includes('✅')?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}`}>{d.fields.estado}</span>}
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1">
+                  {Object.entries(d.fields||{}).filter(([k,v])=>v&&k!=='estado').map(([k,v])=><div key={k} className="text-[11px]"><span className="text-slate-400">{fieldLabels[k]||k}: </span><span className="font-semibold text-slate-700">{v}</span></div>)}
+                </div>
+                {d.notes&&<div className="text-[10px] text-slate-400 mt-1">📝 {d.notes}</div>}
+                <div className="text-[9px] text-slate-300 mt-1">{d.name} · {d.uploadDate?fmDate(d.uploadDate):''}</div>
+              </div>
+              <button onClick={()=>del('documents',d.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-lg hover:bg-rose-50"><Trash2 size={13}/></button>
+            </div>
+          </div>})}
+      </div>
+      :!showDocForm&&<div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
+        <div className="text-3xl mb-3">📄</div>
+        <div className="text-sm font-bold text-blue-700 mb-1">{lang==='es'?'No hay documentos registrados':'No documents registered'}</div>
+        <div className="text-xs text-blue-500">{lang==='es'?'Sube escrituras, certificados de tradición o prediales para tener la ficha completa de tu propiedad.':'Upload deeds, title certificates or property tax records.'}</div>
       </div>}
     </>})()}
 
