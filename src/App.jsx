@@ -186,12 +186,22 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const saveParsedResults=async()=>{
     if(!parsedPreview)return;
     const toSave=parsedPreview.results.filter(r=>r._include);
-    let saved=0;
+    let saved=0,replaced=0;
     for(const r of toSave){
       const {_file,_format,_dup,_include,...stmtData}=r;
-      try{await addDoc(collection(db,'properties',propertyId,'statements'),{...stmtData,createdAt:serverTimestamp()});saved++;}catch(e){/* skip */}
+      try{
+        // If replacing a duplicate, delete the old one first
+        if(_dup){
+          const q=query(collection(db,'properties',propertyId,'statements'),where('year','==',r.year),where('month','==',r.month));
+          const snap=await getDocs(q);
+          for(const d of snap.docs){await deleteDoc(doc(db,'properties',propertyId,'statements',d.id));}
+          replaced++;
+        }
+        await addDoc(collection(db,'properties',propertyId,'statements'),{...stmtData,createdAt:serverTimestamp()});saved++;
+      }catch(e){/* skip */}
     }
-    notify(lang==='es'?`${saved} statements guardados`:`${saved} statements saved`,'success');
+    const msg=replaced>0?(lang==='es'?`${saved} guardados (${replaced} reemplazados)`:`${saved} saved (${replaced} replaced)`):(lang==='es'?`${saved} statements guardados`:`${saved} statements saved`);
+    notify(msg,'success');
     setParsedPreview(null);setModal(null);
   };
 
@@ -2609,8 +2619,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <th className="px-2 py-2 text-right font-bold text-slate-500">{lang==='es'?'Noches':'Nights'}</th>
             </tr></thead>
             <tbody>{rows.map((r,i)=><tr key={i} className={`border-b border-slate-50 ${r._dup?'opacity-40':r._include?'':'opacity-50 bg-slate-50'}`}>
-              <td className="px-1 py-1.5 text-center"><input type="checkbox" checked={r._include} onChange={()=>toggleRow(i)} disabled={r._dup} className="w-3.5 h-3.5 accent-emerald-500"/></td>
-              <td className="px-2 py-1.5"><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>{r._dup&&<span className="ml-1 text-[9px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full font-bold">{lang==='es'?'YA EXISTE':'EXISTS'}</span>}</td>
+              <td className="px-1 py-1.5 text-center"><input type="checkbox" checked={r._include} onChange={()=>toggleRow(i)} className="w-3.5 h-3.5 accent-emerald-500"/></td>
+              <td className="px-2 py-1.5"><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>{r._dup&&<span className="ml-1 text-[9px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded-full font-bold cursor-pointer" onClick={()=>toggleRow(i)}>{lang==='es'?'REEMPLAZAR':'REPLACE'}</span>}</td>
               <td className="px-1 py-1"><input type="number" value={r.revenue||''} onChange={e=>updateRow(i,'revenue',parseFloat(e.target.value)||0)} className="w-20 text-right text-[11px] font-semibold text-blue-600 bg-transparent border border-transparent hover:border-blue-200 focus:border-blue-400 rounded px-1 py-0.5 outline-none"/></td>
               <td className="px-1 py-1"><input type="number" value={r.commission||''} onChange={e=>updateRow(i,'commission',parseFloat(e.target.value)||0)} className="w-16 text-right text-[11px] text-rose-500 bg-transparent border border-transparent hover:border-rose-200 focus:border-rose-400 rounded px-1 py-0.5 outline-none"/></td>
               <td className="px-1 py-1 hidden sm:table-cell"><input type="number" value={r.duke||''} onChange={e=>updateRow(i,'duke',parseFloat(e.target.value)||0)} className="w-14 text-right text-[11px] text-slate-500 bg-transparent border border-transparent hover:border-slate-200 focus:border-slate-400 rounded px-1 py-0.5 outline-none"/></td>
