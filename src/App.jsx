@@ -8,15 +8,16 @@ import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, L
 import { ADMIN_EMAILS, VIP_EMAILS, C, M, fm, fmCurrency, fmDate, pct, CATS, getCats, getTerms, COUNTRIES, CURRENCY_LIST, US_STATES as US, PROPERTY_TYPES as PT } from './lib/constants';
 import { createT } from './lib/i18n';
 // PDF parser loaded dynamically — delays 328KB pdf.js chunk until first upload
-let _parsePDF = null, _parseMortgage = null, _extractText = null;
+let _parsePDF = null, _parseMortgage = null, _extractText = null, _parseCSV = null;
 const loadParsers = async () => {
   if (!_parsePDF) {
     const mod = await import('./lib/pdfParser');
     _parsePDF = mod.parsePDF;
     _parseMortgage = mod.parseMortgageStatement;
     _extractText = mod.extractPDFText;
+    _parseCSV = mod.parseAirbnbCSV;
   }
-  return { parsePDF: _parsePDF, parseMortgageStatement: _parseMortgage, extractPDFText: _extractText };
+  return { parsePDF: _parsePDF, parseMortgageStatement: _parseMortgage, extractPDFText: _extractText, parseAirbnbCSV: _parseCSV };
 };
 import { Inp, Sel, PPick, Mdl, Empty, Tbl, Tip, UpgradeBanner, KPI } from './components/ui';
 const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -160,10 +161,18 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     for(let fi=0; fi<fileArr.length; fi++){
       const f=fileArr[fi];
-      if(!f.name.toLowerCase().endsWith('.pdf')){log.push({file:f.name,status:'error',msg:'No es un archivo PDF'});setUploadLog([...log]);continue;}
+      const ext=f.name.toLowerCase().split('.').pop();
+      if(!['pdf','csv','xlsx'].includes(ext)){log.push({file:f.name,status:'error',msg:'Formato no soportado. Usa PDF o CSV.'});setUploadLog([...log]);continue;}
       log.push({file:f.name,status:'processing',msg:`Procesando... (${fi+1}/${fileArr.length})`});setUploadLog([...log]);
       try{
-        const {parsePDF:pPDF}=await loadParsers();const rawResult=await pPDF(f);
+        let rawResult;
+        if(ext==='csv'){
+          const {parseAirbnbCSV}=await loadParsers();
+          const text=await f.text();
+          rawResult=parseAirbnbCSV(text);
+        } else {
+          const {parsePDF:pPDF}=await loadParsers();rawResult=await pPDF(f);
+        }
         if(rawResult.error){log[log.length-1]={file:f.name,status:'error',msg:rawResult.error};setUploadLog([...log]);continue;}
         const results=Array.isArray(rawResult)?rawResult:[rawResult];
         const fmt=results[0]?.format||'Unknown';
@@ -1371,7 +1380,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
         <label className="flex items-center justify-center gap-2 py-2.5 px-4 bg-blue-600 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-blue-700 transition w-full sm:w-auto">
           <Upload size={14}/> {lang==='es'?'Seleccionar PDF':'Select PDF'}
-          <input type="file" accept=".pdf" className="hidden" onChange={async(e)=>{
+          <input type="file" accept=".pdf,.csv" className="hidden" onChange={async(e)=>{
             const file=e.target.files?.[0];if(!file)return;
             notify(lang==='es'?'Analizando statement...':'Analyzing statement...','info');
             try{
@@ -2571,8 +2580,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div className="flex flex-wrap gap-1.5 mb-3">{['IHM','Vacasa','Evolve','Guesty','Host U','Airbnb','Vrbo'].map(pm=><span key={pm} className="text-[10px] font-semibold bg-blue-50 text-blue-600 px-2 py-1 rounded-lg">{pm}</span>)}<span className="text-[10px] font-semibold bg-slate-100 text-slate-500 px-2 py-1 rounded-lg">+ otros</span></div>
       <label className="block border-2 border-dashed border-blue-300 rounded-2xl p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all">
         <Upload size={32} className="text-blue-400 mx-auto mb-2"/>
-        <div className="text-sm font-semibold text-blue-600">Haz clic aquí para seleccionar PDFs</div>
-        <div className="text-xs text-slate-400 mt-1">Soporta múltiples archivos</div><div className="text-[8px] text-slate-300 mt-1">v2.6</div>
+        <div className="text-sm font-semibold text-blue-600">Haz clic aquí para seleccionar PDFs o CSVs</div>
+        <div className="text-xs text-slate-400 mt-1">Soporta PDFs y CSVs de Airbnb</div><div className="text-[8px] text-slate-300 mt-1">v2.6</div>
         <input type="file" accept=".pdf" multiple className="hidden" onChange={async e=>{
           const arr=[...e.target.files];
           e.target.value='';

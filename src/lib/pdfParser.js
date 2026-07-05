@@ -551,3 +551,95 @@ export async function parsePDF(file) {
   for (const d of detectors) { if (d.parse && d.test(fullText)) { const r = d.parse(fullText); if (!r.error) return r; } }
   return parseGeneric(fullText);
 }
+
+// ═══ CSV PARSER (Airbnb transaction export) ═══
+export function parseAirbnbCSV(csvText) {
+  const lines = csvText.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return { error: 'CSV vacío' };
+
+  const header = lines[0].replace(/^\uFEFF/, '');
+  const cols = parseCSVLine(header);
+
+  const findCol = (...names) => cols.findIndex(c => names.some(n => c.toLowerCase().includes(n.toLowerCase())));
+  const iType = findCol('Tipo', 'Type');
+  const iEndDate = findCol('Fecha de finalización', 'End date');
+  const iNights = findCol('Noches', 'Nights');
+  const iAmount = findCol('Monto', 'Amount');
+  const iGross = findCol('Ingresos brutos', 'Gross earnings');
+  const iFee = findCol('Tarifa por servicio', 'Service fee');
+  const iCurrency = findCol('Moneda', 'Currency');
+
+  if (iType < 0 || iAmount < 0) return { error: 'CSV: columnas no reconocidas' };
+
+  // First pass: detect dominant currency
+  const currCount = {};
+  for (let i = 1; i < lines.length; i++) {
+    const row = parseCSVLine(lines[i]);
+    const type = row[iType] || '';
+    if (!/reservaci[oó]n|reservation/i.test(type)) continue;
+    const cur = (row[iCurrency] || 'USD').trim();
+    currCount[cur] = (currCount[cur] || 0) + 1;
+  }
+  const mainCurrency = Object.entries(currCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'USD';
+
+  const months = {};
+  const getMonth = (yr, mo) => {
+    const key = yr + '-' + mo;
+    if (!months[key]) months[key] = { year: yr, month: mo, revenue: 0, commission: 0, nights: 0, reservations: 0, net: 0 };
+    return months[key];
+  };
+
+  for (let i = 1; i < lines.length; i++) {
+    const row = parseCSVLine(lines[i]);
+    if (row.length < Math.max(iType, iAmount) + 1) continue;
+
+    const type = row[iType] || '';
+    if (!/reservaci[oó]n|reservation|pago de la resoluci[oó]n|resolution/i.test(type)) continue;
+
+    // Skip rows with different currency
+    const cur = (row[iCurrency] || 'USD').trim();
+    if (cur !== mainCurrency) continue;
+
+    const dateStr = row[iEndDate] || row[0] || '';
+    const dateParts = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (!dateParts) continue;
+
+    const mo = parseInt(dateParts[1]);
+    const yr = parseInt(dateParts[3]);
+    if (mo < 1 || mo > 12) continue;
+
+    const m = getMonth(yr, mo);
+    const amount = parseFloat((row[iAmount] || '0').replace(/,/g, '')) || 0;
+    const gross = parseFloat((row[iGross] || '0').replace(/,/g, '')) || 0;
+    const fee = Math.abs(parseFloat((row[iFee] || '0').replace(/,/g, '')) || 0);
+    const nights = parseInt(row[iNights] || '0') || 0;
+
+    m.revenue += gross || amount;
+    m.commission += fee;
+    m.net += amount;
+    m.nights += nights;
+    m.reservations++;
+  }
+
+  const results = Object.values(months)
+    .filter(d => d.revenue > 0 || d.net > 0)
+    .sort((a, b) => a.year * 100 + a.month - b.year * 100 - b.month)
+    .map(d => result({ ...d, format: 'Airbnb CSV', sourceType: 'csv', currency: mainCurrency }));
+
+  if (results.length === 0) return { error: 'CSV: no se encontraron reservaciones' };
+  return results;
+}
+
+// Parse a CSV line handling quoted fields with commas
+function parseCSVLine(line) {
+  const fields = [];
+  let field = '', inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQuotes = !inQuotes; }
+    else if (ch === ',' && !inQuotes) { fields.push(field.trim()); field = ''; }
+    else { field += ch; }
+  }
+  fields.push(field.trim());
+  return fields;
+}
