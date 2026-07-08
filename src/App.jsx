@@ -1214,7 +1214,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {paged.length>0?<>
         <Tbl cols={[
-          {label:'Periodo',render:r=><><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>{r.format&&<span className="ml-1.5 text-[8px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-400">{r.format}</span>}{r.createdAt&&<div className="text-[8px] text-slate-300 mt-0.5">Subido: {r.createdAt.toDate?r.createdAt.toDate().toLocaleDateString():''}</div>}</>},
+          {label:'Periodo',render:r=><><span className="font-bold text-slate-700">{M[r.month-1]} {r.year}</span>{r.format&&<span className={`ml-1.5 text-[8px] font-bold px-1.5 py-0.5 rounded ${r.format.includes('Airbnb')?'bg-rose-50 text-rose-400':r.format.includes('IHM')?'bg-blue-50 text-blue-400':'bg-slate-100 text-slate-400'}`}>{r.format}</span>}{r.createdAt&&<div className="text-[8px] text-slate-300 mt-0.5">Subido: {r.createdAt.toDate?r.createdAt.toDate().toLocaleDateString():''}</div>}</>},
           {label:t('grossRevenue'),r:true,render:r=><span className="text-blue-600 font-semibold">{sFm(r.revenue)}</span>},
           {label:t('nights'),r:true,render:r=>r.nights?<span className="text-slate-600">{r.nights} <span className="text-[9px] text-slate-400">({r.reservations||'—'}res)</span></span>:<span className="text-slate-300">—</span>},
           {label:t('pmCommission'),r:true,render:r=><span className="text-rose-400">{sFm(r.commission)}</span>},
