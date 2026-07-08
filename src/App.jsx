@@ -54,17 +54,18 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [trialDays,setTrialDays]=useState(0);const [isTrial,setIsTrial]=useState(false);
   useEffect(()=>{if(isAdmin||isVIP){if(isVIP)setUserPlan('pro');return;}const ref=doc(db,'users',userEmail.toLowerCase());const unsub=onSnapshot(ref,async(snap)=>{if(snap.exists()){const d=snap.data();if((d.status==='active'||d.status==='past_due')&&d.plan&&d.plan!=='free'){setUserPlan(d.plan);setIsTrial(false);setTrialDays(0);return;}if(d.trialStartDate){const start=d.trialStartDate.toDate?d.trialStartDate.toDate():new Date(d.trialStartDate);const elapsed=Math.floor((Date.now()-start.getTime())/(1000*60*60*24));const remaining=14-elapsed;if(remaining>0){setUserPlan('pro');setIsTrial(true);setTrialDays(remaining)}else{setUserPlan('free');setIsTrial(false);setTrialDays(0)}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}},()=>{});return()=>unsub()},[userEmail,isAdmin,isVIP]);
   const plan=isAdmin?'pro':userPlan;
-  const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes','tenants','documents','providers']};return(access[plan]||access.free).includes(feature);};
+  const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes','tenants','documents','providers','reservations']};return(access[plan]||access.free).includes(feature);};
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');const [viewCur,setViewCur]=useState(null);
   const [portData,setPortData]=useState(null);const [portLoading,setPortLoading]=useState(false);
   const [taxYear,setTaxYear]=useState(new Date().getFullYear()-1);const [landRatio,setLandRatio]=useState(20);const [taxRate,setTaxRate]=useState(24);
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [parsedPreview,setParsedPreview]=useState(null);
-  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);const [tenants,setTenants]=useState([]);const [documents,setDocuments]=useState([]);const [providers,setProviders]=useState([]);
+  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);const [tenants,setTenants]=useState([]);const [documents,setDocuments]=useState([]);const [providers,setProviders]=useState([]);const [reservations,setReservations]=useState([]);
   const [tenantForm,setTenantForm]=useState({name:'',idNumber:'',phone:'',email:'',unit:'',monthlyRent:'',deposit:'',startDate:'',endDate:'',incrementPct:'3',status:'active',notes:''});const utn=useCallback((k,v)=>setTenantForm(x=>({...x,[k]:v})),[]);
   const [uploadingDoc,setUploadingDoc]=useState(false);const [docForm,setDocForm]=useState({type:'escritura',name:'',notes:'',fields:{}});const [showDocForm,setShowDocForm]=useState(false);const [extractedText,setExtractedText]=useState('');
   const [provForm,setProvForm]=useState({name:'',service:'plumbing',phone:'',email:'',rating:'5',notes:''});
+  const [resForm,setResForm]=useState({guest:'',checkin:'',checkout:'',nights:'',amount:'',source:'airbnb',status:'confirmed',notes:'',currency:'USD'});
   const [dark,setDark]=useState(()=>{try{return localStorage.getItem('od-dark')==='1'}catch{return false}});
   const [lang,setLang]=useState(()=>{try{return localStorage.getItem('od-lang')||(prop.country&&!['US','GB'].includes(prop.country)?'es':'en')}catch{return 'en'}});
   const t=createT(lang);
@@ -96,7 +97,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   useEffect(()=>{const b=`properties/${propertyId}`,u=[];
     const L=(s,fn)=>{u.push(onSnapshot(collection(db,b,s),snap=>{const docs=snap.docs.map(d=>({id:d.id,...d.data()}));docs.sort((a,b)=>{const ta=a.createdAt?.toMillis?.()||0,tb=b.createdAt?.toMillis?.()||0;return tb-ta});fn(docs)}))};
-    L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);L('tenants',setTenants);L('documents',setDocuments);L('providers',setProviders);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
+    L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);L('tenants',setTenants);L('documents',setDocuments);L('providers',setProviders);L('reservations',setReservations);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
   // Reset forms when switching property
   useEffect(()=>{setSettingsForm(null);setEditPartners(null);setView('dashboard');setDashYear('all');setEditId(null);setModal(null)},[propertyId]);
 
@@ -311,7 +312,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>id==='property'?'🏠 La Propiedad':partners.find(p=>p.id===id)?.name||id;const pCl=id=>id==='property'?'#6B7280':partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'tenants',icon:<UserPlus size={18}/>,l:lang==='es'?'Inquilinos':'Tenants'},{id:'documents',icon:<FileText size={18}/>,l:lang==='es'?'Documentos':'Documents'},{id:'providers',icon:<Building2 size={18}/>,l:lang==='es'?'Proveedores':'Providers'},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:lang==='es'?'Recordatorios':'Reminders'},{id:'reports',icon:<Target size={18}/>,l:t('reports')},...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[]),{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
+  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'reservations',icon:<Calendar size={18}/>,l:lang==='es'?'Reservas':'Reservations'},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'tenants',icon:<UserPlus size={18}/>,l:lang==='es'?'Inquilinos':'Tenants'},{id:'documents',icon:<FileText size={18}/>,l:lang==='es'?'Documentos':'Documents'},{id:'providers',icon:<Building2 size={18}/>,l:lang==='es'?'Proveedores':'Providers'},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:lang==='es'?'Recordatorios':'Reminders'},{id:'reports',icon:<Target size={18}/>,l:t('reports')},...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[]),{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
 
   if(loading)return<div className="min-h-screen bg-slate-50">
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 border-b border-slate-200 z-40 px-3 py-3 flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 rounded-xl animate-pulse"/><div className="flex-1"><div className="h-4 bg-slate-200 rounded-lg w-32 animate-pulse"/><div className="h-2.5 bg-slate-100 rounded w-20 mt-1.5 animate-pulse"/></div></div>
@@ -2124,6 +2125,83 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
     </>})()}
 
+    {/* ═══ RESERVATIONS ═══ */}
+    {view==='reservations'&&(()=>{
+      const today=new Date().toISOString().split('T')[0];
+      const future=reservations.filter(r=>(r.checkout||r.checkin||'')>=today);
+      const past=reservations.filter(r=>(r.checkout||r.checkin||'')<today);
+      const byMonth={};
+      future.forEach(r=>{const d=r.checkin||'';const [y,m]=(d.split('-'));const key=y+'-'+m;if(!byMonth[key])byMonth[key]={label:M[parseInt(m)-1]+' '+y,amount:0,nights:0,count:0};byMonth[key].amount+=(parseFloat(r.amount)||0);byMonth[key].nights+=(parseInt(r.nights)||0);byMonth[key].count++});
+      const projMonths=Object.values(byMonth).sort((a,b)=>a.label.localeCompare(b.label));
+      const totalProj=future.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+      const totalNights=future.reduce((s,r)=>s+(parseInt(r.nights)||0),0);
+      const sources=[{v:'airbnb',l:'Airbnb'},{v:'booking',l:'Booking.com'},{v:'vrbo',l:'VRBO'},{v:'direct',l:lang==='es'?'Directo':'Direct'},{v:'other',l:lang==='es'?'Otro':'Other'}];
+      const statusBadge=(s)=>{
+        if(s==='confirmed')return<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">{lang==='es'?'Confirmada':'Confirmed'}</span>;
+        if(s==='pending')return<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{lang==='es'?'Pendiente':'Pending'}</span>;
+        if(s==='cancelled')return<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">{lang==='es'?'Cancelada':'Cancelled'}</span>;
+        if(s==='completed')return<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">{lang==='es'?'Completada':'Completed'}</span>;
+        return null;
+      };
+      const calcNights=(ci,co)=>{if(!ci||!co)return'';const d=Math.ceil((new Date(co+'T00:00:00')-new Date(ci+'T00:00:00'))/(1000*60*60*24));return d>0?String(d):''};
+
+      return <>
+      <div className="flex justify-between items-center mb-2"><h1 className="text-[22px] font-extrabold text-slate-800">📅 {lang==='es'?'Reservas':'Reservations'}</h1><button onClick={()=>{setResForm({guest:'',checkin:'',checkout:'',nights:'',amount:'',source:'airbnb',status:'confirmed',notes:'',currency:propCurrency||'USD'});setEditId(null);setModal('reservation')}} className="px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {lang==='es'?'Agregar Reserva':'Add Reservation'}</button></div>
+      <p className="text-sm text-slate-400 mb-4">{lang==='es'?'Reservas confirmadas y proyectadas. Las futuras alimentan las proyecciones de ingresos.':'Confirmed and projected bookings. Future ones feed income projections.'}</p>
+
+      {/* Projection KPIs */}
+      {future.length>0&&<div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <KPI label={lang==='es'?'Reservas Futuras':'Future Bookings'} value={future.length} color="blue"/>
+        <KPI label={lang==='es'?'Ingreso Proyectado':'Projected Income'} value={gFm(totalProj)} color="green"/>
+        <KPI label={lang==='es'?'Noches Reservadas':'Nights Booked'} value={totalNights} color="purple"/>
+        <KPI label={lang==='es'?'Ticket Promedio':'Avg Ticket'} value={future.length>0?gFm(totalProj/future.length):'—'} color="cyan"/>
+      </div>}
+
+      {/* Monthly projection */}
+      {projMonths.length>0&&<div className="bg-gradient-to-r from-blue-50 to-emerald-50 rounded-2xl border border-blue-100 p-4 mb-5">
+        <div className="text-xs font-bold text-blue-700 uppercase mb-3">📊 {lang==='es'?'Proyección por Mes':'Monthly Projection'}</div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">{projMonths.map(m=><div key={m.label} className="bg-white rounded-xl p-3 border border-blue-100">
+          <div className="text-xs font-bold text-slate-700">{m.label}</div>
+          <div className="text-lg font-extrabold text-emerald-600 mt-1">{gFm(m.amount)}</div>
+          <div className="text-[10px] text-slate-400">{m.count} {lang==='es'?'reservas':'bookings'} · {m.nights} {lang==='es'?'noches':'nights'}</div>
+        </div>)}</div>
+      </div>}
+
+      {/* Reservations list */}
+      {reservations.length>0?<div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        {future.length>0&&<><div className="px-4 py-2 bg-emerald-50 text-[10px] font-bold text-emerald-700 uppercase">📅 {lang==='es'?'Próximas':'Upcoming'} ({future.length})</div>
+        <div className="overflow-x-auto"><table className="w-full text-sm">
+          <thead><tr className="bg-slate-50"><th className="text-left px-4 py-2 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Huésped':'Guest'}</th><th className="text-left px-3 py-2 text-[10px] font-bold text-slate-500 uppercase">Check-in</th><th className="text-left px-3 py-2 text-[10px] font-bold text-slate-500 uppercase">Check-out</th><th className="text-right px-3 py-2 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Noches':'Nights'}</th><th className="text-right px-3 py-2 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Monto':'Amount'}</th><th className="text-center px-3 py-2 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Fuente':'Source'}</th><th className="text-center px-3 py-2 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Estado':'Status'}</th><th className="px-2 py-2"></th></tr></thead>
+          <tbody>{[...future].sort((a,b)=>(a.checkin||'').localeCompare(b.checkin||'')).map(r=><tr key={r.id} className="border-b border-slate-50 hover:bg-blue-50/30">
+            <td className="px-4 py-2.5 font-bold text-slate-800">{r.guest||'—'}</td>
+            <td className="px-3 py-2.5 text-slate-600">{r.checkin?fmDate(r.checkin):''}</td>
+            <td className="px-3 py-2.5 text-slate-600">{r.checkout?fmDate(r.checkout):''}</td>
+            <td className="px-3 py-2.5 text-right text-slate-600">{r.nights||'—'}</td>
+            <td className="px-3 py-2.5 text-right font-semibold text-emerald-600">{gFm(r.amount||0)}</td>
+            <td className="px-3 py-2.5 text-center"><span className="text-[9px] font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500">{(sources.find(s=>s.v===r.source)||{l:r.source}).l}</span></td>
+            <td className="px-3 py-2.5 text-center">{statusBadge(r.status)}</td>
+            <td className="px-2 py-2.5"><div className="flex gap-0.5"><button onClick={()=>{setResForm({guest:r.guest||'',checkin:r.checkin||'',checkout:r.checkout||'',nights:String(r.nights||''),amount:String(r.amount||''),source:r.source||'airbnb',status:r.status||'confirmed',notes:r.notes||'',currency:r.currency||'USD'});setEditId(r.id);setModal('reservation')}} className="p-1.5 text-slate-300 hover:text-blue-500 rounded-lg hover:bg-blue-50"><Pencil size={13}/></button><button onClick={()=>del('reservations',r.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-lg hover:bg-rose-50"><Trash2 size={13}/></button></div></td>
+          </tr>)}</tbody>
+        </table></div></>}
+
+        {past.length>0&&<><div className="px-4 py-2 bg-slate-50 text-[10px] font-bold text-slate-400 uppercase">✅ {lang==='es'?'Completadas':'Completed'} ({past.length})</div>
+        <div className="overflow-x-auto"><table className="w-full text-sm">
+          <tbody>{[...past].sort((a,b)=>(b.checkin||'').localeCompare(a.checkin||'')).slice(0,10).map(r=><tr key={r.id} className="border-b border-slate-50 opacity-60">
+            <td className="px-4 py-2 text-slate-600">{r.guest||'—'}</td>
+            <td className="px-3 py-2 text-slate-400">{r.checkin?fmDate(r.checkin):''} → {r.checkout?fmDate(r.checkout):''}</td>
+            <td className="px-3 py-2 text-right text-slate-500">{r.nights||'—'}n</td>
+            <td className="px-3 py-2 text-right text-slate-500">{gFm(r.amount||0)}</td>
+            <td className="px-2 py-2"><button onClick={()=>del('reservations',r.id)} className="p-1 text-slate-300 hover:text-rose-500"><Trash2 size={12}/></button></td>
+          </tr>)}</tbody>
+        </table></div></>}
+      </div>
+      :<div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
+        <div className="text-3xl mb-3">📅</div>
+        <div className="text-sm font-bold text-blue-700">{lang==='es'?'No hay reservas registradas':'No reservations registered'}</div>
+        <div className="text-xs text-blue-500 mt-1">{lang==='es'?'Agrega reservas futuras para proyectar ingresos.':'Add future bookings to project income.'}</div>
+      </div>}
+    </>})()}
+
     {/* ═══ PROVIDERS ═══ */}
     {view==='providers'&&(()=>{
       const services=[{v:'plumbing',l:'🔧 Plomería'},{v:'electrical',l:'⚡ Electricidad'},{v:'painting',l:'🎨 Pintura'},{v:'cleaning',l:'🧹 Aseo'},{v:'locksmith',l:'🔑 Cerrajería'},{v:'pest',l:'🐛 Fumigación'},{v:'gas',l:'🔥 Gas'},{v:'ac',l:'❄️ A/C'},{v:'construction',l:'🏗️ Obra'},{v:'legal',l:'⚖️ Legal'},{v:'accounting',l:'📊 Contabilidad'},{v:'other',l:'📦 Otro'}];
@@ -2506,6 +2584,29 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         ].map(([v,icon,l])=><button key={v} type="button" onClick={()=>utn('status',v)} className={`py-2 rounded-xl border-2 text-xs font-medium transition ${tenantForm.status===v?'border-indigo-500 bg-indigo-50 text-indigo-700':'border-slate-200 text-slate-500'}`}>{icon} {l}</button>)}</div>
       </div>
       <Inp label={lang==='es'?'Notas':'Notes'} value={tenantForm.notes} onChange={v=>utn('notes',v)} placeholder={lang==='es'?'Ej: Tiene mascota, estacionamiento incluido':'e.g. Has pet, parking included'}/>
+    </Mdl>}
+
+    {/* ═══ RESERVATION MODAL ═══ */}
+    {modal==='reservation'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Reserva':'✏️ Edit Reservation'):(lang==='es'?'📅 Nueva Reserva':'📅 New Reservation')} grad="from-blue-500 to-cyan-500" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{const data={...resForm,amount:parseFloat(resForm.amount)||0,nights:parseInt(resForm.nights)||0};if(editId){update('reservations',editId,data)}else{save('reservations',data)}}} disabled={!resForm.checkin||!resForm.amount} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
+      <Inp label={lang==='es'?'Huésped':'Guest'} value={resForm.guest} onChange={v=>setResForm(f=>({...f,guest:v}))} placeholder="Ej: John Smith"/>
+      <div className="grid grid-cols-3 gap-3">
+        <Inp label="Check-in" value={resForm.checkin} onChange={v=>{const n=resForm.checkout?Math.ceil((new Date(resForm.checkout+'T00:00:00')-new Date(v+'T00:00:00'))/(1000*60*60*24)):0;setResForm(f=>({...f,checkin:v,nights:n>0?String(n):f.nights}))}} type="date"/>
+        <Inp label="Check-out" value={resForm.checkout} onChange={v=>{const n=resForm.checkin?Math.ceil((new Date(v+'T00:00:00')-new Date(resForm.checkin+'T00:00:00'))/(1000*60*60*24)):0;setResForm(f=>({...f,checkout:v,nights:n>0?String(n):f.nights}))}} type="date"/>
+        <Inp label={lang==='es'?'Noches':'Nights'} value={resForm.nights} onChange={v=>setResForm(f=>({...f,nights:v}))} type="number"/>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Inp label={lang==='es'?'Monto estimado':'Estimated amount'} value={resForm.amount} onChange={v=>setResForm(f=>({...f,amount:v}))} prefix="$" type="number"/>
+        <Sel label={lang==='es'?'Fuente':'Source'} value={resForm.source} onChange={v=>setResForm(f=>({...f,source:v}))} options={[{v:'airbnb',l:'Airbnb'},{v:'booking',l:'Booking.com'},{v:'vrbo',l:'VRBO'},{v:'direct',l:lang==='es'?'Directo':'Direct'},{v:'other',l:lang==='es'?'Otro':'Other'}]}/>
+      </div>
+      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Estado':'Status'}</label>
+        <div className="grid grid-cols-4 gap-2">{[
+          ['confirmed','🟢',lang==='es'?'Confirmada':'Confirmed'],
+          ['pending','🟡',lang==='es'?'Pendiente':'Pending'],
+          ['completed','🔵',lang==='es'?'Completada':'Completed'],
+          ['cancelled','🔴',lang==='es'?'Cancelada':'Cancelled'],
+        ].map(([v,icon,l])=><button key={v} type="button" onClick={()=>setResForm(f=>({...f,status:v}))} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${resForm.status===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{icon} {l}</button>)}</div>
+      </div>
+      <Inp label={lang==='es'?'Notas':'Notes'} value={resForm.notes} onChange={v=>setResForm(f=>({...f,notes:v}))} placeholder={lang==='es'?'Ej: Código confirmación HMXYZ, solicita late checkout':'e.g. Confirmation code, special requests'}/>
     </Mdl>}
 
     {/* ═══ PROVIDER MODAL ═══ */}
