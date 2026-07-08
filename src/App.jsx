@@ -2349,26 +2349,50 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
 
       {/* CASH FLOW REPORT */}
-      {rptTab==='cashflow'&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-        <div className="border-b-2 border-emerald-600 pb-3 mb-5"><h2 className="text-lg font-extrabold text-slate-800">Estado de Cash Flow</h2><p className="text-xs text-slate-400">{prop.name} · Generated: {new Date().toLocaleDateString('es')}</p></div>
+      {rptTab==='cashflow'&&(()=>{
+        const xr=prop.exchangeRate||(liveTRM&&liveTRM.COP?liveTRM.COP:1);
+        const toPC=(v)=>propCurrency!=='USD'&&xr>1?v*xr:v;
+        const curYear=new Date().getFullYear();
+        const yrStmts=stmts.filter(s=>s.year===curYear);
+        const nMo=yrStmts.length||1;
+        const rRev=toPC(yrStmts.reduce((s,x)=>s+(x.revenue||0),0));
+        const rComm=toPC(yrStmts.reduce((s,x)=>s+(x.commission||0),0));
+        const rDuke=toPC(yrStmts.reduce((s,x)=>s+(x.duke||0),0));
+        const rHoa=toPC(yrStmts.reduce((s,x)=>s+(x.hoa||0),0));
+        const rMaint=toPC(yrStmts.reduce((s,x)=>s+(x.maintenance||0),0));
+        const rWater=toPC(yrStmts.reduce((s,x)=>s+(x.water||0),0));
+        const rVendor=toPC(yrStmts.reduce((s,x)=>s+(x.vendor||0),0));
+        const rPmExp=rComm+rDuke+rHoa+rMaint+rWater+rVendor;
+        const yrExp=expenses.filter(e=>(e.date||'').startsWith(String(curYear)));
+        const rOwnExp=yrExp.reduce((s,e)=>{const amt=e.amount||0;const cur=e.expCurrency||propCurrency;if(cur===propCurrency)return s+amt;if(cur==='USD'&&propCurrency!=='USD')return s+amt*xr;return s+amt},0);
+        const fixedMonthly=expenses.filter(e=>e.frequency==='monthly'&&!['mortgage_pay'].includes(e.category)).reduce((s,e)=>{const amt=e.amount||0;const cur=e.expCurrency||propCurrency;if(cur===propCurrency)return s+amt;if(cur==='USD'&&propCurrency!=='USD')return s+amt*xr;return s+amt},0);
+        const annualFixed=expenses.filter(e=>e.frequency==='annual').reduce((s,e)=>{const amt=e.amount||0;const cur=e.expCurrency||propCurrency;if(cur===propCurrency)return s+amt;if(cur==='USD'&&propCurrency!=='USD')return s+amt*xr;return s+amt},0);
+        const rFixedTotal=fixedMonthly*nMo+annualFixed*(nMo/12);
+        const rTotalExp=rPmExp+rOwnExp;
+        const rNoi=rRev-rTotalExp;
+        const rMort=(mort.monthlyPayment||0)*nMo;
+        const rCf=rNoi-rMort;
+        const rCoc=totCont>0?((rNoi-rMort)/(nMo/12)/totCont*100):0;
+        return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+        <div className="border-b-2 border-emerald-600 pb-3 mb-5"><h2 className="text-lg font-extrabold text-slate-800">Estado de Cash Flow</h2><p className="text-xs text-slate-400">{prop.name} · {curYear} ({nMo} {lang==='es'?'meses':'months'}) · {propCurrency}</p></div>
         <div className="space-y-3">
-          <div className="flex justify-between py-3 px-4 bg-blue-50 rounded-xl border border-blue-100"><span className="font-bold text-blue-700">Revenue Total</span><span className="font-extrabold text-blue-700 text-lg">{gFm(revenue)}</span></div>
+          <div className="flex justify-between py-3 px-4 bg-blue-50 rounded-xl border border-blue-100"><span className="font-bold text-blue-700">Revenue Total</span><span className="font-extrabold text-blue-700 text-lg">{gFm(rRev)}</span></div>
           <div className="pl-6 space-y-1">
-            <div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) PM Commission</span><span className="font-semibold text-rose-500">{sFm(stmtComm)}</span></div>
-            <div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Electricity</span><span className="font-semibold text-rose-500">{sFm(stmtDuke)}</span></div>
-            <div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) HOA</span><span className="font-semibold text-rose-500">{sFm(stmtHoa)}</span></div>
-            <div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Maintenance</span><span className="font-semibold text-rose-500">{sFm(stmtMaint)}</span></div>
-            <div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Water</span><span className="font-semibold text-rose-500">{sFm(stmtWater)}</span></div>
-            <div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Vendor/Other</span><span className="font-semibold text-rose-500">{sFm(stmtVendor)}</span></div>
-            {totExp>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Additional Expenses</span><span className="font-semibold text-rose-500">{gFm(totExp)}</span></div>}
+            {rComm>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) PM Commission</span><span className="font-semibold text-rose-500">{gFm(rComm)}</span></div>}
+            {rDuke>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Electricity</span><span className="font-semibold text-rose-500">{gFm(rDuke)}</span></div>}
+            {rHoa>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) HOA</span><span className="font-semibold text-rose-500">{gFm(rHoa)}</span></div>}
+            {rMaint>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Maintenance</span><span className="font-semibold text-rose-500">{gFm(rMaint)}</span></div>}
+            {rWater>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Water</span><span className="font-semibold text-rose-500">{gFm(rWater)}</span></div>}
+            {rVendor>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Vendor/Other</span><span className="font-semibold text-rose-500">{gFm(rVendor)}</span></div>}
+            {rOwnExp>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) {lang==='es'?'Gastos del Owner':'Owner Expenses'} ({curYear})</span><span className="font-semibold text-rose-500">{gFm(rOwnExp)}</span></div>}
           </div>
-          <div className="flex justify-between py-3 px-4 bg-emerald-50 rounded-xl border border-emerald-100"><span className="font-bold text-emerald-700">= NOI (Net Operating Income)</span><span className="font-extrabold text-emerald-700 text-lg">{gFm(noi)}</span></div>
-          {mort.balance>0&&<><div className="pl-6"><div className="flex justify-between py-2 text-sm"><span className="text-amber-600">(-) Debt Service (annual)</span><span className="font-semibold text-amber-600">{gFm(annualMortgage)}</span></div></div>
-          <div className={`flex justify-between py-3 px-4 rounded-xl border ${cashFlow>=0?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}><span className={`font-bold ${cashFlow>=0?'text-emerald-700':'text-rose-700'}`}>{`= ${t('cashFlow')}`}</span><span className={`font-extrabold text-lg ${cashFlow>=0?'text-emerald-700':'text-rose-700'}`}>{gFm(cashFlow)}</span></div></>}
-          <div className="flex justify-between py-3 px-4 bg-purple-50 rounded-xl border border-purple-100 mt-2"><span className="font-bold text-purple-700">Retorno Cash-on-Cash</span><span className="font-extrabold text-purple-700 text-lg">{coc.toFixed(1)}%</span></div>
-          <p className="text-[10px] text-slate-400 mt-2 text-center">Cash-on-Cash = Cash Flow Anual / Capital Total Invertido ({gFm(totCont)})</p>
+          <div className={`flex justify-between py-3 px-4 rounded-xl border ${rNoi>=0?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}><span className={`font-bold ${rNoi>=0?'text-emerald-700':'text-rose-700'}`}>= NOI (Net Operating Income)</span><span className={`font-extrabold text-lg ${rNoi>=0?'text-emerald-700':'text-rose-700'}`}>{gFm(rNoi)}</span></div>
+          {rMort>0&&<><div className="pl-6"><div className="flex justify-between py-2 text-sm"><span className="text-amber-600">(-) Hipoteca ({nMo} {lang==='es'?'meses':'months'})</span><span className="font-semibold text-amber-600">{gFm(rMort)}</span></div></div>
+          <div className={`flex justify-between py-3 px-4 rounded-xl border ${rCf>=0?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}><span className={`font-bold ${rCf>=0?'text-emerald-700':'text-rose-700'}`}>= Cash Flow</span><span className={`font-extrabold text-lg ${rCf>=0?'text-emerald-700':'text-rose-700'}`}>{gFm(rCf)}</span></div></>}
+          <div className="flex justify-between py-3 px-4 bg-purple-50 rounded-xl border border-purple-100 mt-2"><span className="font-bold text-purple-700">Retorno Cash-on-Cash</span><span className="font-extrabold text-purple-700 text-lg">{rCoc.toFixed(1)}%</span></div>
+          <p className="text-[10px] text-slate-400 mt-2 text-center">Cash-on-Cash = Cash Flow Anualizado / Capital Total Invertido ({gFm(totCont)})</p>
         </div>
-      </div>}
+      </div>})()}
 
       {/* MORTGAGE REPORT */}
       {rptTab==='mortgage_rpt'&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
