@@ -200,17 +200,17 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     for(const r of toSave){
       const {_file,_format,_dup,_include,...stmtData}=r;
       try{
-        // If replacing a duplicate, delete the old one first
-        if(_dup){
-          const q=query(collection(db,'properties',propertyId,'statements'),where('year','==',r.year),where('month','==',r.month));
-          const snap=await getDocs(q);
+        // ALWAYS check and delete existing docs for this year+month — prevents ALL duplication
+        const q=query(collection(db,'properties',propertyId,'statements'),where('year','==',r.year),where('month','==',r.month));
+        const snap=await getDocs(q);
+        if(snap.docs.length>0){
           for(const d of snap.docs){await deleteDoc(doc(db,'properties',propertyId,'statements',d.id));}
-          replaced++;
+          replaced+=snap.docs.length;
         }
         await addDoc(collection(db,'properties',propertyId,'statements'),{...stmtData,createdAt:serverTimestamp()});saved++;
       }catch(e){/* skip */}
     }
-    const msg=replaced>0?(lang==='es'?`${saved} guardados (${replaced} reemplazados)`:`${saved} saved (${replaced} replaced)`):(lang==='es'?`${saved} statements guardados`:`${saved} statements saved`);
+    const msg=replaced>0?(lang==='es'?`${saved} guardados (${replaced} anteriores reemplazados)`:`${saved} saved (${replaced} previous replaced)`):(lang==='es'?`${saved} statements guardados`:`${saved} statements saved`);
     notify(msg,'success');
     setParsedPreview(null);setModal(null);
   };
