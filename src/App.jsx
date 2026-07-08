@@ -55,7 +55,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   useEffect(()=>{if(isAdmin||isVIP){if(isVIP)setUserPlan('pro');return;}const ref=doc(db,'users',userEmail.toLowerCase());const unsub=onSnapshot(ref,async(snap)=>{if(snap.exists()){const d=snap.data();if((d.status==='active'||d.status==='past_due')&&d.plan&&d.plan!=='free'){setUserPlan(d.plan);setIsTrial(false);setTrialDays(0);return;}if(d.trialStartDate){const start=d.trialStartDate.toDate?d.trialStartDate.toDate():new Date(d.trialStartDate);const elapsed=Math.floor((Date.now()-start.getTime())/(1000*60*60*24));const remaining=14-elapsed;if(remaining>0){setUserPlan('pro');setIsTrial(true);setTrialDays(remaining)}else{setUserPlan('free');setIsTrial(false);setTrialDays(0)}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}}else{try{await setDoc(ref,{trialStartDate:serverTimestamp(),email:userEmail},{merge:true});setUserPlan('pro');setIsTrial(true);setTrialDays(14)}catch(e){setUserPlan('free')}}},()=>{});return()=>unsub()},[userEmail,isAdmin,isVIP]);
   const plan=isAdmin?'pro':userPlan;
   const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes','tenants','documents','providers','reservations']};return(access[plan]||access.free).includes(feature);};
-  const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');const [viewCur,setViewCur]=useState(null);
+  const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');const [viewCur,setViewCur]=useState(null);const [dashMode,setDashMode]=useState('real');
   const [portData,setPortData]=useState(null);const [portLoading,setPortLoading]=useState(false);
   const [taxYear,setTaxYear]=useState(new Date().getFullYear()-1);const [landRatio,setLandRatio]=useState(20);const [taxRate,setTaxRate]=useState(24);
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
@@ -388,7 +388,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const directIncomePC=fIncomeEntries.reduce((s,i)=>{const amt=i.amount||0;const cur=i.currency||'USD';if(cur===propCurrency)return s+amt;if(cur==='USD'&&propCurrency!=='USD')return s+amt*xRate;if(cur!=='USD'&&propCurrency==='USD')return s+amt/xRate;return s+amt},0);
 
       // Everything in PROPERTY CURRENCY for calculations
-      const fRev=stmtToPC(rawRev)+directIncomePC;
+      const futureRes=dashMode==='projected'?reservations.filter(r=>r.status!=='cancelled'&&(r.checkout||r.checkin||'')>=new Date().toISOString().split('T')[0]):[];
+      const projectedRevPC=futureRes.reduce((s,r)=>{const amt=parseFloat(r.amount)||0;const cur=r.currency||'USD';if(cur===propCurrency)return s+amt;if(cur==='USD'&&propCurrency!=='USD')return s+amt*xRate;return s+amt},0);
+      const projectedNights=futureRes.reduce((s,r)=>s+(parseInt(r.nights)||0),0);
+      const fRev=stmtToPC(rawRev)+directIncomePC+projectedRevPC;
       const fNet=stmtToPC(rawNet);
       const fComm=stmtToPC(rawComm);
       const fDuke=stmtToPC(rawDuke);
@@ -470,7 +473,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const fCoc=totCont>0?(proyAnual/totCont*100):0;
       const fDscr=mMort>0?(noiAnual/(mMort*12)):0;
       const directNights=fIncomeEntries.reduce((s,i)=>s+(i.nights||0),0);
-      const fNights=(fy?(fy.nights||0):fStmts.reduce((s,x)=>s+(x.nights||0),0))+directNights;
+      const fNights=(fy?(fy.nights||0):fStmts.reduce((s,x)=>s+(x.nights||0),0))+directNights+projectedNights;
       const fRes=(fy?(fy.reservations||0):fStmts.reduce((s,x)=>s+(x.reservations||0),0))+fIncomeEntries.length;
       const availNights=dashYear==='all'?(stmts.length>0?Math.round((stmts.length/12)*365):0):Math.round(n>=12?365:n*30.44);
       const occupancy=availNights>0&&fNights>0?Math.min(100,fNights/availNights*100):0;
@@ -483,7 +486,17 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         (()=>{const cp={};yearExpenses.filter(e=>!isExcludedFromOpEx(e)).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const ck=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[ck].value+=amt/12*(n||1);else if(ef==='monthly')cp[ck].value+=amt*(n||1);else cp[ck].value+=amt});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
         [['Commission',fComm,'#E11D48'],[t('electricity'),fDuke,'#F59E0B'],[t('water'),fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],[t('maintenance'),fMaint,'#10B981'],['Other',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
       const ownerMonthly=n>0?ownerExpTotal/n:0;
-      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const directForMonth=income.filter(i=>{const d=i.date||'';const [iy,im]=d.split('-').map(Number);return iy===s.year&&im===s.month}).reduce((sum,i)=>{const amt=i.amount||0;const cur=i.currency||'USD';if(cur===propCurrency)return sum+amt;if(cur==='USD'&&propCurrency!=='USD')return sum+amt*xRate;return sum+amt},0);const totalRev=rev+directForMonth;const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const exp=pmExp+ownerMonthly;const cf=totalRev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:totalRev,exp,cf}});
+      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const directForMonth=income.filter(i=>{const d=i.date||'';const [iy,im]=d.split('-').map(Number);return iy===s.year&&im===s.month}).reduce((sum,i)=>{const amt=i.amount||0;const cur=i.currency||'USD';if(cur===propCurrency)return sum+amt;if(cur==='USD'&&propCurrency!=='USD')return sum+amt*xRate;return sum+amt},0);const totalRev=rev+directForMonth;const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const exp=pmExp+ownerMonthly;const cf=totalRev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:totalRev,exp,cf,projected:false}});
+      // Add future reservation months to chart
+      if(dashMode==='projected'&&futureRes.length>0){
+        const projByMonth={};
+        futureRes.forEach(r=>{const d=r.checkin||'';const [y,m]=(d.split('-'));const key=y+'-'+m;if(!projByMonth[key])projByMonth[key]={year:parseInt(y),month:parseInt(m),rev:0};const amt=parseFloat(r.amount)||0;const cur=r.currency||'USD';projByMonth[key].rev+=cur===propCurrency?amt:cur==='USD'&&propCurrency!=='USD'?amt*xRate:amt});
+        Object.values(projByMonth).sort((a,b)=>a.year*100+a.month-b.year*100-b.month).forEach(p=>{
+          const exists=mChart.find(c=>c.m===(M[p.month-1]+(dashYear==='all'?'\''+String(p.year).slice(2):'')));
+          if(exists){exists.rev+=p.rev;exists.projected=true}
+          else mChart.push({m:M[p.month-1]+(dashYear==='all'?'\''+String(p.year).slice(2):''),rev:p.rev,exp:0,cf:p.rev,projected:true});
+        });
+      }
 
       return <>
       <div className="hidden print-header"><div style={{display:'flex',justifyContent:'space-between'}}><div><h1 style={{fontSize:'18px',fontWeight:800,margin:0}}>{prop.name}</h1><p style={{fontSize:'9px',color:'#64748B',margin:'3px 0'}}>{prop.address}, {prop.city} {prop.state} · {new Date().toLocaleDateString('es',{day:'2-digit',month:'long',year:'numeric'})}</p></div><div style={{fontSize:'18px',fontWeight:900,color:'#1E3A5F'}}>OD</div></div></div>
@@ -502,9 +515,14 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         {annual.map(y=><button key={y.year} onClick={()=>setDashYear(y.year)} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${dashYear===y.year?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{y.year}{y.n<12?` (${y.n}m)`:''}</button>)}
         {(xRate>1||liveTRM)&&<div className="ml-auto flex gap-1 shrink-0">{[propCurrency,...(propCurrency==='USD'?['COP']:['USD'])].map(c=><button key={c} onClick={()=>setViewCur(c===propCurrency?null:c)} className={`px-3 py-2 rounded-xl text-[10px] font-bold transition ${(viewCur||propCurrency)===c?'bg-blue-600 text-white':'bg-white border border-blue-200 text-blue-500 hover:bg-blue-50'}`}>{c}</button>)}</div>}
         <button onClick={toggleLang} className="px-3 py-2 rounded-xl text-[10px] font-bold bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 transition shrink-0" title={t('language')}>{lang==='en'?'🇺🇸 EN':'🇪🇸 ES'}</button>
+        {reservations.filter(r=>(r.checkout||r.checkin||'')>=new Date().toISOString().split('T')[0]).length>0&&<>
+          <button onClick={()=>setDashMode('real')} className={`px-3 py-2 rounded-xl text-[10px] font-bold transition shrink-0 ${dashMode==='real'?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500'}`}>📊 Real</button>
+          <button onClick={()=>setDashMode('projected')} className={`px-3 py-2 rounded-xl text-[10px] font-bold transition shrink-0 ${dashMode==='projected'?'bg-emerald-600 text-white':'bg-white border border-emerald-200 text-emerald-600'}`}>📅 {lang==='es'?'+ Reservas':'+ Bookings'}</button>
+        </>}
       </div>}
 
       {fRev>0?<>
+      {dashMode==='projected'&&futureRes.length>0&&<div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 mb-4 flex items-center gap-2 text-[11px] text-emerald-700 no-print"><span className="text-lg">📅</span><span><b>{futureRes.length} {lang==='es'?'reservas futuras':'future bookings'}</b> {lang==='es'?`incluidas (+${dFm(projectedRevPC)} proyectado, +${projectedNights} noches)`:`included (+${dFm(projectedRevPC)} projected, +${projectedNights} nights)`}</span><button onClick={()=>setDashMode('real')} className="ml-auto text-[10px] font-bold text-emerald-600 bg-emerald-100 px-2 py-1 rounded-lg hover:bg-emerald-200">{lang==='es'?'Ver solo real':'Show real only'}</button></div>}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-3 mb-5">
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-blue-500 border border-slate-200 shadow-sm">
           <div className="text-[10px] font-bold text-blue-500 uppercase tracking-widest">{t('grossRevenue')}</div>
@@ -828,7 +846,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <XAxis dataKey="m" tick={{fontSize:9,fill:'#94a3b8'}} interval={mChart.length>18?2:0}/>
               <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>dFm(v)}/>
               <Tooltip content={<Tip fmt={dFm}/>}/><Legend wrapperStyle={{fontSize:10}}/>
-              <Bar dataKey="rev" name={t("grossRevenue")} fill="#93C5FD" radius={[3,3,0,0]}/>
+              <Bar dataKey="rev" name={t("grossRevenue")} radius={[3,3,0,0]}>{mChart.map((entry,idx)=><Cell key={idx} fill={entry.projected?'#86EFAC':'#93C5FD'}/>)}</Bar>
               <Bar dataKey="exp" name={t("expenses")} fill="#FCA5A5" radius={[3,3,0,0]}/>
               <Bar dataKey="cf" name={t("cashFlow")} fill="#6EE7B7" radius={[3,3,0,0]}/>
             </BarChart>
