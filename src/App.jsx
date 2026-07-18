@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef, lazy, Suspense } from 'react';
-import { db, auth } from './firebase';
+import { db, auth, functions as fbFunctions, storage } from './firebase';
+import { httpsCallable } from 'firebase/functions';
+import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where, updateDoc, getDocs, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart, Line, LineChart } from 'recharts';
-import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer, MessageSquare, Send, Moon, Sun, Calculator, FileText } from 'lucide-react';
+import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer, MessageSquare, Send, Moon, Sun, Calculator, FileText, Download } from 'lucide-react';
 
 import { ADMIN_EMAILS, VIP_EMAILS, C, M, fm, fmCurrency, fmDate, pct, CATS, getCats, getTerms, COUNTRIES, CURRENCY_LIST, US_STATES as US, PROPERTY_TYPES as PT } from './lib/constants';
 import { createT } from './lib/i18n';
@@ -63,7 +65,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [parsedPreview,setParsedPreview]=useState(null);
   const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);const [tenants,setTenants]=useState([]);const [documents,setDocuments]=useState([]);const [providers,setProviders]=useState([]);const [reservations,setReservations]=useState([]);
   const [tenantForm,setTenantForm]=useState({name:'',idNumber:'',phone:'',email:'',unit:'',monthlyRent:'',deposit:'',startDate:'',endDate:'',incrementPct:'3',status:'active',notes:''});const utn=useCallback((k,v)=>setTenantForm(x=>({...x,[k]:v})),[]);
-  const [uploadingDoc,setUploadingDoc]=useState(false);const [docForm,setDocForm]=useState({type:'escritura',name:'',notes:'',fields:{}});const [showDocForm,setShowDocForm]=useState(false);const [extractedText,setExtractedText]=useState('');
+  const [uploadingDoc,setUploadingDoc]=useState(false);const [docForm,setDocForm]=useState({type:'escritura',name:'',notes:'',fields:{}});const [showDocForm,setShowDocForm]=useState(false);const [extractedText,setExtractedText]=useState('');const [ocrProgress,setOcrProgress]=useState('');const [aiExtracting,setAiExtracting]=useState(false);const [docFile,setDocFile]=useState(null);
   const [provForm,setProvForm]=useState({name:'',service:'plumbing',phone:'',email:'',rating:'5',notes:''});
   const [resForm,setResForm]=useState({guest:'',checkin:'',checkout:'',nights:'',amount:'',source:'airbnb',status:'confirmed',notes:'',currency:'USD'});
   const [dark,setDark]=useState(()=>{try{return localStorage.getItem('od-dark')==='1'}catch{return false}});
@@ -89,6 +91,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const umc=useCallback((k,v)=>setMortConfig(x=>({...x,[k]:v})),[]);
   const partners=prop.partners||[];const mort=prop.mortgage||{};
   const [expenseForm,setExpenseForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});const [editId,setEditId]=useState(null);
+  const [fcForm,setFcForm]=useState({concept:'',category:'',mode:'fijo',amount:'',currency:'',frequency:'monthly',active:true});const [fcEditingId,setFcEditingId]=useState(null);const [fcShowForm,setFcShowForm]=useState(false);
   const [nf,setNf]=useState({date:'',month:'',grossAmount:''});
   const [contribForm,setContribForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',purpose:'operations',payType:'capital',expCategory:'otros'});
   const [stmtForm,setStmtForm]=useState({year:new Date().getFullYear(),month:1,revenue:'',net:'',commission:'',duke:'',water:'',hoa:'',maintenance:'',vendor:'',nights:'',reservations:''});
@@ -146,6 +149,45 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const update=async(sub,id,data)=>{await updateDoc(doc(db,'properties',propertyId,sub,id),data);setModal(null);setEditId(null)};
   const del=async(sub,id)=>{if(!confirm('¿Eliminar?'))return;await deleteDoc(doc(db,'properties',propertyId,sub,id))};
   const saveMortgage=async()=>{setSavingMort(true);try{const data={balance:parseFloat(mortConfig.bal)||0,rate:parseFloat(mortConfig.rate)||0,termYears:parseInt(mortConfig.term)||30,monthlyPayment:parseFloat(mortConfig.pay)||0,startDate:mortConfig.start||'',includesTaxes:!!mortConfig.includesTaxes,includesInsurance:!!mortConfig.includesInsurance};const p=window.__mortParsed;if(p?.parsed){data.principalAndInterest=p.principalAndInterest||0;data.principal=p.principal||0;data.interest=p.interest||0;data.taxEscrow=p.taxEscrow||0;data.insuranceEscrow=p.insuranceEscrow||0;data.taxAndInsuranceCombined=p.taxAndInsuranceCombined||0;data.otherEscrow=p.otherEscrow||0;data.servicer=p.servicer||'';window.__mortParsed=null;}await updateDoc(doc(db,'properties',propertyId),{mortgage:data})}catch(e){notify('Error: '+e.message,'error')}setSavingMort(false)};
+
+  // ═══ Fixed Costs Template (self-managed properties) ═══
+  // Se guardan en prop.fixedCosts y se proyectan automáticamente cada mes — no crean docs.
+  const saveFixedCost=async()=>{
+    const concept=(fcForm.concept||'').trim();
+    if(!concept)return notify('Escribe un concepto','error');
+    const items=[...(prop.fixedCosts||[])];
+    const item={
+      id:fcEditingId||(Date.now().toString(36)+Math.random().toString(36).slice(2,7)),
+      concept,
+      category:fcForm.category||'otros',
+      mode:fcForm.mode||'fijo',
+      frequency:fcForm.frequency||'monthly',
+      amount:fcForm.mode==='variable'?0:(parseFloat(fcForm.amount)||0),
+      currency:fcForm.currency||propCurrency||'USD',
+      active:fcForm.active!==false,
+    };
+    if(fcEditingId){const idx=items.findIndex(x=>x.id===fcEditingId);if(idx>=0)items[idx]=item;else items.push(item);}
+    else items.push(item);
+    try{
+      await updateDoc(doc(db,'properties',propertyId),{fixedCosts:items});
+      setFcForm({concept:'',category:'',mode:'fijo',amount:'',currency:'',frequency:'monthly',active:true});setFcEditingId(null);setFcShowForm(false);
+      notify(fcEditingId?'Costo fijo actualizado':'Costo fijo agregado','success');
+    }catch(e){notify('Error: '+e.message,'error')}
+  };
+  const editFixedCost=(it)=>{setFcEditingId(it.id);setFcForm({concept:it.concept||'',category:it.category||'',mode:it.mode||'fijo',amount:String(it.amount||''),currency:it.currency||'',frequency:it.frequency||'monthly',active:it.active!==false});setFcShowForm(true)};
+  // Monthly-equivalent amount in property currency (anual/12, mensual as-is)
+  const fcMonthlyPC=(it)=>{const a=parseFloat(it.amount)||0;const mo=it.frequency==='annual'?a/12:a;return toPropCur(mo,it.currency||propCurrency)};
+  const deleteFixedCost=async(id)=>{
+    if(!confirm('¿Eliminar este costo fijo del template?'))return;
+    const items=(prop.fixedCosts||[]).filter(x=>x.id!==id);
+    try{await updateDoc(doc(db,'properties',propertyId),{fixedCosts:items});notify('Eliminado','success')}
+    catch(e){notify('Error: '+e.message,'error')}
+  };
+  const toggleFixedCostActive=async(id)=>{
+    const items=(prop.fixedCosts||[]).map(x=>x.id===id?{...x,active:x.active===false}:x);
+    try{await updateDoc(doc(db,'properties',propertyId),{fixedCosts:items})}
+    catch(e){notify('Error: '+e.message,'error')}
+  };
 
   // PDF Upload handler — with robust duplicate detection
   const handlePDFs=async(files)=>{
@@ -222,6 +264,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const pt=useMemo(()=>{const r={};partners.forEach(p=>{r[p.id]={name:p.name,color:p.color,own:p.ownership,cont:0,exp:0,inc:0}});contribs.forEach(c=>{if(r[c.paidBy])r[c.paidBy].cont+=c.amount||0});expenses.forEach(e=>{if(r[e.paidBy])r[e.paidBy].exp+=e.amount||0});const tn=income.reduce((s,i)=>s+(i.netAmount||0),0);partners.forEach(p=>{r[p.id].inc=tn*(p.ownership/100)});return r},[partners,contribs,expenses,income]);
 
   const propCountry=prop.country||'US';
+  const rentalType=prop.rentalType||(prop.type==='longterm'?'traditional':'short');
   const propCurrency=prop.currency||'USD';
   const fmP=v=>fmCurrency(v,propCurrency);
   const propCats=getCats(propCountry,lang);
@@ -256,7 +299,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const stmtMaint=stmts.reduce((s,x)=>s+(x.maintenance||0),0);
   const stmtWater=stmts.reduce((s,x)=>s+(x.water||0),0);
   const stmtVendor=stmts.reduce((s,x)=>s+(x.vendor||0),0);
-  const totalOpEx=stmtComm+stmtDuke+stmtHoa+stmtMaint+stmtWater+stmtVendor+totExp;
+  // Fixed cost template proyectado sobre el mismo horizonte que los statements
+  const fixedTplMoAllTime=(prop.fixedCosts||[]).filter(x=>x.active!==false).reduce((s,x)=>{const amt=parseFloat(x.amount)||0;const mo=x.frequency==='annual'?amt/12:amt;return s+toPropCur(mo,x.currency||propCurrency)},0);
+  const fixedTplHorizonTotal=fixedTplMoAllTime*(stmts.length||12);
+  const totalOpEx=stmtComm+stmtDuke+stmtHoa+stmtMaint+stmtWater+stmtVendor+totExp+fixedTplHorizonTotal;
 
   // NOI = Revenue - Operating Expenses (without mortgage)
   const revenue = stmtRev || totGross;
@@ -279,7 +325,20 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   const fixedExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return c?.fixed||e.type==='fixed'}),[expenses,propCats,lang]);
   const additionalExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return !c?.fixed&&e.type!=='fixed'}),[expenses,propCats,lang]);
-  const expByCat=useMemo(()=>{const r={};const escrowCats=[];if(mort.includesTaxes){escrowCats.push('taxes','predial')};if(mort.includesInsurance){escrowCats.push('insurance')};expenses.filter(e=>e.category!=='mortgage_pay'&&!escrowCats.includes(e.category)&&!/hipoteca|mortgage|debt.service/i.test(e.concept||'')).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const k=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!r[k])r[k]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0,monthly:0};const amt=toPropCur(e.amount||0,e.expCurrency);const f=eFreq(e);const mo=f==='annual'?amt/12:f==='monthly'?amt:amt;r[k].value+=amt;r[k].monthly+=(f==='annual'?amt/12:f==='monthly'?amt:0)});return Object.values(r).sort((a,b)=>b.monthly-a.monthly||b.value-a.value)},[expenses,propCats,lang,mort]);
+  const expByCat=useMemo(()=>{const r={};const escrowCats=[];if(mort.includesTaxes){escrowCats.push('taxes','predial')};if(mort.includesInsurance){escrowCats.push('insurance')};expenses.filter(e=>e.category!=='mortgage_pay'&&!escrowCats.includes(e.category)&&!/hipoteca|mortgage|debt.service/i.test(e.concept||'')).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const k=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!r[k])r[k]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0,monthly:0};const amt=toPropCur(e.amount||0,e.expCurrency);const f=eFreq(e);const mo=f==='annual'?amt/12:f==='monthly'?amt:amt;r[k].value+=amt;r[k].monthly+=(f==='annual'?amt/12:f==='monthly'?amt:0)});
+    // Incluir Costos Fijos template proyectados como aporte mensual
+    (prop.fixedCosts||[]).filter(x=>x.active!==false).forEach(it=>{
+      if(escrowCats.includes(it.category))return;
+      const c=propCats.find(x=>x.v===it.category);
+      const k=(!c||it.category==='otros'||!it.category)?'_other':it.category;
+      if(!r[k])r[k]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0,monthly:0};
+      const amt=parseFloat(it.amount)||0;
+      const mo=it.frequency==='annual'?amt/12:amt;
+      const moPC=toPropCur(mo,it.currency||propCurrency);
+      r[k].monthly+=moPC;
+      r[k].value+=moPC;
+    });
+    return Object.values(r).sort((a,b)=>b.monthly-a.monthly||b.value-a.value)},[expenses,propCats,lang,mort,prop.fixedCosts]);
 
   const annual=useMemo(()=>{const y={};stmts.forEach(s=>{if(!y[s.year])y[s.year]={year:s.year,revenue:0,net:0,commission:0,duke:0,water:0,hoa:0,maintenance:0,vendor:0,nights:0,reservations:0,n:0};const a=y[s.year];a.revenue+=s.revenue||0;a.net+=s.net||0;a.commission+=s.commission||0;a.duke+=s.duke||0;a.water+=s.water||0;a.hoa+=s.hoa||0;a.maintenance+=s.maintenance||0;a.vendor+=s.vendor||0;a.nights+=s.nights||0;a.reservations+=s.reservations||0;a.n++});return Object.values(y).sort((a,b)=>a.year-b.year)},[stmts]);
 
@@ -312,7 +371,56 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const sE=useMemo(()=>mortCalc(parseFloat(extraP)||0,parseFloat(extraPA)||0),[mortCalc,extraP,extraPA]);
 
   const pN=id=>id==='property'?'🏠 La Propiedad':partners.find(p=>p.id===id)?.name||id;const pCl=id=>id==='property'?'#6B7280':partners.find(p=>p.id===id)?.color||'#94a3b8';
-  const nav=[{id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[]),{id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},{id:'income',icon:<DollarSign size={18}/>,l:t('income')},{id:'reservations',icon:<Calendar size={18}/>,l:lang==='es'?'Reservas':'Reservations'},{id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},{id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},{id:'tenants',icon:<UserPlus size={18}/>,l:lang==='es'?'Inquilinos':'Tenants'},{id:'documents',icon:<FileText size={18}/>,l:lang==='es'?'Documentos':'Documents'},{id:'providers',icon:<Building2 size={18}/>,l:lang==='es'?'Proveedores':'Providers'},{id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},{id:'pipeline',icon:<Clock size={18}/>,l:lang==='es'?'Recordatorios':'Reminders'},{id:'reports',icon:<Target size={18}/>,l:t('reports')},...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[]),{id:'support',icon:<MessageSquare size={18}/>,l:t('support')},{id:'settings',icon:<Settings size={18}/>,l:t('settings')}];
+  const navGroups=[
+    {
+      title:lang==='es'?'Vista General':'Overview',
+      items:[
+        {id:'dashboard',icon:<Home size={18}/>,l:t('dashboard')},
+        ...(allProperties.length>1?[{id:'portfolio',icon:<Layers size={18}/>,l:lang==='es'?'Portafolio':'Portfolio'}]:[])
+      ]
+    },
+    {
+      title:lang==='es'?'Finanzas':'Finance',
+      items:[
+        {id:'income',icon:<DollarSign size={18}/>,l:t('income')},
+        {id:'fixedCosts',icon:<Calendar size={18}/>,l:lang==='es'?'Costos Fijos':'Fixed Costs'},
+        {id:'expenses',icon:<Receipt size={18}/>,l:t('expenses')},
+        ...(rentalType==='short'?[{id:'statements',icon:<ClipboardList size={18}/>,l:t('statements')},{id:'reservations',icon:<Calendar size={18}/>,l:lang==='es'?'Reservas':'Reservations'}]:[]),
+        {id:'mortgage',icon:<Landmark size={18}/>,l:t('mortgageNav')},
+        {id:'reports',icon:<Target size={18}/>,l:t('reports')},
+        ...(propCountry==='US'?[{id:'taxes',icon:<Calculator size={18}/>,l:'Tax Center'}]:[])
+      ]
+    },
+    {
+      title:lang==='es'?'Personas':'People',
+      items:[
+        {id:'partners',icon:<Users size={18}/>,l:t('partnersCapital')},
+        ...(rentalType==='traditional'?[{id:'tenants',icon:<UserPlus size={18}/>,l:lang==='es'?'Inquilinos':'Tenants'}]:[]),
+        {id:'providers',icon:<Building2 size={18}/>,l:lang==='es'?'Proveedores':'Providers'}
+      ]
+    },
+    {
+      title:lang==='es'?'Propiedad':'Property',
+      items:[
+        {id:'documents',icon:<FileText size={18}/>,l:lang==='es'?'Títulos y Documentos':'Title & Documents'},
+        {id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},
+        {id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')}
+      ]
+    },
+    {
+      title:lang==='es'?'Acciones':'Actions',
+      items:[
+        {id:'pipeline',icon:<Clock size={18}/>,l:lang==='es'?'Recordatorios':'Reminders'},
+        {id:'support',icon:<MessageSquare size={18}/>,l:t('support')}
+      ]
+    },
+    {
+      title:lang==='es'?'Sistema':'System',
+      items:[
+        {id:'settings',icon:<Settings size={18}/>,l:t('settings')}
+      ]
+    }
+  ];
 
   if(loading)return<div className="min-h-screen bg-slate-50">
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 border-b border-slate-200 z-40 px-3 py-3 flex items-center gap-3"><div className="w-8 h-8 bg-slate-200 rounded-xl animate-pulse"/><div className="flex-1"><div className="h-4 bg-slate-200 rounded-lg w-32 animate-pulse"/><div className="h-2.5 bg-slate-100 rounded w-20 mt-1.5 animate-pulse"/></div></div>
@@ -320,7 +428,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     <div className="flex-1 p-3 md:p-6 pt-[72px] md:pt-6"><div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">{Array(5).fill(0).map((_,i)=><div key={i} className="bg-white rounded-2xl p-4 border border-slate-200 animate-pulse" style={{animationDelay:i*100+'ms'}}><div className="h-2.5 bg-slate-200 rounded w-16 mb-3"/><div className="h-6 bg-slate-200 rounded w-24 mb-2"/><div className="h-2 bg-slate-100 rounded w-20"/></div>)}</div>
     <div className="grid grid-cols-1 md:grid-cols-12 gap-4"><div className="md:col-span-7 bg-white rounded-2xl p-5 border border-slate-200 h-64 animate-pulse"/><div className="md:col-span-5 bg-white rounded-2xl p-5 border border-slate-200 h-64 animate-pulse" style={{animationDelay:'200ms'}}/></div></div></div>
   </div>;
-  const ctx={propertyId,prop,allProperties,onSwitchProperty,onLogout,onAddProperty,userEmail,isAdmin,plan,canUse,view,setView,modal,setModal,editId,setEditId,mobileNav,setMobileNav,dark,setDark,stmts,expenses,income,contribs,valuations,repairs,tasks,tickets,partners,mort,annual,revenue,stmtNet:stmts.reduce((s,x)=>s+(x.net||0),0),stmtComm:stmts.reduce((s,x)=>s+(x.commission||0),0),totNet:income.reduce((s,i)=>s+(i.netAmount||0),0),totCont:contribs.reduce((s,c)=>s+(c.amount||0),0)+(partners||[]).reduce((s,p)=>s+(p.initialCapital||0),0),marketValue,realEquity,realLTV,appreciation,latestVal,pt,fixedExp,additionalExp,expByCat,dashYear,setDashYear,stmtPage,setStmtPage,stmtYearFilter,setStmtYearFilter,rptTab,setRptTab,uploadLog,setUploadLog,toast,setToast,loading,expenseForm,ue,contribForm,uc,stmtForm,us,valForm,uv,repairForm,ur,taskForm,ut,mortConfig,umc,savingMort,ticketForm,setTicketForm,settingsForm,setSettingsForm,editPartners,setEditPartners,save,update,del,handlePDFs,saveMortgage,markPaid,notify,propCountry,propCurrency,propCats,propTerms,fmP,COUNTRIES,CURRENCY_LIST,M,fm,fmCurrency,fmDate,pct,CATS,US,PT,C,PER_PAGE};
+  const ctx={propertyId,prop,allProperties,onSwitchProperty,onLogout,onAddProperty,userEmail,isAdmin,plan,canUse,view,setView,modal,setModal,editId,setEditId,mobileNav,setMobileNav,dark,setDark,stmts,expenses,income,contribs,valuations,repairs,tasks,tickets,partners,mort,annual,revenue,stmtNet:stmts.reduce((s,x)=>s+(x.net||0),0),stmtComm:stmts.reduce((s,x)=>s+(x.commission||0),0),totNet:income.reduce((s,i)=>s+(i.netAmount||0),0),totCont:contribs.reduce((s,c)=>s+(c.amount||0),0)+(partners||[]).reduce((s,p)=>s+(p.initialCapital||0),0),marketValue,realEquity,realLTV,appreciation,latestVal,pt,fixedExp,additionalExp,expByCat,dashYear,setDashYear,stmtPage,setStmtPage,stmtYearFilter,setStmtYearFilter,rptTab,setRptTab,uploadLog,setUploadLog,toast,setToast,loading,expenseForm,ue,contribForm,uc,stmtForm,us,valForm,uv,repairForm,ur,taskForm,ut,mortConfig,umc,savingMort,ticketForm,setTicketForm,settingsForm,setSettingsForm,editPartners,setEditPartners,save,update,del,handlePDFs,saveMortgage,markPaid,notify,propCountry,rentalType,propCurrency,propCats,propTerms,fmP,COUNTRIES,CURRENCY_LIST,M,fm,fmCurrency,fmDate,pct,CATS,US,PT,C,PER_PAGE};
   return <DashboardContext.Provider value={ctx}><div className="min-h-screen bg-[#F8FAFC] flex">
     {/* MOBILE HEADER */}
     <div className="md:hidden fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-lg border-b border-slate-200 z-40 px-3 py-2.5 flex items-center gap-3">
@@ -340,7 +448,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         {allProperties.length>0&&<div className="relative"><select value={propertyId} onChange={e=>onSwitchProperty(e.target.value)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none appearance-none pr-8 cursor-pointer hover:bg-slate-100">{allProperties.map(p=><option key={p.id} value={p.id}>{p.name||'Sin nombre'}</option>)}</select><ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"/></div>}
         {onAddProperty&&<button onClick={onAddProperty} className="w-full mt-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl text-[11px] font-bold hover:bg-blue-100 transition flex items-center justify-center gap-1"><Plus size={13}/>Agregar Propiedad</button>}
       </div>
-      <nav role="navigation" aria-label="Módulos" className="flex-1 p-3 space-y-0.5 overflow-y-auto">{nav.map(n=><button key={n.id} onClick={()=>{setView(n.id);setMobileNav(false)}} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] transition-all ${view===n.id?'bg-blue-50 text-blue-700 font-bold':'text-slate-500 hover:bg-slate-50 hover:text-slate-700 font-medium'}`}>{n.icon}{n.l}</button>)}</nav>
+      <nav role="navigation" aria-label="Módulos" className="flex-1 p-3 overflow-y-auto">{navGroups.map((g,gi)=><div key={g.title} className={gi>0?'mt-4':''}><div className="px-4 mb-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-400">{g.title}</div><div className="space-y-0.5">{g.items.map(n=><button key={n.id} onClick={()=>{setView(n.id);setMobileNav(false)}} className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] transition-all ${view===n.id?'bg-blue-50 text-blue-700 font-bold':'text-slate-500 hover:bg-slate-50 hover:text-slate-700 font-medium'}`}>{n.icon}{n.l}</button>)}</div></div>)}</nav>
       <div className="p-3 border-t border-slate-100 space-y-1">
         <button onClick={()=>setDark(!dark)} className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-slate-400 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition font-medium">{dark?<Sun size={16}/>:<Moon size={16}/>}{dark?'Modo Claro':'Modo Oscuro'}</button>
         <button onClick={onLogout} className="w-full flex items-center gap-3 px-4 py-2.5 text-[13px] text-slate-400 hover:text-rose-600 rounded-xl hover:bg-rose-50 transition font-medium"><LogOut size={16}/>Cerrar Sesión</button>
@@ -444,8 +552,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         return s+amt;
       },0);
 
-      // 2. Total OpEx = PM expenses (from statements) + Owner expenses (from Gastos)
-      const totalOpEx=fOpEx+ownerExpTotal;
+      // 2a. Costos Fijos template (self-managed template proyectado)
+      const fixedTplMonthly=(prop.fixedCosts||[]).filter(x=>x.active!==false).reduce((s,x)=>{const amt=parseFloat(x.amount)||0;const mo=x.frequency==='annual'?amt/12:amt;return s+toPC(mo,x.currency||propCurrency)},0);
+      const fixedTplTotal=fixedTplMonthly*(n||1);
+      // 2b. Total OpEx = PM expenses (from statements) + Owner expenses (from Gastos) + Fixed template
+      const totalOpEx=fOpEx+ownerExpTotal+fixedTplTotal;
 
       // 3. NOI = Revenue - ALL operating expenses
       const fNoi=fRev-totalOpEx;
@@ -479,14 +590,23 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const occupancy=availNights>0&&fNights>0?Math.min(100,fNights/availNights*100):0;
       const adr=fNights>0?fRev/fNights:(n>0?fRev/(n*30):0);
       const revpar=availNights>0?fRev/availNights:0;
+      // ── Renta Tradicional: % canon cobrado del mes actual ──
+      const now=new Date();const curY=now.getFullYear(),curM=now.getMonth()+1;
+      const activeTenants=(tenants||[]).filter(t=>t.status!=='inactive'&&t.startDate&&parseFloat(t.monthlyRent)>0);
+      const rentExpected=activeTenants.reduce((s,t)=>s+(parseFloat(t.monthlyRent)||0),0);
+      const rentPaid=activeTenants.reduce((s,t)=>{
+        const k=`rent-${t.id}-${curY}-${curM}`;
+        return income.find(i=>i.paymentKey===k)?s+(parseFloat(t.monthlyRent)||0):s;
+      },0);
+      const rentPaidPct=rentExpected>0?(rentPaid/rentExpected*100):0;
       const prevYr=dashYear!=='all'?annual.find(y=>y.year===dashYear-1):null;
       const revChg=prevYr&&prevYr.revenue?((fRev-prevYr.revenue)/prevYr.revenue*100):null;
       const chartColors=['#E11D48','#F59E0B','#06B6D4','#8B5CF6','#10B981','#64748B','#DB2777','#EA580C'];
       const expData=isOwnerManaged?
-        (()=>{const cp={};yearExpenses.filter(e=>!isExcludedFromOpEx(e)).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const ck=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[ck].value+=amt/12*(n||1);else if(ef==='monthly')cp[ck].value+=amt*(n||1);else cp[ck].value+=amt});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
+        (()=>{const cp={};yearExpenses.filter(e=>!isExcludedFromOpEx(e)).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const ck=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[ck].value+=amt/12*(n||1);else if(ef==='monthly')cp[ck].value+=amt*(n||1);else cp[ck].value+=amt});(prop.fixedCosts||[]).filter(x=>x.active!==false).forEach(it=>{const c=propCats.find(x=>x.v===it.category);const ck=(!c||it.category==='otros'||!it.category)?'_other':it.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=parseFloat(it.amount)||0;const mo=it.frequency==='annual'?amt/12:amt;cp[ck].value+=toPC(mo,it.currency||propCurrency)*(n||1)});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
         [['Commission',fComm,'#E11D48'],[t('electricity'),fDuke,'#F59E0B'],[t('water'),fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],[t('maintenance'),fMaint,'#10B981'],['Other',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
       const ownerMonthly=n>0?ownerExpTotal/n:0;
-      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const directForMonth=income.filter(i=>{const d=i.date||'';const [iy,im]=d.split('-').map(Number);return iy===s.year&&im===s.month}).reduce((sum,i)=>{const amt=i.amount||0;const cur=i.currency||'USD';if(cur===propCurrency)return sum+amt;if(cur==='USD'&&propCurrency!=='USD')return sum+amt*xRate;return sum+amt},0);const totalRev=rev+directForMonth;const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const exp=pmExp+ownerMonthly;const cf=totalRev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:totalRev,exp,cf,projected:false}});
+      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const directForMonth=income.filter(i=>{const d=i.date||'';const [iy,im]=d.split('-').map(Number);return iy===s.year&&im===s.month}).reduce((sum,i)=>{const amt=i.amount||0;const cur=i.currency||'USD';if(cur===propCurrency)return sum+amt;if(cur==='USD'&&propCurrency!=='USD')return sum+amt*xRate;return sum+amt},0);const totalRev=rev+directForMonth;const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const exp=pmExp+ownerMonthly+fixedTplMonthly;const cf=totalRev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:totalRev,exp,cf,projected:false}});
       // Add future reservation months to chart
       if(dashMode==='projected'&&futureRes.length>0){
         const projByMonth={};
@@ -542,12 +662,17 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${fCF>=0?'text-emerald-700':'text-rose-600'}`}>{dFm(fCF)}</div>
           <div className={`text-[10px] ${fCF>=0?'text-emerald-500':'text-rose-400'}`}>{dFm(fCFmo)}/{t('mo')}{!fMortP&&` · = NOI`}</div>
         </div>
-        <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-cyan-500 border border-slate-200 shadow-sm">
+        {rentalType==='traditional'?<div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-cyan-500 border border-slate-200 shadow-sm">
+          <div className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">{lang==='es'?'Canon Cobrado':'Rent Collected'}</div>
+          <div className="text-[9px] text-slate-400 -mt-0.5">{lang==='es'?`Mes actual · ${M[curM-1]} ${curY}`:`Current month · ${M[curM-1]} ${curY}`}</div>
+          <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${rentPaidPct>=100?'text-emerald-700':rentPaidPct>0?'text-amber-600':'text-rose-600'}`}>{rentPaidPct.toFixed(0)}%</div>
+          <div className="text-[10px] text-slate-400">{dFm(rentPaid)} / {dFm(rentExpected)} · {activeTenants.length} {lang==='es'?'inquilino':'tenant'}{activeTenants.length!==1?'s':''}</div>
+        </div>:<div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-cyan-500 border border-slate-200 shadow-sm">
           <div className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">{t('occupancy')}</div>
           <div className="text-[9px] text-slate-400 -mt-0.5">{t('subOccupancy')}</div>
           <div className="text-base md:text-[22px] font-extrabold text-slate-800 mt-0.5">{occupancy>0?occupancy.toFixed(0)+'%':'0%'}</div>
           <div className="text-[10px] text-slate-400">{fNights>0?`${fNights} ${t('nights')} · ADR ${dFm(adr)}`:`0 ${t('nights')}`}</div>
-        </div>
+        </div>}
         <div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-purple-500 border border-slate-200 shadow-sm">
           <div className="text-[10px] font-bold text-purple-600 uppercase tracking-widest">{t('cashOnCash')}{partial?' (ann.)':''}</div>
           <div className="text-[9px] text-slate-400 -mt-0.5">{t('subCoC')}</div>
@@ -574,14 +699,25 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                   const isOther=!c||e.category==='otros'||!e.category;
                   const catKey=isOther?'_other':(c?e.category:'_other');
                   const catName=isOther?(lang==='es'?'Otros':'Other'):(c?c.l:'Other');
-                  if(!cats[catKey])cats[catKey]={name:catName,value:0};
+                  if(!cats[catKey])cats[catKey]={name:catName,value:0,fromTpl:false};
                   const amt=toPC(e.amount||0,e.expCurrency);
                   const ef2=eFreq(e);if(ef2==='annual')cats[catKey].value+=amt/12*(n||1);
                   else if(ef2==='monthly')cats[catKey].value+=amt*(n||1);
                   else cats[catKey].value+=amt;
                 });
+                // Incluir Costos Fijos template proyectados
+                (prop.fixedCosts||[]).filter(x=>x.active!==false).forEach(it=>{
+                  const c=propCats.find(x=>x.v===it.category);
+                  const isOther=!c||it.category==='otros'||!it.category;
+                  const catKey=isOther?'_other':it.category;
+                  const catName=isOther?(lang==='es'?'Otros':'Other'):(c?c.l:it.category);
+                  if(!cats[catKey])cats[catKey]={name:catName,value:0,fromTpl:true};
+                  const amt=parseFloat(it.amount)||0;
+                  const mo=it.frequency==='annual'?amt/12:amt;
+                  cats[catKey].value+=toPC(mo,it.currency||propCurrency)*(n||1);
+                });
                 return Object.values(cats).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map(c=>
-                  <div key={c.name} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,(c.value||0)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{c.name}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(c.value)} <span className="text-slate-400">({(c.value/fRev*100).toFixed(0)}%)</span></span></div></div>
+                  <div key={c.name} className="rounded-lg bg-slate-50 relative overflow-hidden" style={{height:'28px'}}><div className="absolute inset-y-0 left-0 bg-orange-400 opacity-75" style={{width:Math.max(2,(c.value||0)/fRev*100)+'%'}}/><div className="absolute inset-0 flex items-center justify-between px-2 md:px-4 overflow-hidden"><span className="text-[9px] md:text-[10px] text-slate-600 truncate">{c.name}{c.fromTpl&&<span className="ml-1 text-[8px] text-blue-500 font-bold">📋</span>}</span><span className="text-[9px] md:text-[10px] font-bold text-slate-700 whitespace-nowrap">{dFm(c.value)} <span className="text-slate-400">({(c.value/fRev*100).toFixed(0)}%)</span></span></div></div>
                 );
               })()}
             </>:<>
@@ -605,6 +741,17 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                     if(f==='annual')cats[catKey].value+=amt/12*(n||1);
                     else if(f==='monthly')cats[catKey].value+=amt*(n||1);
                     else cats[catKey].value+=amt;
+                  });
+                  // Incluir Costos Fijos template proyectados
+                  (prop.fixedCosts||[]).filter(x=>x.active!==false).forEach(it=>{
+                    const c=propCats.find(x=>x.v===it.category);
+                    const isOther=!c||it.category==='otros'||!it.category;
+                    const catKey=isOther?'_other':it.category;
+                    const catName=isOther?(lang==='es'?'Otros':'Other'):(c?c.l:it.category);
+                    if(!cats[catKey])cats[catKey]={name:catName,fixed:true,value:0};
+                    const amt=parseFloat(it.amount)||0;
+                    const mo=it.frequency==='annual'?amt/12:amt;
+                    cats[catKey].value+=toPC(mo,it.currency||propCurrency)*(n||1);
                   });
                   const sorted=Object.values(cats).filter(c=>c.value>0).sort((a,b)=>b.value-a.value);
                   const fixed=sorted.filter(c=>c.fixed);
@@ -773,10 +920,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                 if(mortPct>60) insights.push({type:'danger',icon:'🏦',title:`Mortgage consumes ${mortPct.toFixed(0)}% of revenue`,desc:`Debt service is too high relative to revenue. DSCR ${fDscr.toFixed(2)}x. ${fDscr<1.25?'Consider refinancing at a lower rate or extending the term.':'DSCR is acceptable but margin is tight.'}`});
               }
 
-              // Expense efficiency
+              // Expense efficiency (usa totalOpEx que YA incluye template + owner expenses + PM)
               if(fRev>0){
-                const opExPct=fOpEx/fRev*100;
-                if(opExPct>55) insights.push({type:'warn',icon:'📋',title:`Ratio de gastos alto: ${opExPct.toFixed(0)}%`,desc:`Los gastos operativos consumesn más de la mitad of revenue. Los principales: PM Commission ${dFm(fComm)} (${(fComm/fRev*100).toFixed(0)}%), Electricity ${dFm(fDuke)} (${(fDuke/fRev*100).toFixed(0)}%), HOA ${dFm(fHoa)} (${(fHoa/fRev*100).toFixed(0)}%).`});
+                const opExPct=totalOpEx/fRev*100;
+                if(opExPct>55) insights.push({type:'warn',icon:'📋',title:`Ratio de gastos alto: ${opExPct.toFixed(0)}%`,desc:`Los gastos operativos consumen más de la mitad del revenue. Los principales: PM Commission ${dFm(fComm)} (${(fComm/fRev*100).toFixed(0)}%), Electricity ${dFm(fDuke)} (${(fDuke/fRev*100).toFixed(0)}%), HOA ${dFm(fHoa)} (${(fHoa/fRev*100).toFixed(0)}%).`});
               }
 
               // Electricity trend
@@ -1269,42 +1416,211 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     {/* ═══ EXPENSES ═══ */}
     {view==='expenses'&&<>
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6"><div className="flex items-center gap-2"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🧾 {t('expenses')}</h1><span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span><CurToggle/></div><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 active:bg-rose-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> {t('addExpense')}</button></div>
-      {expenses.length>0&&(()=>{
+
+
+      {/* Banner: template proyectado */}
+      {(prop.fixedCosts||[]).length>0&&<div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 mb-4 flex items-start gap-2"><span className="text-base">📋</span><div className="flex-1"><div className="text-[12px] font-bold text-blue-800">Los costos fijos se suman automáticamente</div><div className="text-[11px] text-blue-700">{(prop.fixedCosts||[]).filter(c=>c.active!==false).length} costos fijos configurados. Aparecen en cada mes sin recargar. Solo agregá los gastos adicionales.</div></div><button onClick={()=>setView('fixedCosts')} className="text-[11px] font-bold text-blue-700 bg-white border border-blue-300 px-2.5 py-1 rounded-lg hover:bg-blue-50">Configurar</button></div>}
+
+      {(expenses.length>0||(prop.fixedCosts||[]).length>0)&&(()=>{
+        const fixedTpl=(prop.fixedCosts||[]).filter(x=>x.active!==false);
+        const fixedAutoMo=fixedTpl.reduce((s,x)=>s+fcMonthlyPC(x),0);
         const monthlyRecurring=expenses.filter(e=>eFreq(e)==='monthly').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
         const annualRecurring=expenses.filter(e=>eFreq(e)==='annual').reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
         const oneTime=expenses.filter(e=>!isRecurring(e)).reduce((s,e)=>s+toPropCur(e.amount||0,e.expCurrency),0);
-        const monthlyEquiv=monthlyRecurring+(annualRecurring/12);
+        const monthlyEquiv=fixedAutoMo+monthlyRecurring+(annualRecurring/12);
         return <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-5">
-          <KPI label={`Costo Mensual`} value={gFm(monthlyEquiv)} sub="Fijos + anuales/12" color="blue"/>
-          <KPI label="Mensuales" value={gFm(monthlyRecurring)} sub={expenses.filter(e=>eFreq(e)==='monthly').length+' gastos'} color="amber"/>
+          <KPI label="Costo Mensual" value={gFm(monthlyEquiv)} sub={fixedAutoMo>0?`Incluye ${gFm(fixedAutoMo)} fijos auto`:'Fijos + anuales/12'} color="blue"/>
+          <KPI label="Fijos Auto" value={gFm(fixedAutoMo)} sub={fixedTpl.length+' costos template'} color="amber"/>
           <KPI label="Anuales" value={gFm(annualRecurring)} sub={gFm(annualRecurring/12)+'/mo equiv.'} color="purple"/>
-          <KPI label="Compras" value={gFm(oneTime)} sub={expenses.filter(e=>!isRecurring(e)).length+' gastos'} color="red"/>
+          <KPI label="Adicionales" value={gFm(oneTime)} sub={expenses.filter(e=>!isRecurring(e)).length+' gastos'} color="red"/>
         </div>
       })()}
       {expByCat.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-4"><h3 className="text-sm font-bold text-slate-700 mb-3">Costo Mensual por Categoría <span className="text-[10px] text-slate-400 font-normal">(anuales ÷ 12)</span></h3><ResponsiveContainer width="100%" height={Math.max(150,expByCat.length*35)}><BarChart data={expByCat.map(c=>({...c,mensual:c.monthly||c.value}))} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis type="number" tickFormatter={v=>gFm(v)} tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#64748b'}} width={120}/><Tooltip content={<Tip fmt={gFm}/>}/><Bar dataKey="mensual" name={t('monthly')} fill="#DC2626" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer></div>}
 
-      {/* Grouped by month */}
-      {expenses.length>0&&(()=>{
+      {/* Grouped by month — fixed template auto-projected per month */}
+      {(expenses.length>0||(prop.fixedCosts||[]).length>0)&&(()=>{
+        const fixedTpl=(prop.fixedCosts||[]).filter(x=>x.active!==false);
+        const fixedMonthTotal=fixedTpl.reduce((s,x)=>s+fcMonthlyPC(x),0);
         const sorted=[...expenses].sort((a,b)=>{const da=a.date||'0000';const db=b.date||'0000';return db.localeCompare(da)});
         const groups={};sorted.forEach(e=>{const d=e.date||'';const key=d?d.slice(0,7):'sin-fecha';if(!groups[key])groups[key]={label:d?M[parseInt(d.slice(5,7))-1]+' '+d.slice(0,4):'Sin fecha',items:[],total:0};groups[key].items.push(e);groups[key].total+=toPropCur(e.amount||0,e.expCurrency)});
-        return Object.entries(groups).map(([key,g])=><div key={key} className="mb-4">
-          <div className="flex justify-between items-center mb-2 px-1"><h3 className="text-sm font-bold text-slate-600">{g.label}</h3><span className="text-sm font-extrabold text-rose-500">{gFm(g.total)} <span className="text-[9px] text-slate-400">{gVc}</span></span></div>
-          <Tbl cols={[
-            {label:'Fecha',render:r=><span className="text-slate-500 text-xs">{r.date?r.date.slice(8):''}</span>},
-            {label:'Concepto',key:'concept',cls:'text-slate-700 font-medium'},
-            {label:'Categoría',render:r=>{const c=propCats.find(x=>x.v===r.category);return<span className="text-xs">{c?c.i+' '+c.l:r.category}</span>}},
-            {label:'Tipo',render:r=>{const ef=eFreq(r);return<div className="flex gap-1 flex-wrap"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.type==='fixed'?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}`}>{r.type==='fixed'?'Fijo':'Compra'}</span>{ef!=='once'&&<span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ef==='annual'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}`}>{ef==='annual'?'Anual':'Mensual'}</span>}</div>}},
-            {label:'Pagó',render:r=><span style={{color:pCl(r.paidBy)}} className="text-xs font-semibold">{pN(r.paidBy)}</span>},
-            {label:'Monto',r:true,render:r=>{const cv=toPropCur(r.amount||0,r.expCurrency);return<div className="text-right"><span className="font-bold text-rose-500">{gFm(cv)}</span>{r.expCurrency&&r.expCurrency!==propCurrency&&<div className="text-[9px] text-slate-400">({fmCurrency(r.amount,r.expCurrency)} {r.expCurrency})</div>}{eFreq(r)==='annual'&&<div className="text-[9px] text-slate-400">{gFm(cv/12)}/{t('mo')}</div>}</div>}}
-          ]} rows={g.items} onDel={del} dc="expenses" onEdit={r=>{setExpenseForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'additional',frequency:r.frequency||'once',expCurrency:r.expCurrency||''});setEditId(r.id);setModal('expense')}}/>
-        </div>)
+        // Con template: auto-generar todos los meses pasados con proyección de fijos
+        if(fixedTpl.length>0){
+          const now=new Date();const cy=now.getFullYear(),cm=now.getMonth()+1;
+          // Candidatos para mes de inicio: gasto más antiguo, fecha de compra, o 12 meses atrás
+          const expenseKeys=Object.keys(groups).filter(k=>/^\d{4}-\d{2}$/.test(k));
+          const candidates=[];
+          if(expenseKeys.length>0)candidates.push(expenseKeys.sort()[0]);
+          if(prop.purchaseDate&&/^\d{4}-\d{2}/.test(prop.purchaseDate))candidates.push(prop.purchaseDate.slice(0,7));
+          const backDate=new Date(cy,cm-1-12,1);candidates.push(`${backDate.getFullYear()}-${String(backDate.getMonth()+1).padStart(2,'0')}`);
+          const earliestKey=candidates.sort()[0];
+          const [sy,sm]=earliestKey.split('-').map(Number);
+          let iy=sy,im=sm;let guard=0;
+          // Recorrer solo hasta el mes actual — no proyectar meses futuros
+          while((iy<cy||(iy===cy&&im<=cm))&&guard++<240){
+            const k=`${iy}-${String(im).padStart(2,'0')}`;
+            if(!groups[k])groups[k]={label:M[im-1]+' '+iy,items:[],total:0};
+            im++;if(im>12){im=1;iy++}
+          }
+        }
+        const ordered=Object.entries(groups).sort((a,b)=>b[0].localeCompare(a[0]));
+        return ordered.map(([key,g])=>{
+          const showFixed=fixedTpl.length>0&&key!=='sin-fecha';
+          const monthTotal=g.total+(showFixed?fixedMonthTotal:0);
+          return <div key={key} className="mb-4">
+            <div className="flex justify-between items-center mb-2 px-1"><h3 className="text-sm font-bold text-slate-600">{g.label}</h3><div className="text-right"><span className="text-sm font-extrabold text-rose-500">{gFm(monthTotal)} <span className="text-[9px] text-slate-400">{gVc}</span></span>{showFixed&&<div className="text-[9px] text-slate-400">📋 {gFm(fixedMonthTotal)} fijos + 💸 {gFm(g.total)} adicionales</div>}</div></div>
+
+            {showFixed&&<div className="bg-blue-50/60 border border-blue-100 rounded-2xl p-2 mb-2">
+              <div className="flex items-center justify-between mb-1.5 px-1"><div className="text-[10px] font-bold text-blue-700 uppercase tracking-wide">📋 Costos Fijos (auto)</div><button onClick={()=>setView('fixedCosts')} className="text-[10px] font-bold text-blue-600 hover:text-blue-800">Editar template →</button></div>
+              <div className="space-y-1">
+                {fixedTpl.map(it=>{const cat=propCats.find(c=>c.v===it.category);const monthlyPC=fcMonthlyPC(it);const isAnnual=it.frequency==='annual';const badge=it.mode==='estimado'?'text-amber-700':it.mode==='variable'?'text-purple-700':'text-emerald-700';return <div key={it.id} className="flex items-center gap-2 px-2 py-1.5 bg-white/70 rounded-lg text-[11px]">
+                  <span className="w-5 text-center shrink-0">{cat?cat.i:'💰'}</span>
+                  <span className="flex-1 truncate text-slate-700 font-medium">{it.concept}{isAnnual&&<span className="ml-1 text-[8px] font-bold text-purple-600">ANUAL/12</span>}</span>
+                  <span className={`text-[9px] font-bold uppercase ${badge}`}>{it.mode||'fijo'}</span>
+                  <span className="font-bold text-slate-700 w-20 text-right">{it.mode==='variable'?<span className="text-slate-400">—</span>:gFm(monthlyPC)}</span>
+                </div>})}
+              </div>
+            </div>}
+
+            {g.items.length>0&&<Tbl cols={[
+              {label:'Fecha',render:r=><span className="text-slate-500 text-xs">{r.date?r.date.slice(8):''}</span>},
+              {label:'Concepto',key:'concept',cls:'text-slate-700 font-medium'},
+              {label:'Categoría',render:r=>{const c=propCats.find(x=>x.v===r.category);return<span className="text-xs">{c?c.i+' '+c.l:r.category}</span>}},
+              {label:'Tipo',render:r=>{const ef=eFreq(r);return<div className="flex gap-1 flex-wrap"><span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${r.type==='fixed'?'bg-amber-100 text-amber-700':'bg-slate-100 text-slate-600'}`}>{r.type==='fixed'?'Fijo':'Compra'}</span>{ef!=='once'&&<span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${ef==='annual'?'bg-purple-100 text-purple-700':'bg-blue-100 text-blue-700'}`}>{ef==='annual'?'Anual':'Mensual'}</span>}</div>}},
+              {label:'Pagó',render:r=><span style={{color:pCl(r.paidBy)}} className="text-xs font-semibold">{pN(r.paidBy)}</span>},
+              {label:'Monto',r:true,render:r=>{const cv=toPropCur(r.amount||0,r.expCurrency);return<div className="text-right"><span className="font-bold text-rose-500">{gFm(cv)}</span>{r.expCurrency&&r.expCurrency!==propCurrency&&<div className="text-[9px] text-slate-400">({fmCurrency(r.amount,r.expCurrency)} {r.expCurrency})</div>}{eFreq(r)==='annual'&&<div className="text-[9px] text-slate-400">{gFm(cv/12)}/{t('mo')}</div>}</div>}}
+            ]} rows={g.items} onDel={del} dc="expenses" onEdit={r=>{setExpenseForm({date:r.date||'',concept:r.concept||'',amount:String(r.amount||''),paidBy:r.paidBy||partners[0]?.id||'',category:r.category||'otros',type:r.type||'additional',frequency:r.frequency||'once',expCurrency:r.expCurrency||''});setEditId(r.id);setModal('expense')}}/>}
+
+            {g.items.length===0&&showFixed&&<div className="text-[11px] text-slate-400 italic px-3 py-2 bg-slate-50 rounded-xl">Sin gastos adicionales este mes — solo costos fijos del template.</div>}
+          </div>;
+        });
       })()}
       {!expenses.length&&<Empty icon={Receipt} title="Sin gastos" desc="Registra gastos fijos y adicionales." action="Registrar" onAction={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}}/>}
     </>}
 
+    {/* ═══ COSTOS FIJOS ═══ */}
+    {view==='fixedCosts'&&(()=>{
+      const tpl=prop.fixedCosts||[];
+      const active=tpl.filter(x=>x.active!==false);
+      const inactive=tpl.filter(x=>x.active===false);
+      const monthlyItems=active.filter(x=>(x.frequency||'monthly')==='monthly');
+      const annualItems=active.filter(x=>x.frequency==='annual');
+      const monthlyTotal=monthlyItems.reduce((s,x)=>s+fcMonthlyPC(x),0);
+      const annualTotal=annualItems.reduce((s,x)=>s+toPropCur(parseFloat(x.amount)||0,x.currency||propCurrency),0);
+      const totalMes=monthlyTotal+annualTotal/12;
+      const totalAño=totalMes*12;
+      const modeBadge=(m)=>m==='estimado'?{cls:'bg-amber-100 text-amber-700',l:'ESTIMADO'}:m==='variable'?{cls:'bg-purple-100 text-purple-700',l:'VARIABLE'}:{cls:'bg-emerald-100 text-emerald-700',l:'FIJO'};
+      const openNew=()=>{setFcEditingId(null);setFcForm({concept:'',category:'',mode:'fijo',amount:'',currency:propCurrency||'USD',frequency:'monthly',active:true});setFcShowForm(true)};
+      return <>
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-2"><div><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">📋 {lang==='es'?'Costos Fijos Mensuales':'Monthly Fixed Costs'} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span></h1><div className="text-[11px] text-slate-500 mt-0.5">{lang==='es'?'Configura una vez, se suman automáticamente cada mes':'Set up once, auto-added every month'}</div></div><button onClick={openNew} className="px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> {lang==='es'?'Nuevo Costo Fijo':'New Fixed Cost'}</button></div>
+
+        {/* KPIs */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-3 mb-5">
+          <KPI label={lang==='es'?'Total / Mes':'Total / Mo'} value={gFm(totalMes)} sub={active.length+' '+(lang==='es'?'costos activos':'active items')} color="red"/>
+          <KPI label={lang==='es'?'Total / Año':'Total / Year'} value={gFm(totalAño)} sub={lang==='es'?'proyección anual':'annual projection'} color="blue"/>
+          <KPI label={lang==='es'?'Mensuales':'Monthly'} value={gFm(monthlyTotal)} sub={monthlyItems.length+' '+(lang==='es'?'conceptos':'items')} color="amber"/>
+          <KPI label={lang==='es'?'Anuales':'Annual'} value={gFm(annualTotal)} sub={annualItems.length+' '+(lang==='es'?'conceptos · ':'items · ')+gFm(annualTotal/12)+'/mes'} color="purple"/>
+        </div>
+
+        {/* Info banner */}
+        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3 md:p-4 mb-5 flex items-start gap-3">
+          <span className="text-xl shrink-0">💡</span>
+          <div className="text-[12px] text-blue-800"><div className="font-bold mb-0.5">{lang==='es'?'Los costos fijos se suman automáticamente':'Fixed costs are added automatically'}</div><div>{lang==='es'?'No necesitas hacer nada cada mes. El Dashboard y Gastos incluyen estos costos automáticamente. Solo actualiza los montos cuando cambien.':'No need to do anything each month. Dashboard and Expenses include these automatically. Just update amounts when they change.'}</div></div>
+        </div>
+
+        {/* Form */}
+        {fcShowForm&&<div className="bg-white rounded-2xl p-4 border border-blue-200 shadow-sm mb-5">
+          <div className="flex justify-between items-center mb-3"><div className="text-sm font-bold text-slate-700">{fcEditingId?(lang==='es'?'Editar costo fijo':'Edit fixed cost'):(lang==='es'?'Nuevo costo fijo':'New fixed cost')}</div><button onClick={()=>{setFcShowForm(false);setFcEditingId(null);setFcForm({concept:'',category:'',mode:'fijo',amount:'',currency:'',active:true})}} className="p-1 text-slate-400 hover:text-slate-600"><X size={16}/></button></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div><label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">{lang==='es'?'Concepto':'Concept'}</label><input type="text" placeholder={lang==='es'?'ej. Mayordomo, Servicios':'e.g. Housekeeping, Utilities'} value={fcForm.concept} onChange={e=>setFcForm(x=>({...x,concept:e.target.value}))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:border-blue-400 focus:outline-none"/></div>
+            <div><label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">{lang==='es'?'Categoría':'Category'}</label><select value={fcForm.category} onChange={e=>setFcForm(x=>({...x,category:e.target.value}))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:border-blue-400 focus:outline-none"><option value="">{lang==='es'?'Elegir...':'Select...'}</option>{propCats.map(c=><option key={c.v} value={c.v}>{c.i} {c.l}</option>)}</select></div>
+            <div><label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">{lang==='es'?'Modo':'Mode'}</label><select value={fcForm.mode} onChange={e=>setFcForm(x=>({...x,mode:e.target.value}))} className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:border-blue-400 focus:outline-none"><option value="fijo">{lang==='es'?'Fijo (mismo monto cada mes)':'Fixed (same each month)'}</option><option value="estimado">{lang==='es'?'Estimado (promedio ajustable)':'Estimated (adjustable avg)'}</option><option value="variable">{lang==='es'?'Variable (sin monto default)':'Variable (no default amount)'}</option></select></div>
+            <div><label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">{lang==='es'?'Frecuencia':'Frequency'}</label><div className="grid grid-cols-2 gap-1">{[['monthly',lang==='es'?'🔄 Mensual':'🔄 Monthly'],['annual',lang==='es'?'📅 Anual':'📅 Annual']].map(([v,l])=><button key={v} type="button" onClick={()=>setFcForm(x=>({...x,frequency:v}))} className={`py-2 rounded-lg border-2 text-[11px] font-medium transition ${(fcForm.frequency||'monthly')===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500 bg-white'}`}>{l}</button>)}</div></div>
+            <div><label className="block text-[10px] font-bold text-slate-500 mb-1 uppercase">{lang==='es'?(fcForm.frequency==='annual'?'Monto Anual & Moneda':'Monto & Moneda'):(fcForm.frequency==='annual'?'Annual Amount & Currency':'Amount & Currency')}</label><div className="flex gap-2"><input type="number" placeholder={fcForm.mode==='variable'?'—':'0'} disabled={fcForm.mode==='variable'} value={fcForm.amount} onChange={e=>setFcForm(x=>({...x,amount:e.target.value}))} className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:border-blue-400 focus:outline-none disabled:bg-slate-50 disabled:text-slate-400"/><select value={fcForm.currency||propCurrency||'USD'} onChange={e=>setFcForm(x=>({...x,currency:e.target.value}))} className="px-2 py-2 text-sm border border-slate-200 rounded-lg">{CURRENCY_LIST.map(c=><option key={c.v} value={c.v}>{c.v}</option>)}</select></div>{fcForm.frequency==='annual'&&fcForm.amount&&fcForm.mode!=='variable'&&<div className="text-[10px] text-blue-600 font-semibold bg-blue-50 px-2 py-1 rounded mt-1">= {gFm(toPropCur(parseFloat(fcForm.amount)/12,fcForm.currency||propCurrency))}/mes equivalente</div>}</div>
+          </div>
+          <div className="flex items-center gap-3 mb-3"><label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={fcForm.active!==false} onChange={e=>setFcForm(x=>({...x,active:e.target.checked}))} className="w-4 h-4"/><span className="text-[12px] text-slate-600">{lang==='es'?'Activo (se suma al mes)':'Active (added to month)'}</span></label></div>
+          <div className="flex gap-2"><button onClick={saveFixedCost} className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700">{fcEditingId?(lang==='es'?'Guardar cambios':'Save changes'):(lang==='es'?'+ Agregar':'+ Add')}</button><button onClick={()=>{setFcShowForm(false);setFcEditingId(null);setFcForm({concept:'',category:'',mode:'fijo',amount:'',currency:'',active:true})}} className="px-4 py-2 bg-slate-100 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-200">{lang==='es'?'Cancelar':'Cancel'}</button></div>
+        </div>}
+
+        {/* List */}
+        {tpl.length===0&&<Empty icon={Calendar} title={lang==='es'?'Sin costos fijos':'No fixed costs'} desc={lang==='es'?'Configura tus costos recurrentes (mayordomo, admin, servicios) y aparecerán auto-sumados cada mes.':'Configure your recurring costs and they will auto-add each month.'} action={lang==='es'?'Crear primero':'Create first'} onAction={openNew}/>}
+
+        {active.length>0&&<div className="space-y-2 mb-4">
+          {active.map(it=>{const b=modeBadge(it.mode);const cat=propCats.find(c=>c.v===it.category);const monthlyPC=fcMonthlyPC(it);const isAnnual=it.frequency==='annual';return <div key={it.id} className="flex items-center gap-3 bg-white rounded-2xl border border-slate-200 shadow-sm p-3 md:p-4">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-lg shrink-0">{cat?cat.i:'💰'}</div>
+            <div className="flex-1 min-w-0"><div className="flex items-center gap-2 flex-wrap"><span className="text-[13px] font-bold text-slate-800 truncate">{it.concept}</span><span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${b.cls}`}>{b.l}</span>{isAnnual&&<span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">ANUAL</span>}</div><div className="text-[11px] text-slate-400 truncate">{cat?cat.l:it.category}</div></div>
+            <div className="text-right shrink-0"><div className="text-[13px] font-extrabold text-slate-800">{it.mode==='variable'?<span className="text-slate-400">—</span>:<>{gFm(monthlyPC)}<span className="text-[9px] text-slate-400 font-normal">/mes</span></>}</div>{isAnnual&&it.mode!=='variable'&&<div className="text-[9px] text-slate-400">({fmCurrency(it.amount,it.currency||propCurrency)} {it.currency||propCurrency}/año)</div>}{!isAnnual&&it.currency&&it.currency!==propCurrency&&it.mode!=='variable'&&<div className="text-[9px] text-slate-400">({fmCurrency(it.amount,it.currency)} {it.currency})</div>}</div>
+            <div className="flex gap-1 shrink-0"><button onClick={()=>toggleFixedCostActive(it.id)} title={lang==='es'?'Pausar':'Pause'} className="p-2 text-amber-500 hover:bg-amber-50 rounded-lg"><EyeOff size={14}/></button><button onClick={()=>editFixedCost(it)} title={lang==='es'?'Editar':'Edit'} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"><Pencil size={14}/></button><button onClick={()=>deleteFixedCost(it.id)} title={lang==='es'?'Eliminar':'Delete'} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button></div>
+          </div>})}
+        </div>}
+
+        {inactive.length>0&&<>
+          <div className="text-[11px] font-bold text-slate-500 uppercase mb-2 mt-4">{lang==='es'?'Inactivos':'Inactive'} ({inactive.length})</div>
+          <div className="space-y-2 opacity-60">
+            {inactive.map(it=>{const cat=propCats.find(c=>c.v===it.category);return <div key={it.id} className="flex items-center gap-3 bg-slate-50 rounded-2xl border border-slate-200 p-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-lg shrink-0">{cat?cat.i:'💰'}</div>
+              <div className="flex-1 min-w-0"><div className="text-[13px] font-bold text-slate-500 line-through truncate">{it.concept}</div><div className="text-[11px] text-slate-400">{cat?cat.l:it.category}</div></div>
+              <div className="flex gap-1 shrink-0"><button onClick={()=>toggleFixedCostActive(it.id)} title={lang==='es'?'Reactivar':'Reactivate'} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg"><Eye size={14}/></button><button onClick={()=>deleteFixedCost(it.id)} title={lang==='es'?'Eliminar':'Delete'} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg"><Trash2 size={14}/></button></div>
+            </div>})}
+          </div>
+        </>}
+      </>;
+    })()}
+
     {/* ═══ INCOME (powered by statements) ═══ */}
     {view==='income'&&<>
       <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">💰 {t('income')} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><button onClick={()=>{setIncForm({date:new Date().toISOString().split('T')[0],amount:'',source:'direct',concept:'',currency:'USD',nights:''});setEditId(null);setModal('addIncome')}} className="px-4 py-2.5 bg-emerald-600 text-white text-xs rounded-xl font-bold hover:bg-emerald-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {lang==='es'?'Reserva Directa':'Direct Booking'}</button></div>
+
+      {/* ─── RENTA TRADICIONAL: Ledger de Canon Mensual ─── */}
+      {rentalType==='traditional'&&(()=>{
+        const activeTenants=(tenants||[]).filter(t=>t.status!=='inactive'&&t.startDate&&parseFloat(t.monthlyRent)>0);
+        if(activeTenants.length===0)return <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5"><div className="text-[12px] text-amber-800"><strong>{lang==='es'?'Sin inquilinos activos':'No active tenants'}</strong> — {lang==='es'?'agrega un inquilino con canon mensual en la sección Inquilinos para empezar a registrar los pagos del canon.':'Add a tenant with monthly rent in Tenants section to start tracking rent payments.'}</div></div>;
+        const today=new Date();today.setDate(1);
+        const rows=[];
+        for(const tn of activeTenants){
+          const start=new Date(tn.startDate+'T00:00:00');start.setDate(1);
+          const end=tn.endDate?new Date(tn.endDate+'T00:00:00'):today;
+          const lastMonth=end<today?end:today;
+          let cur=new Date(start);
+          while(cur<=lastMonth){
+            const y=cur.getFullYear(),m=cur.getMonth()+1;
+            const paymentKey=`rent-${tn.id}-${y}-${m}`;
+            const paidRecord=income.find(i=>i.paymentKey===paymentKey);
+            rows.push({tenant:tn,year:y,month:m,paymentKey,paid:!!paidRecord,paidRecord,amount:parseFloat(tn.monthlyRent)||0});
+            cur.setMonth(cur.getMonth()+1);
+          }
+        }
+        rows.sort((a,b)=>(b.year*100+b.month)-(a.year*100+a.month));
+        const totalExpected=rows.reduce((s,r)=>s+r.amount,0);
+        const totalPaid=rows.filter(r=>r.paid).reduce((s,r)=>s+r.amount,0);
+        const togglePaid=async(r)=>{
+          if(r.paid&&r.paidRecord){
+            await del('income',r.paidRecord.id);
+          }else{
+            await save('income',{date:`${r.year}-${String(r.month).padStart(2,'0')}-01`,amount:r.amount,source:'rent',concept:`${lang==='es'?'Canon':'Rent'} ${M[r.month-1]} ${r.year} · ${r.tenant.name}`,currency:propCurrency||'USD',nights:0,paymentKey:r.paymentKey,tenantId:r.tenant.id});
+          }
+        };
+        return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 md:p-5 mb-5">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-sm font-bold text-slate-700">🏠 {lang==='es'?'Canon Mensual de Inquilinos':'Monthly Tenant Rent'} <span className="text-[10px] text-slate-400 font-normal">({activeTenants.length} {lang==='es'?'inquilino':'tenant'}{activeTenants.length!==1?'s':''} · {rows.length} {lang==='es'?'meses':'months'})</span></h3>
+          </div>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100"><div className="text-[9px] font-bold text-emerald-600 uppercase">{lang==='es'?'Cobrado':'Paid'}</div><div className="text-base font-bold text-emerald-700">{gFm(totalPaid)}</div></div>
+            <div className="bg-amber-50 rounded-xl p-3 border border-amber-100"><div className="text-[9px] font-bold text-amber-600 uppercase">{lang==='es'?'Pendiente':'Pending'}</div><div className="text-base font-bold text-amber-700">{gFm(totalExpected-totalPaid)}</div></div>
+            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200"><div className="text-[9px] font-bold text-slate-500 uppercase">{lang==='es'?'Esperado total':'Expected total'}</div><div className="text-base font-bold text-slate-700">{gFm(totalExpected)}</div></div>
+          </div>
+          <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
+            {rows.map(r=><div key={r.paymentKey} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition ${r.paid?'bg-emerald-50 border-emerald-200':'bg-slate-50 border-slate-200'}`}>
+              <button onClick={()=>togglePaid(r)} className={`shrink-0 w-7 h-7 rounded-lg border-2 flex items-center justify-center transition ${r.paid?'bg-emerald-500 border-emerald-500 text-white':'bg-white border-slate-300 text-transparent hover:border-emerald-400'}`} title={r.paid?(lang==='es'?'Desmarcar pago':'Unmark paid'):(lang==='es'?'Marcar como pagado':'Mark as paid')}><CheckCircle size={16}/></button>
+              <div className="flex-1 min-w-0">
+                <div className="text-[12px] font-semibold text-slate-700 truncate">{M[r.month-1]} {r.year}</div>
+                <div className="text-[10px] text-slate-400 truncate">{r.tenant.name}{r.tenant.unit?` · ${r.tenant.unit}`:''}</div>
+              </div>
+              <div className={`text-[13px] font-bold ${r.paid?'text-emerald-600':'text-slate-600'}`}>{gFm(r.amount)}</div>
+              {r.paid?<span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">✓ {lang==='es'?'PAGADO':'PAID'}</span>:<span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{lang==='es'?'PENDIENTE':'PENDING'}</span>}
+            </div>)}
+          </div>
+        </div>;
+      })()}
 
       {/* Direct bookings */}
       {income.length>0&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden mb-5">
@@ -1987,28 +2303,98 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ DOCUMENTS ═══ */}
     {view==='documents'&&(()=>{
-      const docTypes=[
-        {v:'escritura',l:'📜 Escritura',fields:['numEscritura','notaria','fechaRegistro','area','linderos','propietarios']},
-        {v:'tradicion',l:'📋 Certificado de Tradición',fields:['matricula','circulo','propietarios','gravamenes','estado','fechaExpedicion']},
-        {v:'predial',l:'🏛️ Predial',fields:['avaluoCatastral','impuestoAnual','direccion','destino','estrato']},
+      const docTypesCO=[
+        {v:'escritura',l:'📜 Escritura',fields:['naturalezaActo','numEscritura','notaria','fechaRegistro','valorVenta','formaPago','matriculaInmobiliaria','area','coeficiente','linderos','propietarios','vendedor']},
+        {v:'tradicion',l:'📋 Certificado de Tradición',fields:['matricula','estadoFolio','circulo','propietarios','gravamenes','estado','numAnotaciones','direccion','areaTotal','fechaExpedicion','ultimaTransaccion']},
+        {v:'predial',l:'🏛️ Predial',fields:['avaluoCatastral','impuestoAnual','vigencia','cedulaCatastral','direccion','destino','estrato','areaTerreno','areaConstruida']},
         {v:'contrato',l:'📑 Contrato Arriendo',fields:['inquilino','canon','fechaInicio','fechaFin','deposito']},
         {v:'poliza',l:'🛡️ Póliza de Seguro',fields:['aseguradora','numPoliza','tipoCobertura','valorAsegurado','prima','deducible','vigenciaInicio','vigenciaFin','coberturas']},
         {v:'otro',l:'📄 Otro Documento',fields:['descripcion']},
       ];
-      const fieldLabels={numEscritura:'Nº Escritura',notaria:'Notaría',fechaRegistro:'Fecha Registro',area:'Área (m²)',linderos:'Linderos',propietarios:'Propietarios',matricula:'Matrícula Inmobiliaria',circulo:'Círculo Registral',gravamenes:'Gravámenes / Hipotecas',estado:'Estado',fechaExpedicion:'Fecha Expedición',avaluoCatastral:'Avalúo Catastral',impuestoAnual:'Impuesto Anual',direccion:'Dirección',destino:'Destino Económico',estrato:'Estrato',inquilino:'Inquilino',canon:'Canon Mensual',fechaInicio:'Fecha Inicio',fechaFin:'Fecha Fin',deposito:'Depósito',descripcion:'Descripción',aseguradora:'Aseguradora',numPoliza:'Nº Póliza',tipoCobertura:'Tipo de Cobertura',valorAsegurado:'Valor Asegurado',prima:'Prima (Anual)',deducible:'Deducible',vigenciaInicio:'Vigencia Desde',vigenciaFin:'Vigencia Hasta',coberturas:'Coberturas Incluidas'};
+      const docTypesUS=[
+        {v:'deed',l:'📜 Deed',fields:['deedType','grantor','grantee','county','parcelNumber','recordedDate','salePrice','legalDescription']},
+        {v:'titlePolicy',l:'🏷️ Title Insurance Policy',fields:['titleInsurer','policyNumber','coverageAmount','effectiveDate','exceptions']},
+        {v:'propertyTax',l:'🏛️ Property Tax Bill',fields:['parcelNumber','assessedValue','annualTax',  'taxYear','dueDate','county'],},
+        {v:'closingDisclosure',l:'📃 Closing Disclosure / HUD-1',fields:['salePrice','closingDate','buyerName','sellerName','loanAmount','prorationsTaxes','closingCosts']},
+        {v:'hoa',l:'🏘️ HOA Documents',fields:['hoaName','monthlyDues','specialAssessment','restrictions','contactInfo']},
+        {v:'inspection',l:'🔍 Home Inspection Report',fields:['inspector','inspectionDate','majorFindings','recommendations','overallCondition']},
+        {v:'mortgage',l:'🏦 Mortgage / Deed of Trust',fields:['lender','loanNumber','loanAmount','interestRate','termYears','firstPaymentDate']},
+        {v:'lease',l:'📑 Lease Agreement',fields:['tenant','monthlyRent','startDate','endDate','securityDeposit']},
+        {v:'insurance',l:'🛡️ Homeowners Insurance',fields:['insurer','policyNumber','dwellingCoverage','annualPremium','deductible','effectiveDate','expirationDate','coverages']},
+        {v:'survey',l:'📐 Property Survey',fields:['surveyor','surveyDate','lotArea','boundaries','easements']},
+        {v:'appraisal',l:'💵 Appraisal Report',fields:['appraiser','appraisalDate','appraisedValue','approach','comparables']},
+        {v:'other',l:'📄 Other Document',fields:['description']},
+      ];
+      const docTypes=propCountry==='US'?docTypesUS:docTypesCO;
+      const fieldLabels={
+        // CO — Escritura
+        numEscritura:'Nº Escritura',notaria:'Notaría',fechaRegistro:'Fecha Registro',area:'Área (m²)',linderos:'Linderos',propietarios:'Propietario (Comprador)',vendedor:'Vendedor',naturalezaActo:'Naturaleza del Acto',valorVenta:'Valor de Venta',formaPago:'Forma de Pago',matriculaInmobiliaria:'Matrícula Inmobiliaria',coeficiente:'Coeficiente Copropiedad (%)',
+        // CO — Tradición
+        matricula:'Matrícula Inmobiliaria',circulo:'Círculo Registral',gravamenes:'Gravámenes / Hipotecas',estado:'Estado',fechaExpedicion:'Fecha Expedición',estadoFolio:'Estado del Folio',numAnotaciones:'Nº de Anotaciones',ultimaTransaccion:'Última Transacción',areaTotal:'Área Total (m²)',
+        // CO — Predial
+        avaluoCatastral:'Avalúo Catastral',impuestoAnual:'Impuesto Anual',direccion:'Dirección',destino:'Destino Económico',estrato:'Estrato',vigencia:'Vigencia (Año)',cedulaCatastral:'Cédula Catastral',areaTerreno:'Área Terreno (m²)',areaConstruida:'Área Construida (m²)',
+        // CO — otros
+        inquilino:'Inquilino',canon:'Canon Mensual',fechaInicio:'Fecha Inicio',fechaFin:'Fecha Fin',deposito:'Depósito',descripcion:'Descripción',aseguradora:'Aseguradora',numPoliza:'Nº Póliza',tipoCobertura:'Tipo de Cobertura',valorAsegurado:'Valor Asegurado',prima:'Prima (Anual)',deducible:'Deducible',vigenciaInicio:'Vigencia Desde',vigenciaFin:'Vigencia Hasta',coberturas:'Coberturas Incluidas',
+        // US
+        deedType:'Deed Type',grantor:'Grantor (Seller)',grantee:'Grantee (Buyer)',county:'County',parcelNumber:'Parcel / APN',recordedDate:'Recorded Date',salePrice:'Sale Price',legalDescription:'Legal Description',
+        titleInsurer:'Title Insurer',policyNumber:'Policy Number',coverageAmount:'Coverage Amount',effectiveDate:'Effective Date',exceptions:'Exceptions',
+        assessedValue:'Assessed Value',annualTax:'Annual Tax',taxYear:'Tax Year',dueDate:'Due Date',
+        closingDate:'Closing Date',buyerName:'Buyer',sellerName:'Seller',loanAmount:'Loan Amount',prorationsTaxes:'Tax Prorations',closingCosts:'Closing Costs',
+        hoaName:'HOA Name',monthlyDues:'Monthly Dues',specialAssessment:'Special Assessment',restrictions:'Restrictions / CC&Rs',contactInfo:'Contact Info',
+        inspector:'Inspector',inspectionDate:'Inspection Date',majorFindings:'Major Findings',recommendations:'Recommendations',overallCondition:'Overall Condition',
+        lender:'Lender',loanNumber:'Loan Number',interestRate:'Interest Rate',termYears:'Term (years)',firstPaymentDate:'First Payment Date',
+        tenant:'Tenant',monthlyRent:'Monthly Rent',startDate:'Start Date',endDate:'End Date',securityDeposit:'Security Deposit',
+        insurer:'Insurer',dwellingCoverage:'Dwelling Coverage',annualPremium:'Annual Premium',expirationDate:'Expiration Date',coverages:'Coverages',
+        surveyor:'Surveyor',surveyDate:'Survey Date',lotArea:'Lot Area',boundaries:'Boundaries',easements:'Easements',
+        appraiser:'Appraiser',appraisalDate:'Appraisal Date',appraisedValue:'Appraised Value',approach:'Valuation Approach',comparables:'Comparables',
+        description:'Description'
+      };
 
       const extractFields=(text,type)=>{
         const f={};
+        const T=text.replace(/\s+/g,' ');
         if(type==='escritura'){
-          const ne=text.match(/[Ee]scritura\s*(?:[Nn]o?\.?|[Nn]úmero)?\s*(\d[\d.]*)/);if(ne)f.numEscritura=ne[1];
-          const nt=text.match(/[Nn]otar[ií]a\s*(\w[\w\s]*?)(?:\s+de\s+|\s+del\s+|\s*,)/i);if(nt)f.notaria=nt[1].trim();
-          const ar=text.match(/[Áá]rea\s*(?:construida|total|privada)?\s*(?:de)?\s*([\d.,]+)\s*(?:m2|m²|metros)/i);if(ar)f.area=ar[1];
-          const pr=text.match(/(?:propietari[oa]s?|otorgante|vendedor|comprador)\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑa-záéíóúñ\s,]+)/i);if(pr)f.propietarios=pr[1].trim().slice(0,100);
+          let ne=T.match(/[Ee]scritura\s+(?:[Pp][úu]blica\s+)?(?:[Nn][úu]mero|[Nn]o\.?|N°|Nº)?[^()\d]{0,80}\((\d[\d.,]*)\)/);
+          if(!ne)ne=T.match(/[Ee]scritura\s+(?:[Pp][úu]blica\s+)?(?:[Nn][úu]mero|[Nn]o\.?|N°|Nº)?\s*(\d[\d.,]{1,12})\b/);
+          if(ne)f.numEscritura=ne[1].replace(/[.,]/g,'');
+          let nt=T.match(/[Nn]otar[ií]a[^()\d]{0,80}\((\d{1,3})\)\s*(?:de(?:l)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]+?)(?:\s|,|\.|$))?/);
+          if(nt)f.notaria=nt[2]?`${nt[1]} de ${nt[2].trim()}`:`${nt[1]}`;
+          if(!nt){const nt2=T.match(/[Nn]otar[ií]a\s+(\d{1,3})(?:\s+de(?:l)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]+?)(?:\s|,|\.|$))?/);if(nt2)f.notaria=nt2[2]?`${nt2[1]} de ${nt2[2].trim()}`:nt2[1];}
+          if(!f.notaria){const nt3=T.match(/[Nn]otar[ií]a\s+([A-Za-zÁÉÍÓÚÑáéíóúñ]+(?:\s+y\s+[A-Za-zÁÉÍÓÚÑáéíóúñ]+)?)\s+(?:de(?:l)?\s+([A-ZÁÉÍÓÚÑa-záéíóúñ\s]+?))?(?:\s|,|\.|$)/);if(nt3)f.notaria=nt3[2]?`${nt3[1]} de ${nt3[2].trim()}`:nt3[1];}
+          const ar=T.match(/[Áá]rea\s*(?:construida|total|privada|del?\s+lote)?\s*(?:de|:)?\s*([\d.,]+)\s*(?:m2|m²|M2|M²|metros\s*cuadrados)/i);if(ar)f.area=ar[1];
+          // Propietarios: SOLO acepta nombres en MAYÚSCULAS (mínimo 2 palabras de 3+ letras) — evita falsos positivos
+          const NAME='([A-ZÁÉÍÓÚÑ]{2,}(?:\\s+(?:DE|DEL|LA|LAS|LOS|Y)\\s+)?(?:\\s+[A-ZÁÉÍÓÚÑ]{2,}){1,5})';
+          let pr=T.match(new RegExp('compareci[óo](?:eron)?\\s+(?:el|la|los|las)?\\s*(?:se[ñn]or(?:es|a|as)?\\s+)?(?:don|do[ñn]a\\s+)?'+NAME));
+          if(!pr)pr=T.match(new RegExp('(?:OTORGA(?:NTES?)?|VENDEDOR(?:ES)?|COMPRADOR(?:ES)?|PROPIETARIO[S]?)\\s*[:\\-]\\s*'+NAME));
+          if(!pr)pr=T.match(new RegExp('(?:se[ñn]or(?:es|a|as)?|don|do[ñn]a)\\s+'+NAME+'\\s*,?\\s*(?:var[oó]n|mujer|colombian[oa]|mayor)'));
+          if(pr)f.propietarios=pr[1].trim().replace(/\s+/g,' ').slice(0,120);
+          const fr=T.match(/\(\s*(\d{1,2})\s*\)\s*d[ií]as?\s+del?\s*mes\s+de\s+([A-Za-záéíóúñÁÉÍÓÚÑ]+)\s+de(?:\s+\w+){0,5}?\s*\(\s*(\d{4})\s*\)/i);
+          if(fr)f.fechaRegistro=`${fr[1]} de ${fr[2]} de ${fr[3]}`;
+          const ld=T.match(/(?:LINDEROS|Linderos)\s*(?:son los siguientes)?\s*[:\-]?\s*((?:POR EL\s+(?:NORTE|SUR|ORIENTE|OCCIDENTE|ESTE|OESTE)[^.]{5,200}\.?\s*){1,4})/);
+          if(ld)f.linderos=ld[1].trim().replace(/\s+/g,' ').slice(0,500);
         } else if(type==='tradicion'){
-          const mt=text.match(/[Mm]atr[ií]cula\s*(?:[Ii]nmobiliaria)?\s*(?:[Nn]o?\.?)?\s*([\d-]+)/);if(mt)f.matricula=mt[1];
-          const cr=text.match(/[Cc][ií]rculo\s*(?:[Rr]egistral)?\s*[:\-]?\s*(\w[\w\s]*?)(?:\n|,|\.|$)/);if(cr)f.circulo=cr[1].trim();
-          const hip=text.match(/[Hh]ipoteca|[Gg]rav[aá]men|[Ee]mbargo/i);f.estado=hip?'⚠️ Con anotaciones':'✅ Libre de gravámenes';
-          const fe=text.match(/(?:[Ff]echa\s*(?:de\s*)?[Ee]xpedici[oó]n)\s*[:\-]?\s*(\d{1,2}[\s/.-]\w+[\s/.-]\d{2,4})/i);if(fe)f.fechaExpedicion=fe[1];
+          // Matrícula: prioriza "Nro Matrícula: 001-XXXXXX" (formato Supernotariado), evita el Pin No
+          let mt=T.match(/[Nn]ro\.?\s*[Mm]atr[ií]cula\s*[:\-]?\s*(\d{3}-\d{4,})/);
+          if(!mt)mt=T.match(/[Mm]atr[ií]cula\s+(?:[Ii]nmobiliaria\s+)?(?:[Nn]ro?\.?|N°|Nº)?\s*[:\-]?\s*(\d{3}-\d{4,})/);
+          if(!mt)mt=T.match(/[Mm]atr[ií]cula\s+(?:[Ii]nmobiliaria\s+)?(?:[Nn]ro?\.?|N°|Nº)?\s*[:\-]?\s*([\d-]{6,})/);
+          if(mt)f.matricula=mt[1];
+          // Círculo: acepta dígitos al inicio ("001 - MEDELLIN SUR") · stop antes de DEPTO/MUNICIPIO/etc
+          const cr=T.match(/c[ií]rculo\s*registral\s*[:\-]?\s*(\d+\s*[-–]\s*(?:(?!DEPTO|MUNICIPIO|VEREDA|FECHA|RADICACI[OÓ]N)[A-ZÁÉÍÓÚÑa-záéíóúñ]+\s*){1,4})/i);
+          if(cr)f.circulo=cr[1].trim().replace(/\s+/g,' ');
+          const hip=T.match(/HIPOTECA|EMBARGO|hipoteca|embargo/);
+          const srv=T.match(/SERVIDUMBRE|servidumbre/);
+          if(hip)f.estado='⚠️ Hipoteca / Embargo';
+          else if(srv)f.estado='⚠️ Con servidumbres';
+          else f.estado='✅ Libre de gravámenes';
+          const grav=T.match(/ESPECIFICACION\s*[:\-]?\s*(SERVIDUMBRE[^.]{5,200}|HIPOTECA[^.]{5,200}|EMBARGO[^.]{5,200})/i);
+          if(grav)f.gravamenes=grav[1].trim().replace(/\s+/g,' ').slice(0,300);
+          let fe=T.match(/Impreso\s+el\s+(\d{1,2}\s+de\s+[A-Za-záéíóúñ]+\s+de\s+\d{4})/i);
+          if(!fe)fe=T.match(/(?:[Ff]echa\s*(?:de\s*)?(?:[Ee]xpedici[oó]n|[Ii]mpresi[oó]n))\s*[:\-]?\s*(\d{1,2}[\s/.-][\w]+[\s/.-]\d{2,4})/i);
+          if(fe)f.fechaExpedicion=fe[1].trim();
+          // Propietario actual: última línea "A:" en anotaciones (adquiriente más reciente)
+          const owners=[...T.matchAll(/\bA:\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\/,]{5,80}?)(?:\s+(?:CC|NIT|CE)#|\s{2,}|$)/g)];
+          if(owners.length>0)f.propietarios=owners[owners.length-1][1].trim().replace(/\s+/g,' ').slice(0,120);
+          if(!f.propietarios){const adq=T.match(/ADQUIRI[OÓ]\s*[:\-]?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s\.\/]{5,80}?)(?:\s+EL\s+|,|\.|\s{2,})/);if(adq)f.propietarios=adq[1].trim().replace(/\s+/g,' ').slice(0,120);}
         } else if(type==='predial'){
           const av=text.match(/[Aa]val[uú]o\s*(?:[Cc]atastral)?\s*[:\$]?\s*([\d.,]+)/);if(av)f.avaluoCatastral=av[1];
           const im=text.match(/[Ii]mpuesto\s*(?:[Aa]nual|[Pp]redial)?\s*[:\$]?\s*([\d.,]+)/);if(im)f.impuestoAnual=im[1];
@@ -2044,10 +2430,34 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       const handleDocUpload=async(e)=>{
         const file=e.target.files?.[0];if(!file)return;
-        setUploadingDoc(true);
+        setDocFile(file);
+        setUploadingDoc(true);setOcrProgress('');
         try{
           const {extractPDFText}=await loadParsers();
-          const {fullText:text}=await extractPDFText(file);
+          let {fullText:text}=await extractPDFText(file);
+          if(text.trim().length<100){
+            setOcrProgress(lang==='es'?'PDF escaneado. Iniciando OCR…':'Scanned PDF. Starting OCR…');
+            const [Tesseract,pdfjsLib]=await Promise.all([
+              import('tesseract.js').then(m=>m.default),
+              import('pdfjs-dist').then(m=>m.default||m)
+            ]);
+            const buf=await file.arrayBuffer();
+            const pdf=await pdfjsLib.getDocument({data:new Uint8Array(buf)}).promise;
+            const maxPages=Math.min(pdf.numPages,5);
+            let ocrText='';
+            for(let i=1;i<=maxPages;i++){
+              setOcrProgress(lang==='es'?`OCR página ${i}/${maxPages}…`:`OCR page ${i}/${maxPages}…`);
+              const page=await pdf.getPage(i);
+              const viewport=page.getViewport({scale:2});
+              const canvas=document.createElement('canvas');
+              canvas.width=viewport.width;canvas.height=viewport.height;
+              await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+              const {data:{text:pageText}}=await Tesseract.recognize(canvas,'spa',{logger:m=>{if(m.status==='recognizing text')setOcrProgress(lang==='es'?`OCR pág ${i}/${maxPages} · ${Math.round(m.progress*100)}%`:`OCR pg ${i}/${maxPages} · ${Math.round(m.progress*100)}%`)}});
+              ocrText+=pageText+'\n';
+            }
+            text=ocrText;
+            if(pdf.numPages>maxPages)notify(lang==='es'?`OCR procesó ${maxPages} de ${pdf.numPages} páginas`:`OCR processed ${maxPages} of ${pdf.numPages} pages`,'info');
+          }
           setExtractedText(text);
           const autoFields=extractFields(text,docForm.type);
           setDocForm(f=>({...f,name:file.name,fields:{...f.fields,...autoFields}}));
@@ -2055,18 +2465,51 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           if(Object.keys(autoFields).length>0) notify(lang==='es'?`${Object.keys(autoFields).length} campos extraídos automáticamente`:`${Object.keys(autoFields).length} fields auto-extracted`);
           else notify(lang==='es'?'PDF leído. Completa los campos manualmente.':'PDF read. Fill fields manually.','warn');
         }catch(err){notify('Error leyendo PDF: '+err.message,'error')}
-        setUploadingDoc(false);
+        setUploadingDoc(false);setOcrProgress('');
+      };
+
+      const extractWithAI=async()=>{
+        if(!extractedText||extractedText.trim().length<20){notify(lang==='es'?'No hay texto suficiente':'Not enough text','error');return;}
+        setAiExtracting(true);
+        try{
+          const call=httpsCallable(fbFunctions,'extractDocumentFields');
+          const res=await call({text:extractedText,docType:docForm.type});
+          const aiFields=res.data?.fields||{};
+          const count=Object.keys(aiFields).length;
+          setDocForm(f=>({...f,fields:{...f.fields,...aiFields}}));
+          notify(lang==='es'?`🤖 IA extrajo ${count} campos`:`🤖 AI extracted ${count} fields`,'success');
+        }catch(err){
+          const msg=err?.message||'Error';
+          notify(lang==='es'?`Error IA: ${msg}`:`AI error: ${msg}`,'error');
+        }
+        setAiExtracting(false);
       };
 
       const saveDoc=async()=>{
-        await save('documents',{type:docForm.type,name:docForm.name,notes:docForm.notes,fields:docForm.fields,textPreview:(extractedText||'').slice(0,500),uploadDate:new Date().toISOString().split('T')[0]});
-        setShowDocForm(false);setDocForm({type:'escritura',name:'',notes:'',fields:{}});setExtractedText('');
+        let fileURL='',filePath='';
+        if(docFile&&auth.currentUser){
+          try{
+            const ts=Date.now();
+            const safeName=docFile.name.replace(/[^a-zA-Z0-9.\-_]/g,'_');
+            filePath=`users/${auth.currentUser.uid}/documents/${propertyId}/${ts}_${safeName}`;
+            const ref=storageRef(storage,filePath);
+            const snap=await uploadBytes(ref,docFile,{contentType:docFile.type||'application/pdf'});
+            fileURL=await getDownloadURL(snap.ref);
+          }catch(err){notify((lang==='es'?'Archivo no subido: ':'File not uploaded: ')+err.message,'warn')}
+        }
+        await save('documents',{type:docForm.type,name:docForm.name,notes:docForm.notes,fields:docForm.fields,textPreview:(extractedText||'').slice(0,500),uploadDate:new Date().toISOString().split('T')[0],fileURL,filePath,fileSize:docFile?.size||0});
+        setShowDocForm(false);setDocForm({type:propCountry==='US'?'deed':'escritura',name:'',notes:'',fields:{}});setExtractedText('');setDocFile(null);
+        notify(lang==='es'?'✅ Documento guardado':'✅ Document saved','success');
       };
 
-      const curType=docTypes.find(d=>d.v===docForm.type);
+      const curType=docTypes.find(d=>d.v===docForm.type)||docTypes[0];
+      // Si el tipo actual no existe para este país, resetearlo al default del país
+      if(!docTypes.find(d=>d.v===docForm.type)&&docForm.type!==docTypes[0].v){
+        setTimeout(()=>setDocForm(f=>({...f,type:docTypes[0].v})),0);
+      }
 
       return <>
-      <div className="flex justify-between items-center mb-2"><h1 className="text-[22px] font-extrabold text-slate-800">📄 {lang==='es'?'Documentos de Propiedad':'Property Documents'}</h1></div>
+      <div className="flex justify-between items-center mb-2"><h1 className="text-[22px] font-extrabold text-slate-800">📄 {lang==='es'?'Títulos y Documentos':'Title & Documents'}</h1></div>
       <p className="text-sm text-slate-400 mb-5">{lang==='es'?'Sube escrituras, certificados de tradición, prediales y otros documentos. La IA extrae los datos clave automáticamente.':'Upload deeds, title certificates, property tax records. AI extracts key data automatically.'}</p>
 
       {/* Upload area */}
@@ -2076,7 +2519,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
         <label className="cursor-pointer inline-block">
           <input type="file" accept=".pdf" onChange={handleDocUpload} className="hidden"/>
-          <div className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition inline-flex items-center gap-2">{uploadingDoc?<><Loader2 size={16} className="animate-spin"/>{lang==='es'?'Analizando...':'Analyzing...'}</>:<><Upload size={16}/>{lang==='es'?'Subir PDF':'Upload PDF'}</>}</div>
+          <div className="px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition inline-flex items-center gap-2">{uploadingDoc?<><Loader2 size={16} className="animate-spin"/>{ocrProgress||(lang==='es'?'Analizando...':'Analyzing...')}</>:<><Upload size={16}/>{lang==='es'?'Subir PDF':'Upload PDF'}</>}</div>
         </label>
         <div className="text-[10px] text-slate-400 mt-2">{lang==='es'?'El sistema extrae automáticamente los datos clave del documento':'The system automatically extracts key data from the document'}</div>
       </div>}
@@ -2085,9 +2528,16 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {showDocForm&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">{curType?.l} <span className="text-[10px] text-slate-400">{docForm.name}</span></h3>
-          <button onClick={()=>{setShowDocForm(false);setExtractedText('')}} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
+          <button onClick={()=>{setShowDocForm(false);setExtractedText('');setDocFile(null)}} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
         </div>
-        <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-[11px] text-emerald-700">🤖 {lang==='es'?'Datos extraídos automáticamente. Verifica y corrige lo que sea necesario.':'Data extracted automatically. Verify and correct as needed.'}</div>
+        {Object.values(docForm.fields||{}).some(v=>v)
+          ?<div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-[11px] text-emerald-700">🤖 {lang==='es'?'Datos extraídos automáticamente. Verifica y corrige lo que sea necesario.':'Data extracted automatically. Verify and correct as needed.'}</div>
+          :<div className="bg-amber-50 border border-amber-100 rounded-xl p-3 mb-4 text-[11px] text-amber-700">⚠️ {lang==='es'?'No se pudieron extraer datos automáticamente. Completa los campos manualmente.':'Could not auto-extract data. Fill fields manually.'}</div>}
+        {extractedText&&<details open className="mb-4 bg-slate-50 border border-slate-200 rounded-xl">
+          <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold text-slate-600 select-none">🔍 {lang==='es'?'Texto detectado en el PDF':'Text detected in PDF'} ({extractedText.length} {lang==='es'?'caracteres':'chars'})</summary>
+          <pre className="px-3 py-2 text-[10px] text-slate-500 max-h-48 overflow-auto whitespace-pre-wrap font-mono border-t border-slate-200">{extractedText.slice(0,3000)}{extractedText.length>3000?'\n…':''}</pre>
+        </details>}
+        {extractedText&&['escritura','tradicion','predial','contrato','poliza'].includes(docForm.type)&&<button onClick={extractWithAI} disabled={aiExtracting} className="w-full mb-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50">{aiExtracting?<><Loader2 size={16} className="animate-spin"/>{lang==='es'?'IA leyendo el documento…':'AI reading document…'}</>:<>✨ {lang==='es'?'Extraer con IA (Claude)':'Extract with AI (Claude)'}</>}</button>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {curType?.fields.map(fk=><div key={fk}>
             <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{fieldLabels[fk]||fk}</label>
@@ -2101,32 +2551,91 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <input value={docForm.notes} onChange={e=>setDocForm(f=>({...f,notes:e.target.value}))} className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm" placeholder={lang==='es'?'Notas adicionales...':'Additional notes...'}/>
         </div>
         <div className="flex gap-3 mt-4">
-          <button onClick={()=>{setShowDocForm(false);setExtractedText('')}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button>
+          <button onClick={()=>{setShowDocForm(false);setExtractedText('');setDocFile(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button>
           <button onClick={saveDoc} className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-sm">{lang==='es'?'Guardar Documento':'Save Document'}</button>
         </div>
       </div>}
 
       {/* Document list */}
-      {documents.length>0?<div className="space-y-3">
+      {documents.length>0?<div className="space-y-4">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mt-6 mb-2">{lang==='es'?`Mis Documentos (${documents.length})`:`My Documents (${documents.length})`}</h3>
         {documents.sort((a,b)=>(b.uploadDate||'').localeCompare(a.uploadDate||'')).map(d=>{
           const dt=docTypes.find(t=>t.v===d.type);
           const isTradicion=d.type==='tradicion';
           const daysSinceUpload=d.uploadDate?Math.floor((Date.now()-new Date(d.uploadDate+'T00:00:00'))/(1000*60*60*24)):999;
-          return <div key={d.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 hover:shadow-md transition">
-            <div className="flex justify-between items-start">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-bold text-slate-800">{dt?.l||d.type}</span>
-                  {isTradicion&&daysSinceUpload>30&&<span className="text-[9px] font-bold bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full">⚠️ {lang==='es'?'Vencido (+30 días)':'Expired (+30 days)'}</span>}
-                  {d.fields?.estado&&<span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${d.fields.estado.includes('✅')?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}`}>{d.fields.estado}</span>}
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-1">
-                  {Object.entries(d.fields||{}).filter(([k,v])=>v&&k!=='estado').map(([k,v])=><div key={k} className="text-[11px]"><span className="text-slate-400">{fieldLabels[k]||k}: </span><span className="font-semibold text-slate-700">{v}</span></div>)}
-                </div>
-                {d.notes&&<div className="text-[10px] text-slate-400 mt-1">📝 {d.notes}</div>}
-                <div className="text-[9px] text-slate-300 mt-1">{d.name} · {d.uploadDate?fmDate(d.uploadDate):''}</div>
+          const fields=Object.entries(d.fields||{}).filter(([k,v])=>v&&k!=='estado');
+          const longFieldKeys=['linderos','gravamenes','descripcion','coberturas','legalDescription','boundaries','restrictions','majorFindings','recommendations','exceptions','comparables'];
+          // HIGHLIGHTS por tipo de documento — campos más críticos
+          const highlightsByType={
+            escritura:['naturalezaActo','valorVenta','propietarios','fechaRegistro','matriculaInmobiliaria'],
+            tradicion:['estadoFolio','propietarios','gravamenes','fechaExpedicion','matricula'],
+            predial:['avaluoCatastral','impuestoAnual','vigencia','cedulaCatastral'],
+            contrato:['inquilino','canon','fechaInicio','fechaFin'],
+            poliza:['aseguradora','valorAsegurado','prima','vigenciaFin'],
+            deed:['deedType','salePrice','grantee','recordedDate'],
+            titlePolicy:['titleInsurer','coverageAmount','effectiveDate'],
+            propertyTax:['assessedValue','annualTax','taxYear'],
+            mortgage:['lender','loanAmount','interestRate','firstPaymentDate'],
+            insurance:['insurer','dwellingCoverage','annualPremium','expirationDate'],
+            lease:['tenant','monthlyRent','startDate','endDate'],
+            closingDisclosure:['salePrice','closingDate','loanAmount'],
+            hoa:['hoaName','monthlyDues'],
+            inspection:['inspector','inspectionDate','overallCondition'],
+            appraisal:['appraiser','appraisedValue','appraisalDate'],
+            survey:['surveyor','lotArea','surveyDate']
+          };
+          const highlightKeys=highlightsByType[d.type]||[];
+          const highlights=highlightKeys.map(k=>[k,d.fields?.[k]]).filter(([,v])=>v);
+          const highlightSet=new Set(highlightKeys);
+          const shortFields=fields.filter(([k])=>!longFieldKeys.includes(k)&&!highlightSet.has(k));
+          const longFields=fields.filter(([k])=>longFieldKeys.includes(k));
+          return <div key={d.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition overflow-hidden">
+            {/* Header con gradiente por tipo */}
+            <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-5 py-3 border-b border-slate-100 flex justify-between items-center">
+              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                <span className="text-base font-extrabold text-slate-800 truncate">{dt?.l||d.type}</span>
+                {isTradicion&&daysSinceUpload>30&&<span className="text-[10px] font-bold bg-rose-100 text-rose-600 px-2 py-1 rounded-full whitespace-nowrap">⚠️ {lang==='es'?'Vencido':'Expired'}</span>}
+                {d.fields?.estado&&<span className={`text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap ${d.fields.estado.includes('✅')?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}`}>{d.fields.estado}</span>}
               </div>
-              <button onClick={()=>del('documents',d.id)} className="p-1.5 text-slate-300 hover:text-rose-500 rounded-lg hover:bg-rose-50"><Trash2 size={13}/></button>
+              <div className="flex gap-1.5 shrink-0">
+                {d.fileURL&&<a href={d.fileURL} target="_blank" rel="noopener noreferrer" title={lang==='es'?'Ver / Descargar PDF':'View / Download PDF'} className="px-3 py-1.5 text-blue-600 hover:text-white hover:bg-blue-600 rounded-lg border border-blue-200 hover:border-blue-600 transition flex items-center gap-1.5 text-[11px] font-bold"><Download size={13}/>{lang==='es'?'Ver PDF':'View PDF'}</a>}
+                <button onClick={async()=>{if(!confirm(lang==='es'?`¿Eliminar este documento?\n\n${d.name||d.type}`:`Delete this document?\n\n${d.name||d.type}`))return;if(d.filePath){try{await deleteObject(storageRef(storage,d.filePath))}catch(e){/* file may not exist */}}del('documents',d.id)}} title={lang==='es'?'Eliminar documento':'Delete document'} className="px-3 py-1.5 text-rose-500 hover:text-white hover:bg-rose-500 rounded-lg border border-rose-200 hover:border-rose-500 transition flex items-center gap-1.5 text-[11px] font-bold"><Trash2 size={13}/>{lang==='es'?'Eliminar':'Delete'}</button>
+              </div>
+            </div>
+            {/* Body: campos extraídos en formato ficha */}
+            <div className="p-5">
+              {fields.length===0?<div className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">⚠️ {lang==='es'?'No se extrajeron datos automáticamente — abre el documento para verlo.':'No data was auto-extracted — open the document to view it.'}</div>
+              :<>
+                {/* HIGHLIGHTS — datos críticos en grande */}
+                {highlights.length>0&&<div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 mb-4">
+                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-2">⭐ {lang==='es'?'Datos Clave':'Key Highlights'}</div>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {highlights.map(([k,v])=><div key={k}>
+                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">{fieldLabels[k]||k}</div>
+                      <div className="text-[15px] font-extrabold text-slate-800 break-words leading-tight">{v}</div>
+                    </div>)}
+                  </div>
+                </div>}
+                {/* Resto de campos cortos */}
+                {shortFields.length>0&&<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 mb-4">
+                  {shortFields.map(([k,v])=><div key={k} className="border-l-2 border-slate-200 pl-3">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{fieldLabels[k]||k}</div>
+                    <div className="text-[13px] font-semibold text-slate-700 break-words">{v}</div>
+                  </div>)}
+                </div>}
+                {/* Campos largos: linderos, gravámenes, etc. */}
+                {longFields.length>0&&<div className="space-y-3 mt-3 pt-3 border-t border-slate-100">
+                  {longFields.map(([k,v])=><div key={k}>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{fieldLabels[k]||k}</div>
+                    <div className="text-[12px] text-slate-700 bg-slate-50 rounded-lg p-3 whitespace-pre-wrap break-words leading-relaxed">{v}</div>
+                  </div>)}
+                </div>}
+              </>}
+              {d.notes&&<div className="text-[11px] text-slate-500 mt-3 pt-3 border-t border-slate-100">📝 {d.notes}</div>}
+              <div className="text-[10px] text-slate-300 mt-3 flex justify-between items-center">
+                <span className="truncate">📎 {d.name}</span>
+                <span className="whitespace-nowrap ml-2">{d.uploadDate?fmDate(d.uploadDate):''}</span>
+              </div>
             </div>
           </div>})}
       </div>
@@ -2317,6 +2826,15 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
               <div><span className="text-slate-400">Margen Promedio</span><div className="font-extrabold text-slate-800 text-base">{stmtRev?((stmtNet/stmtRev)*100).toFixed(1)+'%':'—'}</div></div>
             </div>
           </div>
+          {(prop.fixedCosts||[]).filter(x=>x.active!==false).length>0&&<div className="mt-3 bg-blue-50 rounded-xl p-4 border border-blue-100">
+            <h4 className="text-xs font-bold text-blue-700 mb-2">📋 Costos Fijos Template — Proyección</h4>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 text-center text-xs">
+              <div><span className="text-slate-400">Costos Fijos/Mes</span><div className="font-extrabold text-blue-700 text-base">{gFm(fixedTplMoAllTime)}</div></div>
+              <div><span className="text-slate-400">Sobre {stmts.length||12} meses</span><div className="font-extrabold text-rose-500 text-base">{gFm(fixedTplHorizonTotal)}</div></div>
+              <div><span className="text-slate-400">Anual equivalente</span><div className="font-extrabold text-slate-800 text-base">{gFm(fixedTplMoAllTime*12)}</div></div>
+            </div>
+            <div className="text-[10px] text-slate-400 mt-2 text-center">Estos costos NO están en la tabla de arriba (que proviene de statements). Vienen del template en Costos Fijos.</div>
+          </div>}
         </>:<p className="text-sm text-slate-400 text-center py-8">Carga statements para generar el P&L.</p>}
       </div>}
 
@@ -2362,7 +2880,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         const fixedMonthly=expenses.filter(e=>e.frequency==='monthly'&&!['mortgage_pay'].includes(e.category)).reduce((s,e)=>{const amt=e.amount||0;const cur=e.expCurrency||propCurrency;if(cur===propCurrency)return s+amt;if(cur==='USD'&&propCurrency!=='USD')return s+amt*xr;return s+amt},0);
         const annualFixed=expenses.filter(e=>e.frequency==='annual').reduce((s,e)=>{const amt=e.amount||0;const cur=e.expCurrency||propCurrency;if(cur===propCurrency)return s+amt;if(cur==='USD'&&propCurrency!=='USD')return s+amt*xr;return s+amt},0);
         const rFixedTotal=fixedMonthly*nMo+annualFixed*(nMo/12);
-        const rTotalExp=rPmExp+rOwnExp;
+        const rFixedTpl=fixedTplMoAllTime*nMo;
+        const rTotalExp=rPmExp+rOwnExp+rFixedTpl;
         const rNoi=rRev-rTotalExp;
         const rMort=(mort.monthlyPayment||0)*nMo;
         const rCf=rNoi-rMort;
@@ -2379,6 +2898,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             {rWater>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Water</span><span className="font-semibold text-rose-500">{gFm(rWater)}</span></div>}
             {rVendor>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) Vendor/Other</span><span className="font-semibold text-rose-500">{gFm(rVendor)}</span></div>}
             {rOwnExp>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">(-) {lang==='es'?'Gastos del Owner':'Owner Expenses'} ({curYear})</span><span className="font-semibold text-rose-500">{gFm(rOwnExp)}</span></div>}
+            {rFixedTpl>0&&<div className="flex justify-between py-2 text-sm"><span className="text-rose-500">📋 (-) {lang==='es'?'Costos Fijos':'Fixed Costs'} ({nMo} {lang==='es'?'meses':'months'})</span><span className="font-semibold text-rose-500">{gFm(rFixedTpl)}</span></div>}
           </div>
           <div className={`flex justify-between py-3 px-4 rounded-xl border ${rNoi>=0?'bg-emerald-50 border-emerald-100':'bg-rose-50 border-rose-100'}`}><span className={`font-bold ${rNoi>=0?'text-emerald-700':'text-rose-700'}`}>= NOI (Net Operating Income)</span><span className={`font-extrabold text-lg ${rNoi>=0?'text-emerald-700':'text-rose-700'}`}>{gFm(rNoi)}</span></div>
           {rMort>0&&<><div className="pl-6"><div className="flex justify-between py-2 text-sm"><span className="text-amber-600">(-) Hipoteca ({nMo} {lang==='es'?'meses':'months'})</span><span className="font-semibold text-amber-600">{gFm(rMort)}</span></div></div>
@@ -2414,11 +2934,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       {/* EXPENSES REPORT */}
       {rptTab==='expenses_rpt'&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
         <div className="border-b-2 border-rose-500 pb-3 mb-5"><h2 className="text-lg font-extrabold text-slate-800">Expenses Report</h2><p className="text-xs text-slate-400">{prop.name} · {expenses.length} records · Generated: {new Date().toLocaleDateString('es')}</p></div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
-          <div className="bg-rose-50 rounded-xl p-3 text-center border border-rose-100"><div className="text-[10px] text-rose-600 font-bold uppercase">Total Expenses</div><div className="text-xl font-extrabold text-rose-700">{gFm(totalOpEx)}</div></div>
-          <div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Fijos (Statements)</div><div className="text-xl font-extrabold text-amber-700">{sFm(stmtRev-stmtNet)}</div></div>
-          <div className="bg-slate-50 rounded-xl p-3 text-center border"><div className="text-[10px] text-slate-500 font-bold uppercase">Adicionales</div><div className="text-xl font-extrabold text-slate-800">{gFm(totExp)}</div></div>
-          <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100"><div className="text-[10px] text-blue-600 font-bold uppercase">{t('expenseRatio')}</div><div className="text-xl font-extrabold text-blue-700">{expRatio.toFixed(1)}%</div></div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+          <div className="bg-rose-50 rounded-xl p-3 text-center border border-rose-100"><div className="text-[10px] text-rose-600 font-bold uppercase">Total Gastos</div><div className="text-xl font-extrabold text-rose-700">{gFm(totalOpEx)}</div><div className="text-[9px] text-rose-500 mt-1">{expRatio.toFixed(1)}% del revenue</div></div>
+          {stmtRev>0&&<div className="bg-amber-50 rounded-xl p-3 text-center border border-amber-100"><div className="text-[10px] text-amber-600 font-bold uppercase">Statements PM</div><div className="text-xl font-extrabold text-amber-700">{sFm(stmtRev-stmtNet)}</div><div className="text-[9px] text-amber-500 mt-1">de {stmts.length} statements</div></div>}
+          {totExp>0&&<div className="bg-slate-50 rounded-xl p-3 text-center border"><div className="text-[10px] text-slate-500 font-bold uppercase">Gastos Manuales</div><div className="text-xl font-extrabold text-slate-800">{gFm(totExp)}</div><div className="text-[9px] text-slate-400 mt-1">{expenses.length} registros</div></div>}
+          {fixedTplHorizonTotal>0&&<div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100"><div className="text-[10px] text-blue-600 font-bold uppercase">📋 Costos Fijos</div><div className="text-xl font-extrabold text-blue-700">{gFm(fixedTplHorizonTotal)}</div><div className="text-[9px] text-blue-500 mt-1">{gFm(fixedTplMoAllTime)}/mes × {stmts.length||12}</div></div>}
         </div>
         {/* Breakdown from statements */}
         {stmtRev>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Desglose — Costos Operativos (de Statements)</h3>
@@ -2428,7 +2948,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </div>)}
           </div>
         </>}
-        {expByCat.length>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Additional Expenses by Category</h3>
+        {expByCat.length>0&&<><h3 className="text-sm font-bold text-slate-700 mb-3">Gastos por Categoría <span className="text-[10px] text-slate-400 font-normal">(incluye 📋 costos fijos template)</span></h3>
           <ResponsiveContainer width="100%" height={Math.max(150,expByCat.length*35)}><BarChart data={expByCat} layout="vertical"><CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0"/><XAxis type="number" tickFormatter={v=>gFm(v)} tick={{fontSize:10,fill:'#94a3b8'}}/><YAxis type="category" dataKey="name" tick={{fontSize:10,fill:'#64748b'}} width={120}/><Tooltip content={<Tip fmt={gFm}/>}/><Bar dataKey="value" name="Monto" fill="#DC2626" radius={[0,6,6,0]}/></BarChart></ResponsiveContainer>
         </>}
       </div>}
@@ -2453,22 +2973,43 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         }
         if(editId){update('expenses',editId,data)}else{save('expenses',data)}
       }} disabled={!expenseForm.amount||!expenseForm.concept} className="flex-1 py-2.5 bg-rose-500 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label={lang==='es'?'Fecha':'Date'} value={expenseForm.date} onChange={v=>ue('date',v)} type="date" required/><Sel label={lang==='es'?'Categoría':'Category'} value={expenseForm.category} onChange={v=>ue('category',v)} options={propCats.map(c=>({v:c.v,l:c.i+' '+c.l}))}/></div>
-      {(()=>{const existing=expenses.find(e=>e.category===expenseForm.category&&e.category!=='otros'&&(e.type==='fixed'||eFreq(e)==='monthly'||eFreq(e)==='annual')&&!editId);return existing?<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2.5 rounded-xl">⚠️ {lang==='es'?<>Ya tienes un gasto fijo en esta categoría (<b>{existing.concept}</b>). Si un socio pagó esta obligación, usa <button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:existing.concept,amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});setModal('contribution')}} className="underline text-purple-600 font-bold">Aporte de Socio</button> en vez de crear otro gasto.</>:<>You already have a fixed expense in this category (<b>{existing.concept}</b>). If a partner paid this obligation, use <button onClick={()=>{setContribForm({date:new Date().toISOString().split('T')[0],concept:existing.concept,amount:'',paidBy:partners[0]?.id||'',purpose:'operations'});setModal('contribution')}} className="underline text-purple-600 font-bold">Partner Payment</button> instead of creating another expense.</>}</div>:null})()}
-      <Inp label={lang==='es'?'Concepto':'Concept'} value={expenseForm.concept} onChange={v=>ue('concept',v)} placeholder={lang==='es'?'Descripción del gasto':'Expense description'} required error={expenseForm.concept===''&&expenseForm.amount?(lang==='es'?'Ingresa una descripción':'Enter a description'):''}/>
-      <div className="grid grid-cols-2 gap-3">
-        <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Moneda</label><div className="grid grid-cols-3 gap-1">{[['USD','🇺🇸 USD'],['COP','🇨🇴 COP'],['EUR','🇪🇺 EUR']].map(([v,l])=><button key={v} type="button" onClick={()=>ue('expCurrency',v)} className={`py-2 rounded-xl border-2 text-[10px] font-medium transition ${(expenseForm.expCurrency||propCurrency)===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
-        <Inp label={`${lang==='es'?'Monto':'Amount'} (${expenseForm.expCurrency||propCurrency})`} value={expenseForm.amount} onChange={v=>ue('amount',v)} prefix={(expenseForm.expCurrency||propCurrency)==='EUR'?'€':(expenseForm.expCurrency||propCurrency)==='GBP'?'£':'$'} type="number" min="0" required error={expenseForm.amount&&parseFloat(expenseForm.amount)<=0?(lang==='es'?'El monto debe ser mayor a 0':'Amount must be > 0'):''}/>
+      <div className="space-y-4">
+        {/* Row 1: Concepto (protagonista) */}
+        <Inp label={lang==='es'?'Concepto':'Concept'} value={expenseForm.concept} onChange={v=>ue('concept',v)} placeholder={lang==='es'?'¿En qué gastaste? (ej. Reparación grifo)':'What was it? (e.g. Faucet repair)'} required error={expenseForm.concept===''&&expenseForm.amount?(lang==='es'?'Ingresa una descripción':'Enter a description'):''}/>
+
+        {/* Row 2: Monto + Moneda */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="col-span-2"><Inp label={`${lang==='es'?'Monto':'Amount'}`} value={expenseForm.amount} onChange={v=>ue('amount',v)} prefix={(expenseForm.expCurrency||propCurrency)==='EUR'?'€':(expenseForm.expCurrency||propCurrency)==='GBP'?'£':'$'} type="number" min="0" required error={expenseForm.amount&&parseFloat(expenseForm.amount)<=0?(lang==='es'?'El monto debe ser mayor a 0':'Amount must be > 0'):''}/></div>
+          <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Moneda':'Currency'}</label><select value={expenseForm.expCurrency||propCurrency} onChange={e=>ue('expCurrency',e.target.value)} className="w-full px-3 py-2.5 text-sm border-2 border-slate-200 rounded-xl focus:border-blue-400 focus:outline-none bg-white">{CURRENCY_LIST.map(c=><option key={c.v} value={c.v}>{c.v}</option>)}</select></div>
+        </div>
+        {(expenseForm.expCurrency||propCurrency)!==propCurrency&&prop.exchangeRate>0&&expenseForm.amount&&<div className="text-[11px] text-blue-600 font-semibold bg-blue-50 px-3 py-2 rounded-xl">= {fmCurrency(parseFloat(expenseForm.amount)*((expenseForm.expCurrency||'USD')==='USD'?prop.exchangeRate:1/prop.exchangeRate),propCurrency)} {propCurrency}</div>}
+
+        {/* Row 3: Fecha + Categoría */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Inp label={lang==='es'?'Fecha':'Date'} value={expenseForm.date} onChange={v=>ue('date',v)} type="date" required/>
+          <Sel label={lang==='es'?'Categoría':'Category'} value={expenseForm.category} onChange={v=>ue('category',v)} options={propCats.map(c=>({v:c.v,l:c.i+' '+c.l}))}/>
+        </div>
+
+        {/* Row 4: Quién pagó */}
+        <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'¿Quién pagó?':'Who paid?'}</label><PPick partners={partners} selected={expenseForm.paidBy} onChange={v=>ue('paidBy',v)}/></div>
+
+        {/* Advanced: recurrencia (oculto por default) */}
+        {(expenseForm.frequency&&expenseForm.frequency!=='once')||editId?
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+            <div className="flex items-center justify-between mb-2"><label className="text-[11px] font-bold text-amber-800 uppercase">{lang==='es'?'⚠️ Gasto recurrente':'⚠️ Recurring expense'}</label><button type="button" onClick={()=>{ue('frequency','once');ue('type','additional')}} className="text-[10px] text-amber-700 underline">{lang==='es'?'Convertir a gasto único':'Make one-time'}</button></div>
+            <div className="grid grid-cols-2 gap-1">{[['monthly','🔄 '+t('monthly')],['annual','📅 '+t('annual')]].map(([v,l])=><button key={v} type="button" onClick={()=>{ue('frequency',v);ue('type','fixed')}} className={`py-2 rounded-lg border-2 text-[11px] font-medium transition ${expenseForm.frequency===v?'border-amber-500 bg-white text-amber-700':'border-slate-200 text-slate-500 bg-white'}`}>{l}</button>)}</div>
+            <div className="text-[10px] text-amber-700 mt-2">{lang==='es'?'💡 Los costos recurrentes se manejan mejor en el tab Costos Fijos.':'Recurring costs are better managed in the Fixed Costs tab.'}</div>
+            {expenseForm.frequency==='annual'&&expenseForm.amount&&<div className="text-[11px] text-blue-600 font-semibold bg-white px-3 py-2 rounded-lg mt-2">= {gFm(parseFloat(expenseForm.amount)/12)}/{t('mo')} {lang==='es'?'equivalente':'equivalent'}</div>}
+          </div>
+          :
+          <button type="button" onClick={()=>{ue('frequency','monthly');ue('type','fixed')}} className="text-[11px] text-slate-500 hover:text-slate-700 underline">{lang==='es'?'¿Es un gasto recurrente?':'Is it a recurring expense?'}</button>
+        }
+
+        {/* Warnings */}
+        {expenseForm.category==='mortgage_pay'&&mort.monthlyPayment>0&&<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">⚠️ {lang==='es'?`La hipoteca ya está configurada ($${mort.monthlyPayment}/${t('mo')}). Este gasto NO se sumará doble.`:`Mortgage already configured ($${mort.monthlyPayment}/${t('mo')}). This won't double-count.`}</div>}
+        {(expenseForm.category==='taxes'||expenseForm.category==='predial')&&mort.includesTaxes&&<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">⚠️ {lang==='es'?'Tu pago de hipoteca ya incluye Property Taxes (escrow). Este gasto se excluirá del P&L automáticamente.':'Your mortgage payment already includes Property Taxes (escrow). This expense will be auto-excluded from P&L.'}</div>}
+        {expenseForm.category==='insurance'&&mort.includesInsurance&&<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">⚠️ {lang==='es'?'Tu pago de hipoteca ya incluye Insurance (escrow). Este gasto se excluirá del P&L automáticamente.':'Your mortgage payment already includes Insurance (escrow). This expense will be auto-excluded from P&L.'}</div>}
       </div>
-      {(expenseForm.expCurrency||propCurrency)!==propCurrency&&prop.exchangeRate>0&&expenseForm.amount&&<div className="text-[11px] text-blue-500 font-semibold bg-blue-50 px-3 py-2 rounded-xl">= {fmCurrency(parseFloat(expenseForm.amount)*((expenseForm.expCurrency||'USD')==='USD'?prop.exchangeRate:1/prop.exchangeRate),propCurrency)} {propCurrency}</div>}
-      <div className="grid grid-cols-2 gap-3">
-        <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'Frecuencia':'Frequency'}</label><div className="grid grid-cols-3 gap-1">{[['monthly','🔄 '+t('monthly')],['annual','📅 '+t('annual')],['once','🛒 '+t('purchase')]].map(([v,l])=><button key={v} type="button" onClick={()=>{ue('frequency',v);ue('type',v==='once'?'additional':'fixed')}} className={`py-2.5 rounded-xl border-2 text-[11px] font-medium transition ${(expenseForm.frequency||(expenseForm.type==='fixed'?'monthly':'once'))===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div><div className="text-[10px] text-slate-400 mt-1">{expenseForm.frequency==='monthly'||(!expenseForm.frequency&&expenseForm.type==='fixed')?t('freqMonthlyDesc'):expenseForm.frequency==='annual'?t('freqAnnualDesc'):t('freqPurchaseDesc')}</div></div>
-      </div>
-      {expenseForm.frequency==='annual'&&expenseForm.amount&&<div className="text-[11px] text-blue-500 font-semibold bg-blue-50 px-3 py-2 rounded-xl">= {gFm(parseFloat(expenseForm.amount)/12)}/{t('mo')} {lang==='es'?'equivalente':'equivalent'}</div>}
-      {expenseForm.category==='mortgage_pay'&&mort.monthlyPayment>0&&<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">⚠️ {lang==='es'?`La hipoteca ya está configurada ($${mort.monthlyPayment}/${t('mo')}). Este gasto NO se sumará doble.`:`Mortgage already configured ($${mort.monthlyPayment}/${t('mo')}). This won't double-count.`}</div>}
-      {(expenseForm.category==='taxes'||expenseForm.category==='predial')&&mort.includesTaxes&&<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">⚠️ {lang==='es'?'Tu pago de hipoteca ya incluye Property Taxes (escrow). Este gasto se excluirá del P&L automáticamente para no contar doble.':'Your mortgage payment already includes Property Taxes (escrow). This expense will be auto-excluded from P&L to avoid double-counting.'}</div>}
-      {expenseForm.category==='insurance'&&mort.includesInsurance&&<div className="text-[11px] text-amber-700 font-semibold bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl">⚠️ {lang==='es'?'Tu pago de hipoteca ya incluye Insurance (escrow). Este gasto se excluirá del P&L automáticamente para no contar doble.':'Your mortgage payment already includes Insurance (escrow). This expense will be auto-excluded from P&L to avoid double-counting.'}</div>}
-      <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">{lang==='es'?'¿Quién pagó?':'Who paid?'}</label><PPick partners={partners} selected={expenseForm.paidBy} onChange={v=>ue('paidBy',v)}/></div>
     </Mdl>}
 
     {modal==='contribution'&&<Mdl title={editId?(lang==='es'?'✏️ Editar Registro':'✏️ Edit Record'):(lang==='es'?'💰 Registrar Pago de Socio':'💰 Register Partner Payment')} grad="from-purple-500 to-purple-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{const amt=parseFloat(contribForm.amount);if(contribForm.payType==='expense'){save('expenses',{date:contribForm.date,concept:contribForm.concept,amount:amt,paidBy:contribForm.paidBy,category:contribForm.expCategory||'otros',type:'additional',frequency:'once',fromPartners:true})}else{const data={...contribForm,amount:amt,type:'contribution',purpose:contribForm.purpose||'operations'};if(editId){update('contributions',editId,data)}else{save('contributions',data)}}}} disabled={!contribForm.amount} className="flex-1 py-2.5 bg-purple-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{lang==='es'?'Guardar':'Save'}</button></>}>

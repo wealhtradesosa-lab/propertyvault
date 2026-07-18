@@ -1,9 +1,12 @@
 {
   "name": "ownerdesk-functions",
   "version": "1.0.0",
-  "engines": {"node": "20"},
+  "engines": {
+    "node": "20"
+  },
   "main": "index.js",
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.106.0",
     "firebase-admin": "^12.0.0",
     "firebase-functions": "^4.9.0",
     "stripe": "^17.0.0"
