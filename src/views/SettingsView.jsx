@@ -6,7 +6,7 @@ import { Inp, Sel } from '../components/ui';
 
 export function SettingsView() {
   const { prop, propertyId, partners, latestVal, settingsForm, setSettingsForm, editPartners, setEditPartners, stmts, expenses, income, contribs, valuations, repairs, notify, propTerms, COUNTRIES, CURRENCY_LIST, US, PT, M, fm } = useDashboard();
-      const sf2=settingsForm||{name:prop.name||'',address:prop.address||'',city:prop.city||'',state:prop.state||'',type:prop.type||'vacation',purchasePrice:String(prop.purchasePrice||''),purchaseDate:prop.purchaseDate||'',marketValue:String(latestVal?latestVal.value:prop.purchasePrice||''),manager:prop.manager||'',managerCommission:String(prop.managerCommission||15),bedrooms:String(prop.bedrooms||''),bathrooms:String(prop.bathrooms||''),country:prop.country||'US',currency:prop.currency||'USD',managedBy:prop.managedBy||'pm',exchangeRate:String(prop.exchangeRate||'')};
+      const sf2=settingsForm||{name:prop.name||'',address:prop.address||'',city:prop.city||'',state:prop.state||'',type:prop.type||'vacation',rentalType:prop.rentalType||(prop.type==='longterm'?'traditional':'short'),purchasePrice:String(prop.purchasePrice||''),purchaseDate:prop.purchaseDate||'',marketValue:String(latestVal?latestVal.value:prop.purchasePrice||''),manager:prop.manager||'',managerCommission:String(prop.managerCommission||15),bedrooms:String(prop.bedrooms||''),bathrooms:String(prop.bathrooms||''),country:prop.country||'US',currency:prop.currency||'USD',managedBy:prop.managedBy||'pm',exchangeRate:String(prop.exchangeRate||''),area:String(prop.area||''),matriculaInmobiliaria:prop.matriculaInmobiliaria||'',numEscritura:prop.numEscritura||'',notaria:prop.notaria||'',fechaEscritura:prop.fechaEscritura||'',circuloRegistral:prop.circuloRegistral||'',coeficienteCopropiedad:String(prop.coeficienteCopropiedad||''),linderos:prop.linderos||'',parcelNumber:prop.parcelNumber||'',deedBook:prop.deedBook||'',county:prop.county||''};
       const uf=(k,v)=>{
         const next={...sf2,[k]:v};
         if(k==='country'){const c=COUNTRIES.find(x=>x.v===v);if(c)next.currency=c.cur;next.state=''}
@@ -32,6 +32,7 @@ export function SettingsView() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3"><Inp label="Ciudad" value={sf2.city} onChange={v=>uf('city',v)}/>{stateList.length>0?<Sel label={terms.state} value={sf2.state} onChange={v=>uf('state',v)} options={stateList.map(s=>({v:s,l:s}))}/>:<Inp label={terms.state} value={sf2.state} onChange={v=>uf('state',v)}/>}<Inp label="Fecha de Compra" value={sf2.purchaseDate} onChange={v=>uf('purchaseDate',v)} type="date"/></div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3"><Inp label="Precio de Compra" value={sf2.purchasePrice} onChange={v=>uf('purchasePrice',v)} prefix={sf2.currency==='EUR'?'€':sf2.currency==='GBP'?'£':'$'} type="number"/><Inp label="Valor Comercial Actual" value={sf2.marketValue} onChange={v=>uf('marketValue',v)} prefix={sf2.currency==='EUR'?'€':sf2.currency==='GBP'?'£':'$'} type="number"/></div>
           <div className="grid grid-cols-2 gap-3"><Inp label="Habitaciones" value={sf2.bedrooms} onChange={v=>uf('bedrooms',v)} type="number"/><Inp label="Baños" value={sf2.bathrooms} onChange={v=>uf('bathrooms',v)} type="number"/></div>
+          <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Modelo de Renta</label><div className="grid grid-cols-2 gap-2">{[['short','🏖️ Renta Corta (vacacional / Airbnb)'],['traditional','🏠 Renta Tradicional (canon mensual)']].map(([v,l])=><button key={v} type="button" onClick={()=>uf('rentalType',v)} className={`py-2.5 px-3 rounded-xl border-2 text-xs font-medium transition text-left ${sf2.rentalType===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div><p className="text-[10px] text-slate-400 mt-1.5">{sf2.rentalType==='traditional'?'Renta tradicional: ingresás el canon mensual del inquilino y se replica cada mes — no subís statements.':'Renta corta: subís los statements mensuales del property manager con ingresos y gastos.'}</p></div>
           <div><label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">¿Quién administra?</label><div className="grid grid-cols-2 gap-2">{[['owner','👤 Propietario'],['pm','🏢 Administrador externo']].map(([v,l])=><button key={v} type="button" onClick={()=>uf('managedBy',v)} className={`py-2.5 rounded-xl border-2 text-xs font-medium transition ${sf2.managedBy===v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500'}`}>{l}</button>)}</div></div>
           {sf2.managedBy==='pm'&&<div className="grid grid-cols-2 gap-3"><Inp label="Nombre del Administrador" value={sf2.manager} onChange={v=>uf('manager',v)} placeholder="IHM, Vacasa, Host U..."/><Inp label="Comisión (%)" value={sf2.managerCommission} onChange={v=>uf('managerCommission',v)} type="number"/></div>}
           {sf2.currency!=='USD'&&<div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
@@ -44,12 +45,46 @@ export function SettingsView() {
           </div>}
         </div>
         <button onClick={async()=>{try{
-          const updates={name:sf2.name,address:sf2.address,city:sf2.city,state:sf2.state,type:sf2.type,country:sf2.country||'US',currency:sf2.currency||'USD',managedBy:sf2.managedBy||'pm',exchangeRate:parseFloat(sf2.exchangeRate)||0,purchasePrice:parseFloat(sf2.purchasePrice)||0,purchaseDate:sf2.purchaseDate||'',manager:sf2.managedBy==='pm'?sf2.manager:'',managerCommission:sf2.managedBy==='pm'?(parseFloat(sf2.managerCommission)||15):0,bedrooms:parseInt(sf2.bedrooms)||0,bathrooms:parseInt(sf2.bathrooms)||0};
+          const updates={name:sf2.name,address:sf2.address,city:sf2.city,state:sf2.state,type:sf2.type,rentalType:sf2.rentalType||'short',country:sf2.country||'US',currency:sf2.currency||'USD',managedBy:sf2.managedBy||'pm',exchangeRate:parseFloat(sf2.exchangeRate)||0,purchasePrice:parseFloat(sf2.purchasePrice)||0,purchaseDate:sf2.purchaseDate||'',manager:sf2.managedBy==='pm'?sf2.manager:'',managerCommission:sf2.managedBy==='pm'?(parseFloat(sf2.managerCommission)||15):0,bedrooms:parseInt(sf2.bedrooms)||0,bathrooms:parseInt(sf2.bathrooms)||0,area:parseFloat(sf2.area)||0,matriculaInmobiliaria:sf2.matriculaInmobiliaria||'',numEscritura:sf2.numEscritura||'',notaria:sf2.notaria||'',fechaEscritura:sf2.fechaEscritura||'',circuloRegistral:sf2.circuloRegistral||'',coeficienteCopropiedad:parseFloat(sf2.coeficienteCopropiedad)||0,linderos:sf2.linderos||'',parcelNumber:sf2.parcelNumber||'',deedBook:sf2.deedBook||'',county:sf2.county||''};
           await updateDoc(doc(db,'properties',propertyId),updates);
           const mv=parseFloat(sf2.marketValue)||0;
           if(mv>0&&mv!==(latestVal?latestVal.value:prop.purchasePrice)){await addDoc(collection(db,'properties',propertyId,'valuations'),{date:new Date().toISOString().split('T')[0],value:mv,source:'manual',notes:'Actualizado desde Configuración',createdAt:serverTimestamp()})}
           notify('Guardado correctamente')
         }catch(e){notify('Error: '+e.message,'error')}}} className="mt-5 px-6 py-3 bg-blue-600 text-white rounded-xl font-bold text-sm hover:bg-blue-700 transition shadow-lg shadow-blue-500/20">💾 Guardar Cambios</button>
+      </div>
+
+      {/* Datos Legales & Registrales */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 max-w-2xl mt-4">
+        <h3 className="text-base font-bold text-slate-700 mb-1">📜 Datos Legales & Registrales</h3>
+        <p className="text-xs text-slate-400 mb-4">Escritura, matrícula inmobiliaria, notaría, área. Se auto-completan si subís los documentos en el tab Documentos.</p>
+        <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <Inp label="Área (m²)" value={sf2.area} onChange={v=>uf('area',v)} type="number" placeholder="120"/>
+            {sf2.country==='CO'&&<Inp label="Coeficiente Copropiedad (%)" value={sf2.coeficienteCopropiedad} onChange={v=>uf('coeficienteCopropiedad',v)} type="number" placeholder="1.5"/>}
+          </div>
+          {sf2.country==='CO'?<>
+            <Inp label="Matrícula Inmobiliaria" value={sf2.matriculaInmobiliaria} onChange={v=>uf('matriculaInmobiliaria',v)} placeholder="050C-123456"/>
+            <div className="grid grid-cols-2 gap-3">
+              <Inp label="Nº de Escritura" value={sf2.numEscritura} onChange={v=>uf('numEscritura',v)} placeholder="1234"/>
+              <Inp label="Fecha de Escritura" value={sf2.fechaEscritura} onChange={v=>uf('fechaEscritura',v)} type="date"/>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Inp label="Notaría" value={sf2.notaria} onChange={v=>uf('notaria',v)} placeholder="Notaría 8 de Medellín"/>
+              <Inp label="Círculo Registral" value={sf2.circuloRegistral} onChange={v=>uf('circuloRegistral',v)} placeholder="Medellín Zona Norte"/>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Linderos</label>
+              <textarea value={sf2.linderos} onChange={e=>uf('linderos',e.target.value)} placeholder="Norte: ... / Sur: ... / Oriente: ... / Occidente: ..." rows={3} className="w-full px-3 py-2 text-sm border-2 border-slate-200 rounded-xl focus:border-blue-400 focus:outline-none resize-none"/>
+            </div>
+          </>:<>
+            <Inp label="Parcel / APN Number" value={sf2.parcelNumber} onChange={v=>uf('parcelNumber',v)} placeholder="123-45-678"/>
+            <div className="grid grid-cols-2 gap-3">
+              <Inp label="Deed Book / Reference" value={sf2.deedBook} onChange={v=>uf('deedBook',v)} placeholder="Book 1234 / Page 567"/>
+              <Inp label="County" value={sf2.county} onChange={v=>uf('county',v)} placeholder="Broward"/>
+            </div>
+          </>}
+        </div>
+        <div className="text-[10px] text-slate-400 mt-3 italic">💡 Si tenés la escritura o certificado de tradición como PDF, subilo en <strong>Documentos</strong> y la IA extrae estos campos automáticamente.</div>
       </div>
 
       {/* Partners — editable */}
