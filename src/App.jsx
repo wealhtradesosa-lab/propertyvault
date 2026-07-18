@@ -281,7 +281,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const additionalExp=useMemo(()=>expenses.filter(e=>{const c=propCats.find(x=>x.v===e.category);return !c?.fixed&&e.type!=='fixed'}),[expenses,propCats,lang]);
   const expByCat=useMemo(()=>{const r={};const escrowCats=[];if(mort.includesTaxes){escrowCats.push('taxes','predial')};if(mort.includesInsurance){escrowCats.push('insurance')};expenses.filter(e=>e.category!=='mortgage_pay'&&!escrowCats.includes(e.category)&&!/hipoteca|mortgage|debt.service/i.test(e.concept||'')).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const k=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!r[k])r[k]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0,monthly:0};const amt=toPropCur(e.amount||0,e.expCurrency);const f=eFreq(e);const mo=f==='annual'?amt/12:f==='monthly'?amt:amt;r[k].value+=amt;r[k].monthly+=(f==='annual'?amt/12:f==='monthly'?amt:0)});return Object.values(r).sort((a,b)=>b.monthly-a.monthly||b.value-a.value)},[expenses,propCats,lang,mort]);
 
-  const annual=useMemo(()=>{const y={};stmts.forEach(s=>{if(!y[s.year])y[s.year]={year:s.year,revenue:0,net:0,commission:0,duke:0,water:0,hoa:0,maintenance:0,vendor:0,nights:0,reservations:0,n:0};const a=y[s.year];a.revenue+=s.revenue||0;a.net+=s.net||0;a.commission+=s.commission||0;a.duke+=s.duke||0;a.water+=s.water||0;a.hoa+=s.hoa||0;a.maintenance+=s.maintenance||0;a.vendor+=s.vendor||0;a.nights+=s.nights||0;a.reservations+=s.reservations||0;a.n++});income.forEach(i=>{const d=i.date||'';const yr=parseInt(d.split('-')[0]);if(yr&&y[yr]){const amt=i.amount||0;const cur=i.currency||'USD';y[yr].revenue+=cur==='USD'?amt:amt;y[yr].net+=cur==='USD'?amt:amt}else if(yr){y[yr]={year:yr,revenue:i.amount||0,net:i.amount||0,commission:0,duke:0,water:0,hoa:0,maintenance:0,vendor:0,nights:0,reservations:0,n:0}}});return Object.values(y).sort((a,b)=>a.year-b.year)},[stmts,income]);
+  const annual=useMemo(()=>{const y={};stmts.forEach(s=>{if(!y[s.year])y[s.year]={year:s.year,revenue:0,net:0,commission:0,duke:0,water:0,hoa:0,maintenance:0,vendor:0,nights:0,reservations:0,n:0};const a=y[s.year];a.revenue+=s.revenue||0;a.net+=s.net||0;a.commission+=s.commission||0;a.duke+=s.duke||0;a.water+=s.water||0;a.hoa+=s.hoa||0;a.maintenance+=s.maintenance||0;a.vendor+=s.vendor||0;a.nights+=s.nights||0;a.reservations+=s.reservations||0;a.n++});return Object.values(y).sort((a,b)=>a.year-b.year)},[stmts]);
 
   const monthly=useMemo(()=>{const r={};stmts.forEach(s=>{if(!r[s.year])r[s.year]={rev:Array(12).fill(0),net:Array(12).fill(0)};r[s.year].rev[s.month-1]=s.revenue||0;r[s.year].net[s.month-1]=s.net||0});return r},[stmts]);
   const monthRank=useMemo(()=>{const fy=annual.filter(y=>y.n===12);if(!fy.length)return[];return M.map((m,i)=>{let s=0,c=0;fy.forEach(y=>{if(monthly[y.year]){s+=monthly[y.year].net[i];c++}});return{month:m,avg:c?s/c:0}}).sort((a,b)=>b.avg-a.avg)},[annual,monthly]);
@@ -942,11 +942,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
 
       {/* ── ROW 4: Year comparison + Partners ── */}
-      {(annual.length>1||partners.length>1)&&<div className={`grid ${annual.length>1&&partners.length>1?'grid-cols-2':'grid-cols-1'} gap-4`}>
-        {annual.length>1&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden">
+      {(()=>{const incomeByYear={};income.forEach(i=>{const yr=parseInt((i.date||'').split('-')[0]);if(!yr)return;const amt=i.amount||0;const cur=i.currency||'USD';const amtPC=cur===propCurrency?amt:cur==='USD'&&propCurrency!=='USD'?amt*xRate:cur!=='USD'&&propCurrency==='USD'?amt/xRate:amt;incomeByYear[yr]=(incomeByYear[yr]||0)+amtPC});const annualPC=annual.map(y=>({...y,revenue:stmtToPC(y.revenue)+(incomeByYear[y.year]||0),net:stmtToPC(y.net)+(incomeByYear[y.year]||0),commission:stmtToPC(y.commission),hoa:stmtToPC(y.hoa)}));Object.keys(incomeByYear).forEach(yrStr=>{const yr=parseInt(yrStr);if(!annualPC.find(a=>a.year===yr))annualPC.push({year:yr,revenue:incomeByYear[yr],net:incomeByYear[yr],commission:0,hoa:0,n:0})});annualPC.sort((a,b)=>a.year-b.year);const annualNonEmpty=annualPC.filter(y=>(y.revenue||0)>0||(y.net||0)>0);return(annualNonEmpty.length>1||partners.length>1)&&<div className={`grid ${annualNonEmpty.length>1&&partners.length>1?'grid-cols-2':'grid-cols-1'} gap-4`}>
+        {annualNonEmpty.length>1&&<div className="bg-white rounded-2xl p-3 md:p-5 border border-slate-200 shadow-sm overflow-hidden">
           <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">Comparativo Anual</h3>
           <ResponsiveContainer width="100%" height={160}>
-            <ComposedChart data={annual.map(y=>({...y,revenue:stmtToPC(y.revenue),net:stmtToPC(y.net),commission:stmtToPC(y.commission)}))}>
+            <ComposedChart data={annualNonEmpty}>
               <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9"/>
               <XAxis dataKey="year" tick={{fontSize:11,fill:'#64748b'}}/>
               <YAxis tick={{fontSize:9,fill:'#94a3b8'}} tickFormatter={v=>dFm(v)}/>
@@ -966,7 +966,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             </div>
           </div>})}</div>
         </div>}
-      </div>}
+      </div>})()}
 
       </>:<div className="max-w-xl mx-auto py-8">
         {/* Welcome header */}
