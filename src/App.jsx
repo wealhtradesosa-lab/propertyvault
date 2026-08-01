@@ -47,6 +47,57 @@ class ViewGuard extends React.Component {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// RENTA TRADICIONAL — schedule de canon, mora, cartera vencida e incremento por aniversario
+// ═══════════════════════════════════════════════════════════════
+// Pura: dada la lista de inquilinos y los ingresos (con paymentKey), reconstruye el
+// calendario de canon mes a mes, aplica el incremento anual del contrato en cada
+// aniversario, y calcula mora (interés simple diario) y cartera vencida con aging.
+function computeRentSchedule(tenants, income, opts) {
+  const { dueDay = 5, moraAnnual = 0 } = opts || {};
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const active = (tenants || []).filter(t => t.status !== 'inactive' && t.startDate && parseFloat(t.monthlyRent) > 0);
+  const rows = [];
+  const byTenant = {};
+  for (const tn of active) {
+    const base = parseFloat(tn.monthlyRent) || 0;
+    const inc = parseFloat(tn.incrementPct) || 0;
+    const start = new Date(tn.startDate + 'T00:00:00'); start.setDate(1);
+    const startY = start.getFullYear(), startM = start.getMonth();
+    let end = tn.endDate ? new Date(tn.endDate + 'T00:00:00') : monthStart; end.setDate(1);
+    const lastMonth = end < monthStart ? end : monthStart;
+    const b = byTenant[tn.id] || (byTenant[tn.id] = { overduePrincipal: 0, mora: 0, overdueMonths: 0, maxDaysLate: 0, pendingMonths: 0, currentRent: base });
+    let cur = new Date(start);
+    while (cur <= lastMonth) {
+      const y = cur.getFullYear(), m = cur.getMonth() + 1;
+      const monthsSinceStart = (y - startY) * 12 + (cur.getMonth() - startM);
+      const yearsElapsed = Math.max(0, Math.floor(monthsSinceStart / 12));
+      const amount = (inc > 0 && yearsElapsed > 0) ? Math.round(base * Math.pow(1 + inc / 100, yearsElapsed)) : base;
+      const paymentKey = `rent-${tn.id}-${y}-${m}`;
+      const paidRecord = (income || []).find(i => i.paymentKey === paymentKey);
+      const paid = !!paidRecord;
+      const due = new Date(y, m - 1, dueDay);
+      const daysLate = (!paid && now > due) ? Math.floor((now - due) / 86400000) : 0;
+      const mora = (daysLate > 0 && moraAnnual > 0) ? Math.round(amount * (moraAnnual / 100) * (daysLate / 365)) : 0;
+      const overdue = daysLate > 0 && !paid;
+      rows.push({ tenant: tn, tenantId: tn.id, year: y, month: m, paymentKey, paid, paidRecord, amount, baseRent: base, yearsElapsed, due, daysLate, overdue, mora });
+      b.currentRent = amount;
+      if (!paid) b.pendingMonths++;
+      if (overdue) { b.overduePrincipal += amount; b.mora += mora; b.overdueMonths++; b.maxDaysLate = Math.max(b.maxDaysLate, daysLate); }
+      cur.setMonth(cur.getMonth() + 1);
+    }
+  }
+  rows.sort((a, b) => (b.year * 100 + b.month) - (a.year * 100 + a.month));
+  const totalExpected = rows.reduce((s, r) => s + r.amount, 0);
+  const totalPaid = rows.filter(r => r.paid).reduce((s, r) => s + r.amount, 0);
+  const overduePrincipal = rows.filter(r => r.overdue).reduce((s, r) => s + r.amount, 0);
+  const totalMora = rows.reduce((s, r) => s + r.mora, 0);
+  const aging = { d30: 0, d60: 0, d90: 0, d90p: 0 };
+  rows.filter(r => r.overdue).forEach(r => { const d = r.daysLate, v = r.amount + r.mora; if (d <= 30) aging.d30 += v; else if (d <= 60) aging.d60 += v; else if (d <= 90) aging.d90 += v; else aging.d90p += v; });
+  return { rows, active, totalExpected, totalPaid, overduePrincipal, totalMora, aging, byTenant };
+}
+
+// ═══════════════════════════════════════════════════════════════
 // DASHBOARD
 // ═══════════════════════════════════════════════════════════════
 function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProperty,onLogout,onAddProperty,userEmail}) {
@@ -302,6 +353,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   const propCountry=prop.country||'US';
   const rentalType=prop.rentalType||(prop.type==='longterm'?'traditional':'short');
+  const rentDueDay=parseInt(prop.rentDueDay)||5;
+  const moraAnnual=parseFloat(prop.moraRateAnnual)||0;
+  const rentSchedule=useMemo(()=>computeRentSchedule(tenants,income,{dueDay:rentDueDay,moraAnnual}),[tenants,income,rentDueDay,moraAnnual]);
   const propCurrency=prop.currency||'USD';
   const fmP=v=>fmCurrency(v,propCurrency);
   const propCats=getCats(propCountry,lang);
@@ -722,6 +776,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="text-[9px] text-slate-400 -mt-0.5">{lang==='es'?`Mes actual · ${M[curM-1]} ${curY}`:`Current month · ${M[curM-1]} ${curY}`}</div>
           <div className={`text-base md:text-[22px] font-extrabold mt-0.5 ${rentPaidPct>=100?'text-emerald-700':rentPaidPct>0?'text-amber-600':'text-rose-600'}`}>{rentPaidPct.toFixed(0)}%</div>
           <div className="text-[10px] text-slate-400">{dFm(rentPaid)} / {dFm(rentExpected)} · {activeTenants.length} {lang==='es'?'inquilino':'tenant'}{activeTenants.length!==1?'s':''}</div>
+          {(rentSchedule.overduePrincipal+rentSchedule.totalMora)>0&&<div className="text-[10px] font-bold text-rose-600 mt-0.5">⚠ {lang==='es'?'Cartera vencida':'Overdue'}: {dFm(rentSchedule.overduePrincipal+rentSchedule.totalMora)}</div>}
         </div>:<div className="bg-white rounded-2xl p-3 md:p-4 border-l-4 border-l-cyan-500 border border-slate-200 shadow-sm">
           <div className="text-[10px] font-bold text-cyan-600 uppercase tracking-widest">{t('occupancy')}</div>
           <div className="text-[9px] text-slate-400 -mt-0.5">{t('subOccupancy')}</div>
@@ -1627,26 +1682,9 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
       {/* ─── RENTA TRADICIONAL: Ledger de Canon Mensual ─── */}
       {rentalType==='traditional'&&(()=>{
-        const activeTenants=(tenants||[]).filter(t=>t.status!=='inactive'&&t.startDate&&parseFloat(t.monthlyRent)>0);
+        const {rows,active:activeTenants,totalExpected,totalPaid,overduePrincipal,totalMora,aging}=rentSchedule;
         if(activeTenants.length===0)return <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5"><div className="text-[12px] text-amber-800"><strong>{lang==='es'?'Sin inquilinos activos':'No active tenants'}</strong> — {lang==='es'?'agrega un inquilino con canon mensual en la sección Inquilinos para empezar a registrar los pagos del canon.':'Add a tenant with monthly rent in Tenants section to start tracking rent payments.'}</div></div>;
-        const today=new Date();today.setDate(1);
-        const rows=[];
-        for(const tn of activeTenants){
-          const start=new Date(tn.startDate+'T00:00:00');start.setDate(1);
-          const end=tn.endDate?new Date(tn.endDate+'T00:00:00'):today;
-          const lastMonth=end<today?end:today;
-          let cur=new Date(start);
-          while(cur<=lastMonth){
-            const y=cur.getFullYear(),m=cur.getMonth()+1;
-            const paymentKey=`rent-${tn.id}-${y}-${m}`;
-            const paidRecord=income.find(i=>i.paymentKey===paymentKey);
-            rows.push({tenant:tn,year:y,month:m,paymentKey,paid:!!paidRecord,paidRecord,amount:parseFloat(tn.monthlyRent)||0});
-            cur.setMonth(cur.getMonth()+1);
-          }
-        }
-        rows.sort((a,b)=>(b.year*100+b.month)-(a.year*100+a.month));
-        const totalExpected=rows.reduce((s,r)=>s+r.amount,0);
-        const totalPaid=rows.filter(r=>r.paid).reduce((s,r)=>s+r.amount,0);
+        const carteraVencida=overduePrincipal+totalMora;
         const togglePaid=async(r)=>{
           if(r.paid&&r.paidRecord){
             await del('income',r.paidRecord.id);
@@ -1658,22 +1696,30 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <div className="flex justify-between items-center mb-3">
             <h3 className="text-sm font-bold text-slate-700">🏠 {lang==='es'?'Canon Mensual de Inquilinos':'Monthly Tenant Rent'} <span className="text-[10px] text-slate-400 font-normal">({activeTenants.length} {lang==='es'?'inquilino':'tenant'}{activeTenants.length!==1?'s':''} · {rows.length} {lang==='es'?'meses':'months'})</span></h3>
           </div>
-          <div className="grid grid-cols-3 gap-2 mb-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
             <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100"><div className="text-[9px] font-bold text-emerald-600 uppercase">{lang==='es'?'Cobrado':'Paid'}</div><div className="text-base font-bold text-emerald-700">{gFm(totalPaid)}</div></div>
             <div className="bg-amber-50 rounded-xl p-3 border border-amber-100"><div className="text-[9px] font-bold text-amber-600 uppercase">{lang==='es'?'Pendiente':'Pending'}</div><div className="text-base font-bold text-amber-700">{gFm(totalExpected-totalPaid)}</div></div>
+            <div className={`rounded-xl p-3 border ${carteraVencida>0?'bg-rose-50 border-rose-200':'bg-slate-50 border-slate-200'}`}><div className={`text-[9px] font-bold uppercase ${carteraVencida>0?'text-rose-600':'text-slate-500'}`}>{lang==='es'?'Cartera vencida':'Overdue'}</div><div className={`text-base font-bold ${carteraVencida>0?'text-rose-700':'text-slate-700'}`}>{gFm(carteraVencida)}</div>{totalMora>0&&<div className="text-[9px] text-rose-500">{lang==='es'?'incl. mora':'incl. late fees'} {gFm(totalMora)}</div>}</div>
             <div className="bg-slate-50 rounded-xl p-3 border border-slate-200"><div className="text-[9px] font-bold text-slate-500 uppercase">{lang==='es'?'Esperado total':'Expected total'}</div><div className="text-base font-bold text-slate-700">{gFm(totalExpected)}</div></div>
           </div>
+          {carteraVencida>0&&(aging.d60>0||aging.d90>0||aging.d90p>0)&&<div className="flex flex-wrap gap-1.5 mb-4 text-[9px] font-bold">
+            {aging.d30>0&&<span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-100">1–30d: {gFm(aging.d30)}</span>}
+            {aging.d60>0&&<span className="px-2 py-1 rounded-lg bg-orange-50 text-orange-700 border border-orange-100">31–60d: {gFm(aging.d60)}</span>}
+            {aging.d90>0&&<span className="px-2 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-100">61–90d: {gFm(aging.d90)}</span>}
+            {aging.d90p>0&&<span className="px-2 py-1 rounded-lg bg-rose-100 text-rose-800 border border-rose-200">+90d: {gFm(aging.d90p)}</span>}
+          </div>}
           <div className="space-y-1.5 max-h-[60vh] overflow-y-auto">
-            {rows.map(r=><div key={r.paymentKey} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition ${r.paid?'bg-emerald-50 border-emerald-200':'bg-slate-50 border-slate-200'}`}>
+            {rows.map(r=><div key={r.paymentKey} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition ${r.paid?'bg-emerald-50 border-emerald-200':r.overdue?'bg-rose-50 border-rose-200':'bg-slate-50 border-slate-200'}`}>
               <button onClick={()=>togglePaid(r)} className={`shrink-0 w-7 h-7 rounded-lg border-2 flex items-center justify-center transition ${r.paid?'bg-emerald-500 border-emerald-500 text-white':'bg-white border-slate-300 text-transparent hover:border-emerald-400'}`} title={r.paid?(lang==='es'?'Desmarcar pago':'Unmark paid'):(lang==='es'?'Marcar como pagado':'Mark as paid')}><CheckCircle size={16}/></button>
               <div className="flex-1 min-w-0">
-                <div className="text-[12px] font-semibold text-slate-700 truncate">{M[r.month-1]} {r.year}</div>
-                <div className="text-[10px] text-slate-400 truncate">{r.tenant.name}{r.tenant.unit?` · ${r.tenant.unit}`:''}</div>
+                <div className="text-[12px] font-semibold text-slate-700 truncate">{M[r.month-1]} {r.year}{r.yearsElapsed>0&&<span className="ml-1 text-[9px] text-cyan-600 font-bold" title={lang==='es'?'Canon con incremento aplicado':'Rent with increase applied'}>↑</span>}</div>
+                <div className="text-[10px] text-slate-400 truncate">{r.tenant.name}{r.tenant.unit?` · ${r.tenant.unit}`:''}{r.overdue?<span className="text-rose-500 font-bold"> · {lang==='es'?`vencido ${r.daysLate}d`:`${r.daysLate}d overdue`}{r.mora>0?` · +${gFm(r.mora)} ${lang==='es'?'mora':'late'}`:''}</span>:''}</div>
               </div>
-              <div className={`text-[13px] font-bold ${r.paid?'text-emerald-600':'text-slate-600'}`}>{gFm(r.amount)}</div>
-              {r.paid?<span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">✓ {lang==='es'?'PAGADO':'PAID'}</span>:<span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{lang==='es'?'PENDIENTE':'PENDING'}</span>}
+              <div className={`text-[13px] font-bold ${r.paid?'text-emerald-600':r.overdue?'text-rose-600':'text-slate-600'}`}>{gFm(r.amount+(r.overdue?r.mora:0))}</div>
+              {r.paid?<span className="text-[9px] font-bold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">✓ {lang==='es'?'PAGADO':'PAID'}</span>:r.overdue?<span className="text-[9px] font-bold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full">{lang==='es'?'VENCIDO':'OVERDUE'}</span>:<span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{lang==='es'?'PENDIENTE':'PENDING'}</span>}
             </div>)}
           </div>
+          {moraAnnual===0&&<p className="text-[10px] text-slate-400 mt-3">💡 {lang==='es'?'Configura una tasa de mora anual en Ajustes para cobrar intereses sobre el canon vencido.':'Set an annual late-fee rate in Settings to charge interest on overdue rent.'}</p>}
         </div>;
       })()}
 
@@ -2305,12 +2351,22 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       <div className="flex justify-between items-center mb-2"><h1 className="text-[22px] font-extrabold text-slate-800">👥 {lang==='es'?'Inquilinos y Contratos':'Tenants & Contracts'}</h1><button onClick={()=>{setTenantForm({name:'',idNumber:'',phone:'',email:'',unit:'',monthlyRent:'',deposit:'',startDate:'',endDate:'',incrementPct:'3',status:'active',notes:''});setEditId(null);setModal('tenant')}} className="px-4 py-2.5 bg-indigo-600 text-white text-xs rounded-xl font-bold hover:bg-indigo-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> {lang==='es'?'Agregar Inquilino':'Add Tenant'}</button></div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+      {(()=>{const carteraVencida=rentSchedule.overduePrincipal+rentSchedule.totalMora;return <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
         <KPI label={lang==='es'?'Inquilinos Activos':'Active Tenants'} value={activeTenants.length} color="blue"/>
         <KPI label={lang==='es'?'Canon Mensual Total':'Total Monthly Rent'} value={gFm(totalRent)} color="green"/>
+        <KPI label={lang==='es'?'Cartera Vencida':'Overdue Receivable'} value={gFm(carteraVencida)} color={carteraVencida>0?'red':'green'}/>
         <KPI label={lang==='es'?'Por Vencer (30d)':'Expiring (30d)'} value={expiringTenants.length} color={expiringTenants.length>0?'amber':'green'}/>
         <KPI label={lang==='es'?'Vencidos':'Expired'} value={expiredTenants.length} color={expiredTenants.length>0?'red':'green'}/>
-      </div>
+      </div>})()}
+
+      {/* Cartera vencida por inquilino */}
+      {(()=>{const debtors=activeTenants.map(t=>({t,d:rentSchedule.byTenant[t.id]})).filter(x=>x.d&&x.d.overduePrincipal>0).sort((a,b)=>b.d.maxDaysLate-a.d.maxDaysLate);return debtors.length>0?<div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-5">
+        <div className="text-xs font-bold text-rose-700 mb-2">💰 {lang==='es'?'Cartera vencida por inquilino:':'Overdue rent by tenant:'}</div>
+        {debtors.map(({t,d})=><div key={t.id} className="flex items-center justify-between py-2 border-b border-rose-100 last:border-0">
+          <div className="min-w-0"><span className="text-sm font-bold text-slate-700">{t.name}</span> <span className="text-xs text-slate-400">{t.unit||''}</span><div className="text-[10px] text-rose-500 font-semibold">{d.overdueMonths} {lang==='es'?'mes(es) vencido(s)':'month(s) overdue'} · {lang==='es'?`hasta ${d.maxDaysLate}d de atraso`:`up to ${d.maxDaysLate}d late`}</div></div>
+          <div className="text-right shrink-0"><div className="text-sm font-extrabold text-rose-700">{gFm(d.overduePrincipal+d.mora)}</div>{d.mora>0&&<div className="text-[9px] text-rose-500">{lang==='es'?'canon':'rent'} {gFm(d.overduePrincipal)} + {lang==='es'?'mora':'late'} {gFm(d.mora)}</div>}</div>
+        </div>)}
+      </div>:null})()}
 
       {/* Expiration alerts */}
       {(expiringTenants.length>0||expiredTenants.length>0)&&<div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-5">
