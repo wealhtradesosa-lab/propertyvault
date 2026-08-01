@@ -520,6 +520,52 @@ export async function extractPDFText(file) {
   return { pdf, fullText };
 }
 
+// ═══ FACTURA / CUENTA DE COBRO DE ADMINISTRACIÓN (PH) ═══
+// Lee facturas de administración de propiedad horizontal (formato PHenlínea /
+// ESTRUCTURA IST y similares). Devuelve monto mensual, total a pagar, periodo,
+// fechas y concepto para registrar el gasto automáticamente.
+function pcNum(s) {
+  if (!s) return 0;
+  const raw = String(s).trim();
+  // "998.400,00" (punto miles, coma decimal) vs "998,400.0" (coma miles, punto decimal)
+  let n;
+  if (/,\d{1,2}$/.test(raw)) n = parseFloat(raw.replace(/\./g, '').replace(',', '.'));
+  else n = parseFloat(raw.replace(/,/g, ''));
+  return isNaN(n) ? 0 : Math.round(n);
+}
+export function parseAdminInvoiceText(text) {
+  const t = (text || '').replace(/\s+/g, ' ').trim();
+  const out = { raw: text || '' };
+  // Montos con prefijo $
+  const amts = [];
+  const re = /\$\s*([\d.,]+)/g; let m;
+  while ((m = re.exec(t))) { const n = pcNum(m[1]); if (n > 0) amts.push(n); }
+  out.total = amts.length ? Math.max(...amts) : 0;
+  // "Este Mes" del renglón de concepto (primer monto antes de APORTE/ADMINISTRACIÓN)
+  const cm = t.match(/\$\s*([\d.,]+)\s*\$\s*[\d.,]+\s*\$\s*[\d.,]+\s*(?:APORTE|ADMINISTRACI|EXPENSA|CUOTA)/i)
+        || t.match(/(?:APORTE|ADMINISTRACI|EXPENSA|CUOTA)[^$]*\$\s*([\d.,]+)/i);
+  out.monthly = cm ? pcNum(cm[1]) : 0;
+  out.amount = out.monthly || out.total;
+  const pm = t.match(/([A-ZÁÉÍÓÚ]+ DE \d{4})\s*Periodo:/i) || t.match(/Periodo:?\s*([A-ZÁÉÍÓÚ]+ DE \d{4})/i);
+  out.period = pm ? pm[1].trim() : '';
+  const dd = t.match(/Pague hasta(?: el)?:?\s*(\d{4}-\d{2}-\d{2})/i);
+  out.dueDate = dd ? dd[1] : '';
+  const em = t.match(/(\d{4}-\d{2}-\d{2})\s*Fecha Emisi[oó]n:/i) || t.match(/Fecha Emisi[oó]n:?\s*(\d{4}-\d{2}-\d{2})/i);
+  out.emissionDate = em ? em[1] : '';
+  const cp = t.match(/([A-ZÑÁÉÍÓÚ0-9.\-& ]{3,}?)\s*Copropietario:/i);
+  out.copropietario = cp ? cp[1].trim() : '';
+  const co = t.match(/C[oó]digo Propiedad:?\s*0*(\d+)/i);
+  out.codigo = co ? co[1] : '';
+  const cc = t.match(/\b(APORTE|ADMINISTRACI[OÓ]N|EXPENSAS|CUOTA DE ADMINISTRACI[OÓ]N|CUOTA)\b/i);
+  out.concept = cc ? cc[1].toUpperCase() : 'ADMINISTRACIÓN';
+  out.isAdminInvoice = /Copropietario|Cuenta de Cobro|PHenlinea|PH en l[ií]nea|APORTE|Coeficiente|Coprop|administraci/i.test(t);
+  return out;
+}
+export async function parseAdminInvoice(file) {
+  const { fullText } = await extractPDFText(file);
+  return { ...parseAdminInvoiceText(fullText), fullText };
+}
+
 export async function parsePDF(file) {
   const { fullText } = await extractPDFText(file);
   if (fullText.trim().length < 30) return { error: 'PDF vacío o no se pudo leer' };

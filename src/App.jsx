@@ -10,7 +10,7 @@ import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, L
 import { ADMIN_EMAILS, VIP_EMAILS, C, M, fm, fmCurrency, fmDate, pct, CATS, getCats, getTerms, COUNTRIES, CURRENCY_LIST, US_STATES as US, PROPERTY_TYPES as PT } from './lib/constants';
 import { createT } from './lib/i18n';
 // PDF parser loaded dynamically — delays 328KB pdf.js chunk until first upload
-let _parsePDF = null, _parseMortgage = null, _extractText = null, _parseCSV = null;
+let _parsePDF = null, _parseMortgage = null, _extractText = null, _parseCSV = null, _parseInvoice = null;
 const loadParsers = async () => {
   if (!_parsePDF) {
     const mod = await import('./lib/pdfParser');
@@ -18,8 +18,9 @@ const loadParsers = async () => {
     _parseMortgage = mod.parseMortgageStatement;
     _extractText = mod.extractPDFText;
     _parseCSV = mod.parseAirbnbCSV;
+    _parseInvoice = mod.parseAdminInvoice;
   }
-  return { parsePDF: _parsePDF, parseMortgageStatement: _parseMortgage, extractPDFText: _extractText, parseAirbnbCSV: _parseCSV };
+  return { parsePDF: _parsePDF, parseMortgageStatement: _parseMortgage, extractPDFText: _extractText, parseAirbnbCSV: _parseCSV, parseAdminInvoice: _parseInvoice };
 };
 import { Inp, Sel, PPick, Mdl, Empty, Tbl, Tip, UpgradeBanner, KPI } from './components/ui';
 const LandingPage = lazy(() => import('./components/LandingPage').then(m => ({ default: m.LandingPage })));
@@ -166,6 +167,28 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const umc=useCallback((k,v)=>setMortConfig(x=>({...x,[k]:v})),[]);
   const partners=prop.partners||[];const mort=prop.mortgage||{};
   const [expenseForm,setExpenseForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});const [editId,setEditId]=useState(null);
+  const [invoiceUploading,setInvoiceUploading]=useState(false);const invoiceInputRef=useRef(null);
+  const handleInvoiceUpload=async(e)=>{
+    const file=e.target.files&&e.target.files[0];
+    if(!file)return;
+    setInvoiceUploading(true);
+    try{
+      const {parseAdminInvoice}=await loadParsers();
+      const r=await parseAdminInvoice(file);
+      const gotText=r&&r.fullText&&r.fullText.trim().length>50;
+      if(r&&r.amount>0){
+        const per=r.period?(r.period.charAt(0).toUpperCase()+r.period.slice(1).toLowerCase()):'';
+        setExpenseForm({date:r.emissionDate||r.dueDate||'',concept:'Administración'+(per?' '+per:''),amount:String(r.amount),paidBy:partners[0]?.id||'',category:'hoa',type:'additional',frequency:'once',expCurrency:''});
+        setModal('expense');
+        notify(lang==='es'?`✅ Factura leída · $${r.amount.toLocaleString('es-CO')}${r.total>r.amount?` (total a pagar $${r.total.toLocaleString('es-CO')})`:''}. Revisa y guarda.`:`✅ Invoice read · $${r.amount.toLocaleString()}. Review and save.`,'success');
+      }else if(gotText){
+        notify(lang==='es'?'Leí el PDF pero no encontré el monto. Regístralo manualmente.':'Read the PDF but found no amount. Enter it manually.','warn');
+      }else{
+        notify(lang==='es'?'No pude leer la factura (¿PDF escaneado como imagen? Usa el PDF original digital).':'Could not read the invoice (scanned image? use the original digital PDF).','warn');
+      }
+    }catch(err){notify((lang==='es'?'Error leyendo la factura: ':'Error reading invoice: ')+(err?.message||'Error'),'error');}
+    finally{setInvoiceUploading(false);if(invoiceInputRef.current)invoiceInputRef.current.value='';}
+  };
   const [fcForm,setFcForm]=useState({concept:'',category:'',mode:'fijo',amount:'',currency:'',frequency:'monthly',active:true});const [fcEditingId,setFcEditingId]=useState(null);const [fcShowForm,setFcShowForm]=useState(false);
   const [nf,setNf]=useState({date:'',month:'',grossAmount:''});
   const [contribForm,setContribForm]=useState({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',purpose:'operations',payType:'capital',expCategory:'otros'});
@@ -1525,7 +1548,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
     {/* ═══ EXPENSES ═══ */}
     {view==='expenses'&&<>
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6"><div className="flex items-center gap-2"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🧾 {t('expenses')}</h1><span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span><CurToggle/></div><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 active:bg-rose-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> {t('addExpense')}</button></div>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6"><div className="flex items-center gap-2"><h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🧾 {t('expenses')}</h1><span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span><CurToggle/></div><div className="flex gap-2"><input ref={invoiceInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleInvoiceUpload}/><button onClick={()=>invoiceInputRef.current&&invoiceInputRef.current.click()} disabled={invoiceUploading} className="px-4 py-2.5 bg-white border-2 border-rose-200 text-rose-600 text-xs rounded-xl font-bold hover:bg-rose-50 disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm">{invoiceUploading?<Loader2 size={14} className="animate-spin"/>:<FileText size={14}/>} {lang==='es'?'Subir factura':'Upload invoice'}</button><button onClick={()=>{setExpenseForm({date:'',concept:'',amount:'',paidBy:partners[0]?.id||'',category:'otros',type:'additional',frequency:'once',expCurrency:''});setModal('expense')}} className="px-4 py-2.5 bg-rose-500 text-white text-xs rounded-xl font-bold hover:bg-rose-600 active:bg-rose-700 flex items-center justify-center gap-1.5 shadow-sm"><Plus size={14}/> {t('addExpense')}</button></div></div>
 
 
       {/* Banner: template proyectado */}
