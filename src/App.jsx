@@ -11,6 +11,13 @@ import { ADMIN_EMAILS, VIP_EMAILS, C, M, fm, fmCurrency, fmDate, pct, CATS, getC
 import { createT } from './lib/i18n';
 // PDF parser loaded dynamically — delays 328KB pdf.js chunk until first upload
 let _parsePDF = null, _parseMortgage = null, _extractText = null, _parseCSV = null, _parseInvoice = null;
+// Sube a Storage con timeout — evita que un Storage no disponible cuelgue el botón indefinidamente
+async function uploadBytesTimeout(ref, file, meta, ms = 25000) {
+  return Promise.race([
+    uploadBytes(ref, file, meta),
+    new Promise((_, rej) => setTimeout(() => rej(new Error('Storage no respondió a tiempo. Revisa que Firebase Storage esté habilitado en el proyecto.')), ms)),
+  ]);
+}
 const loadParsers = async () => {
   if (!_parsePDF) {
     const mod = await import('./lib/pdfParser');
@@ -146,7 +153,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const safeName=file.name.replace(/[^a-zA-Z0-9.\-_]/g,'_');
       const filePath=`users/${auth.currentUser.uid}/documents/property-photos/${propertyId}/${ts}_${safeName}`;
       const ref=storageRef(storage,filePath);
-      const snap=await uploadBytes(ref,file,{contentType:file.type||'image/jpeg'});
+      const snap=await uploadBytesTimeout(ref,file,{contentType:file.type||'image/jpeg'});
       const url=await getDownloadURL(snap.ref);
       await updateDoc(doc(db,'properties',propertyId),{photoURL:url,photoPath:filePath});
       notify(lang==='es'?'✅ Foto de la propiedad actualizada':'✅ Property photo updated','success');
@@ -2649,7 +2656,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             const safeName=docFile.name.replace(/[^a-zA-Z0-9.\-_]/g,'_');
             filePath=`users/${auth.currentUser.uid}/documents/${propertyId}/${ts}_${safeName}`;
             const ref=storageRef(storage,filePath);
-            const snap=await uploadBytes(ref,docFile,{contentType:docFile.type||'application/pdf'});
+            const snap=await uploadBytesTimeout(ref,docFile,{contentType:docFile.type||'application/pdf'});
             fileURL=await getDownloadURL(snap.ref);
           }catch(err){notify((lang==='es'?'Archivo no subido: ':'File not uploaded: ')+err.message,'warn')}
         }
