@@ -664,7 +664,21 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       // = Cash Flow
       //
 
-      // 1. Owner expenses from Gastos section (recurring apply to ALL periods)
+      // 1. Owner expenses from Gastos section — recurring cuentan SOLO desde su fecha de inicio
+      // (un gasto mensual que empezó hace 4 meses no debe aplicarse a meses anteriores)
+      const _now=new Date();const _nowIdx=_now.getFullYear()*12+(_now.getMonth()+1);
+      const eStartIdx=(e)=>{if(!e||!e.date)return null;const p=String(e.date).split('-');const y=parseInt(p[0]),mo=parseInt(p[1]||'1');return(y&&mo)?y*12+mo:null;};
+      // Nº de meses que un gasto recurrente estuvo activo dentro de la ventana analizada
+      const activeMonthsFor=(e)=>{
+        const s=eStartIdx(e);
+        if(dashYear==='all'){if(s==null)return n;return Math.max(0,Math.min(n,_nowIdx-s+1));}
+        const yStart=dashYear*12+1,yEnd=dashYear*12+12;
+        const from=Math.max(yStart,s==null?yStart:s);
+        const to=Math.min(yEnd,_nowIdx);
+        return Math.max(0,Math.min(n,to-from+1));
+      };
+      // ¿El gasto (recurrente o puntual) aplica a un mes específico (índice y*12+m)?
+      const expenseAppliesToMonth=(e,idx)=>{const f=eFreq(e);const s=eStartIdx(e);if(f==='monthly'||f==='annual')return s==null?true:idx>=s;return s===idx;};
       const recurringExp=expenses.filter(e=>isRecurring(e));
       const oneTimeExp=dashYear==='all'?expenses.filter(e=>!isRecurring(e)):expenses.filter(e=>!isRecurring(e)&&(e.date||'').startsWith(String(dashYear)));
       const yearExpenses=[...recurringExp,...oneTimeExp];
@@ -679,8 +693,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const ownerExpTotal=yearExpenses.filter(e=>!isExcludedFromOpEx(e)).reduce((s,e)=>{
         const amt=toPC(e.amount||0,e.expCurrency);
         const f=eFreq(e);
-        if(f==='annual')return s+amt/12*(n||1);
-        if(f==='monthly')return s+amt*(n||1);
+        if(f==='annual')return s+amt/12*activeMonthsFor(e);
+        if(f==='monthly')return s+amt*activeMonthsFor(e);
         return s+amt;
       },0);
 
@@ -699,8 +713,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const mortFromExpenses=yearExpenses.filter(e=>isMortgageExp(e)).reduce((s,e)=>{
         const amt=toPC(e.amount||0,e.expCurrency);
         const f=eFreq(e);
-        if(f==='annual')return s+amt/12*(n||1);
-        if(f==='monthly')return s+amt*(n||1);
+        if(f==='annual')return s+amt/12*activeMonthsFor(e);
+        if(f==='monthly')return s+amt*activeMonthsFor(e);
         return s+amt;
       },0);
       const fMortP=mMort>0?(mMort*n):mortFromExpenses;
@@ -735,10 +749,10 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       const revChg=prevYr&&prevYr.revenue?((fRev-prevYr.revenue)/prevYr.revenue*100):null;
       const chartColors=['#E11D48','#F59E0B','#06B6D4','#8B5CF6','#10B981','#64748B','#DB2777','#EA580C'];
       const expData=isOwnerManaged?
-        (()=>{const cp={};yearExpenses.filter(e=>!isExcludedFromOpEx(e)).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const ck=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[ck].value+=amt/12*(n||1);else if(ef==='monthly')cp[ck].value+=amt*(n||1);else cp[ck].value+=amt});(prop.fixedCosts||[]).filter(x=>x.active!==false).forEach(it=>{const c=propCats.find(x=>x.v===it.category);const ck=(!c||it.category==='otros'||!it.category)?'_other':it.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=parseFloat(it.amount)||0;const mo=it.frequency==='annual'?amt/12:amt;cp[ck].value+=toPC(mo,it.currency||propCurrency)*(n||1)});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
+        (()=>{const cp={};yearExpenses.filter(e=>!isExcludedFromOpEx(e)).forEach(e=>{const c=propCats.find(x=>x.v===e.category);const ck=(!c||e.category==='otros'||!e.category)?'_other':e.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=toPC(e.amount||0,e.expCurrency);const ef=eFreq(e);if(ef==='annual')cp[ck].value+=amt/12*activeMonthsFor(e);else if(ef==='monthly')cp[ck].value+=amt*activeMonthsFor(e);else cp[ck].value+=amt});(prop.fixedCosts||[]).filter(x=>x.active!==false).forEach(it=>{const c=propCats.find(x=>x.v===it.category);const ck=(!c||it.category==='otros'||!it.category)?'_other':it.category;if(!cp[ck])cp[ck]={name:c?c.l:(lang==='es'?'Otros':'Other'),value:0};const amt=parseFloat(it.amount)||0;const mo=it.frequency==='annual'?amt/12:amt;cp[ck].value+=toPC(mo,it.currency||propCurrency)*(n||1)});return Object.values(cp).sort((a,b)=>b.value-a.value).filter(c=>c.value>0).map((c,i)=>({name:c.name,value:c.value,fill:chartColors[i%chartColors.length]}))})():
         [['Commission',fComm,'#E11D48'],[t('electricity'),fDuke,'#F59E0B'],[t('water'),fWater,'#06B6D4'],['HOA',fHoa,'#8B5CF6'],[t('maintenance'),fMaint,'#10B981'],['Other',fVendor,'#64748B']].filter(([_,v])=>v>0).map(([name,value,fill])=>({name,value,fill}));
       const ownerMonthly=n>0?ownerExpTotal/n:0;
-      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const directForMonth=income.filter(i=>{const d=i.date||'';const [iy,im]=d.split('-').map(Number);return iy===s.year&&im===s.month}).reduce((sum,i)=>{const amt=i.amount||0;const cur=i.currency||'USD';if(cur===propCurrency)return sum+amt;if(cur==='USD'&&propCurrency!=='USD')return sum+amt*xRate;return sum+amt},0);const totalRev=rev+directForMonth;const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const exp=pmExp+ownerMonthly+fixedTplMonthly;const cf=totalRev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:totalRev,exp,cf,projected:false}});
+      const mChart=[...fStmts].sort((a,b)=>a.year*100+a.month-b.year*100-b.month).map(s=>{const rev=stmtToPC(s.revenue||0);const directForMonth=income.filter(i=>{const d=i.date||'';const [iy,im]=d.split('-').map(Number);return iy===s.year&&im===s.month}).reduce((sum,i)=>{const amt=i.amount||0;const cur=i.currency||'USD';if(cur===propCurrency)return sum+amt;if(cur==='USD'&&propCurrency!=='USD')return sum+amt*xRate;return sum+amt},0);const totalRev=rev+directForMonth;const pmExp=stmtToPC((s.commission||0)+(s.duke||0)+(s.water||0)+(s.hoa||0)+(s.maintenance||0)+(s.vendor||0));const mIdx=s.year*12+s.month;const ownerExpM=yearExpenses.filter(e=>!isExcludedFromOpEx(e)).reduce((sum,e)=>{if(!expenseAppliesToMonth(e,mIdx))return sum;const amt=toPC(e.amount||0,e.expCurrency);const f=eFreq(e);return sum+(f==='annual'?amt/12:amt);},0);const exp=pmExp+ownerExpM+fixedTplMonthly;const cf=totalRev-exp-(mMort>0?mMort:(mortFromExpenses/Math.max(n,1)));return{m:M[s.month-1]+(dashYear==='all'?'\''+String(s.year).slice(2):''),rev:totalRev,exp,cf,projected:false}});
       // Add future reservation months to chart
       if(dashMode==='projected'&&futureRes.length>0){
         const projByMonth={};
