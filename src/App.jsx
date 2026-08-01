@@ -230,6 +230,19 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     }
 
     if(allParsed.length>0){
+      // Check for property mismatch — warn if file seems to belong to another property
+      const otherProps=allProperties.filter(p=>p.id!==propertyId);
+      if(otherProps.length>0&&uploadLog.length>0){
+        const lastFile=uploadLog[uploadLog.length-1]?.file||'';
+        const fileText=(lastFile+' '+(allParsed[0]?._format||'')).toLowerCase();
+        for(const op of otherProps){
+          const opName=(op.name||'').toLowerCase();
+          const opAddr=(op.address||'').toLowerCase();
+          if(opName&&(fileText.includes(opName)||allParsed.some(r=>(r._file||'').toLowerCase().includes(opName)))){
+            notify(`⚠️ Este archivo parece ser de "${op.name}". Estás en "${prop.name}". ¿Seguro que es la propiedad correcta?`,'warn');break;
+          }
+        }
+      }
       setParsedPreview({results:allParsed,existingPeriods});
       setModal('reviewParsed');
     }
@@ -467,6 +480,20 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     </div>}
 
     <ViewGuard>
+
+    {/* ═══ PROPERTY BANNER ═══ */}
+    <div className={`rounded-2xl mb-5 overflow-hidden ${prop.photoURL?'':'bg-gradient-to-r from-slate-800 to-slate-700'}`} style={prop.photoURL?{background:`linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.7)),url(${prop.photoURL}) center/cover`}:{}}>
+      <div className="px-5 py-4 flex items-center justify-between">
+        <div>
+          <h1 className="text-white font-extrabold text-xl">{prop.name||'Mi Propiedad'}</h1>
+          <p className="text-white/60 text-xs mt-0.5">{prop.address||prop.city||''}{prop.country?' · '+(prop.country==='US'?'🇺🇸':'🇨🇴'):''}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {!prop.photoURL&&<button onClick={async()=>{const url=prompt(lang==='es'?'Pega la URL de la foto de tu propiedad (de Airbnb, Google, etc.)':'Paste your property photo URL');if(url){await updateDoc(doc(db,'properties',propertyId),{photoURL:url})}}} className="text-[10px] text-white/50 hover:text-white/80 bg-white/10 px-2 py-1 rounded-lg">📷 {lang==='es'?'Agregar foto':'Add photo'}</button>}
+          <span className="text-white/40 text-[10px]">{propCurrency}</span>
+        </div>
+      </div>
+    </div>
 
     {/* ═══ DASHBOARD VIEW ═══ */}
     {view==='dashboard'&&(()=>{try{
