@@ -81,6 +81,30 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     fetchTRM();const interval=setInterval(fetchTRM,3600000);return()=>clearInterval(interval);
   },[]);
   const notify=(msg,type='success')=>{setToast({msg,type});setTimeout(()=>setToast(null),4000)};
+  const [photoUploading,setPhotoUploading]=useState(false);
+  const photoInputRef=useRef(null);
+  const uploadPropertyPhoto=async(file)=>{
+    if(!file)return;
+    if(!file.type||!file.type.startsWith('image/')){notify(lang==='es'?'Selecciona una imagen válida (JPG, PNG…)':'Please select a valid image (JPG, PNG…)','error');return;}
+    if(file.size>10*1024*1024){notify(lang==='es'?'La imagen supera el límite de 10MB':'Image exceeds the 10MB limit','error');return;}
+    if(!auth.currentUser){notify(lang==='es'?'Debes iniciar sesión para subir fotos':'You must be signed in to upload photos','error');return;}
+    setPhotoUploading(true);
+    try{
+      const ts=Date.now();
+      const safeName=file.name.replace(/[^a-zA-Z0-9.\-_]/g,'_');
+      const filePath=`users/${auth.currentUser.uid}/documents/property-photos/${propertyId}/${ts}_${safeName}`;
+      const ref=storageRef(storage,filePath);
+      const snap=await uploadBytes(ref,file,{contentType:file.type||'image/jpeg'});
+      const url=await getDownloadURL(snap.ref);
+      await updateDoc(doc(db,'properties',propertyId),{photoURL:url,photoPath:filePath});
+      notify(lang==='es'?'✅ Foto de la propiedad actualizada':'✅ Property photo updated','success');
+    }catch(err){
+      notify((lang==='es'?'No se pudo subir la foto: ':'Could not upload photo: ')+(err?.message||'Error'),'error');
+    }finally{
+      setPhotoUploading(false);
+      if(photoInputRef.current)photoInputRef.current.value='';
+    }
+  };
   const [valForm,setValForm]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setValForm(x=>({...x,[k]:v})),[]);
   const [repairForm,setRepairForm]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRepairForm(x=>({...x,[k]:v})),[]);
   const [incForm,setIncForm]=useState({date:'',amount:'',source:'direct',concept:'',currency:'USD',nights:''});const uif=useCallback((k,v)=>setIncForm(x=>({...x,[k]:v})),[]);
@@ -489,7 +513,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <p className="text-white/60 text-xs mt-0.5">{prop.address||prop.city||''}{prop.country?' · '+(prop.country==='US'?'🇺🇸':'🇨🇴'):''}</p>
         </div>
         <div className="flex items-center gap-2">
-          {!prop.photoURL&&<button onClick={async()=>{const url=prompt(lang==='es'?'Pega la URL de la foto de tu propiedad (de Airbnb, Google, etc.)':'Paste your property photo URL');if(url){await updateDoc(doc(db,'properties',propertyId),{photoURL:url})}}} className="text-[10px] text-white/50 hover:text-white/80 bg-white/10 px-2 py-1 rounded-lg">📷 {lang==='es'?'Agregar foto':'Add photo'}</button>}
+          <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={e=>uploadPropertyPhoto(e.target.files&&e.target.files[0])} />
+          <button disabled={photoUploading} onClick={()=>photoInputRef.current&&photoInputRef.current.click()} className="text-[10px] text-white/50 hover:text-white/80 bg-white/10 px-2 py-1 rounded-lg disabled:opacity-60 flex items-center gap-1">
+            {photoUploading?<Loader2 size={11} className="animate-spin"/>:<span>📷</span>}
+            {photoUploading?(lang==='es'?'Subiendo…':'Uploading…'):(prop.photoURL?(lang==='es'?'Cambiar foto':'Change photo'):(lang==='es'?'Agregar foto':'Add photo'))}
+          </button>
           <span className="text-white/40 text-[10px]">{propCurrency}</span>
         </div>
       </div>
