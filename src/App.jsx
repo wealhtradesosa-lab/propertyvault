@@ -2513,6 +2513,76 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         description:'Description'
       };
 
+      // Auto-detecta el tipo de documento por señales del texto.
+      // Retorna {type, confidence:'high'|'medium'|null} — solo sobrescribe si confidence>=medium.
+      const detectDocType=(text,country)=>{
+        const T=text.toUpperCase();
+        const scores={};
+        const add=(k,n)=>{scores[k]=(scores[k]||0)+n};
+        if(country==='CO'){
+          // Certificado de Tradición — señales fuertes
+          if(/CERTIFICADO\s+DE\s+TRADICI[OÓ]N/.test(T))add('tradicion',5);
+          if(/SUPERINTENDENCIA\s+DE\s+NOTARIADO\s+Y\s+REGISTRO/.test(T))add('tradicion',4);
+          if(/SUPERNOTARIADO/.test(T))add('tradicion',3);
+          if(/FOLIO\s+DE\s+MATR[IÍ]CULA/.test(T))add('tradicion',3);
+          if(/NRO\.?\s*MATR[IÍ]CULA/.test(T))add('tradicion',2);
+          if(/OFICINA\s+DE\s+REGISTRO\s+DE\s+INSTRUMENTOS\s+P[UÚ]BLICOS/.test(T))add('tradicion',3);
+          const anotaciones=(T.match(/ANOTACI[OÓ]N\s+N/g)||[]).length;
+          if(anotaciones>=2)add('tradicion',3);
+          else if(anotaciones===1)add('tradicion',1);
+          // Escritura Pública
+          if(/ESCRITURA\s+P[UÚ]BLICA/.test(T))add('escritura',5);
+          if(/NOTAR[IÍ]A\s+(?:N[UÚ]MERO\s+)?\d+/.test(T))add('escritura',2);
+          if(/COMPARECI(?:ERON|[OÓ])/.test(T))add('escritura',3);
+          if(/OTORGA(?:NTES?|DO)/.test(T))add('escritura',2);
+          if(/CIRCULO\s+NOTARIAL/.test(T))add('escritura',2);
+          // Predial
+          if(/IMPUESTO\s+PREDIAL/.test(T))add('predial',4);
+          if(/PREDIAL\s+UNIFICADO/.test(T))add('predial',3);
+          if(/AVAL[UÚ]O\s+CATASTRAL/.test(T))add('predial',3);
+          if(/C[EÉ]DULA\s+CATASTRAL/.test(T))add('predial',3);
+          if(/ESTRATO\s*[:\-]?\s*\d/.test(T))add('predial',1);
+          // Póliza
+          if(/P[OÓ]LIZA\s+(?:DE|N[UÚ]MERO)/.test(T))add('poliza',4);
+          if(/ASEGURADORA/.test(T))add('poliza',2);
+          if(/VALOR\s+ASEGURADO/.test(T))add('poliza',2);
+          if(/DEDUCIBLE/.test(T))add('poliza',1);
+          if(/PRIMA\s+(?:ANUAL|MENSUAL|NETA|TOTAL)/.test(T))add('poliza',2);
+          // Contrato de arrendamiento
+          if(/CONTRATO\s+DE\s+ARRENDAMIENTO/.test(T))add('contrato',5);
+          if(/ARRENDATARIO/.test(T))add('contrato',2);
+          if(/ARRENDADOR/.test(T))add('contrato',2);
+          if(/CANON\s+MENSUAL/.test(T))add('contrato',2);
+        } else {
+          // US
+          if(/WARRANTY\s+DEED|QUITCLAIM\s+DEED|GRANT\s+DEED|SPECIAL\s+WARRANTY/.test(T))add('deed',5);
+          if(/\bGRANTOR\b/.test(T))add('deed',2);
+          if(/\bGRANTEE\b/.test(T))add('deed',2);
+          if(/PROPERTY\s+TAX|TAX\s+BILL|TAX\s+STATEMENT/.test(T))add('propertyTax',4);
+          if(/PARCEL\s+(?:NUMBER|NO|ID)|APN/.test(T))add('propertyTax',2);
+          if(/ASSESSED\s+VALUE/.test(T))add('propertyTax',3);
+          if(/CLOSING\s+DISCLOSURE|HUD-?1|SETTLEMENT\s+STATEMENT/.test(T))add('closingDisclosure',5);
+          if(/DEED\s+OF\s+TRUST|PROMISSORY\s+NOTE|MORTGAGE\s+NOTE/.test(T))add('mortgage',5);
+          if(/LOAN\s+AMOUNT/.test(T))add('mortgage',1);
+          if(/TITLE\s+INSURANCE\s+POLICY|SCHEDULE\s+B\s+EXCEPTIONS/.test(T))add('titlePolicy',5);
+          if(/HOMEOWNERS?\s+INSURANCE|DWELLING\s+COVERAGE/.test(T))add('insurance',4);
+          if(/LEASE\s+AGREEMENT|RENTAL\s+AGREEMENT/.test(T))add('lease',5);
+          if(/\bTENANT\b/.test(T))add('lease',1);
+          if(/\bLANDLORD\b/.test(T))add('lease',1);
+          if(/APPRAISAL\s+REPORT|APPRAISED\s+VALUE/.test(T))add('appraisal',5);
+          if(/PLAT\s+OF\s+SURVEY|BOUNDARY\s+SURVEY|SURVEYOR'?S/.test(T))add('survey',4);
+          if(/INSPECTION\s+REPORT|HOME\s+INSPECTION/.test(T))add('inspection',5);
+          if(/HOMEOWNERS?\s+ASSOCIATION|\bHOA\b|CC&R|COVENANTS/.test(T))add('hoa',4);
+        }
+        const entries=Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+        if(!entries.length)return {type:null,confidence:null};
+        const [top,topScore]=entries[0];
+        const secondScore=entries[1]?entries[1][1]:0;
+        if(topScore>=4&&topScore-secondScore>=2)return {type:top,confidence:'high'};
+        if(topScore>=3&&topScore>secondScore)return {type:top,confidence:'medium'};
+        return {type:null,confidence:null};
+      };
+
       const extractFields=(text,type)=>{
         const f={};
         const T=text.replace(/\s+/g,' ');
@@ -2675,8 +2745,16 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
             if(pdf.numPages>maxPages)notify(lang==='es'?`OCR procesó ${maxPages} de ${pdf.numPages} páginas`:`OCR processed ${maxPages} of ${pdf.numPages} pages`,'info');
           }
           setExtractedText(text);
-          const autoFields=extractFields(text,docForm.type);
-          setDocForm(f=>({...f,name:file.name,fields:{...f.fields,...autoFields}}));
+          // Auto-detecta tipo real. Si difiere del seleccionado con confianza suficiente, lo cambia.
+          const det=detectDocType(text,propCountry);
+          const finalType=det.type&&det.type!==docForm.type?det.type:docForm.type;
+          if(det.type&&det.type!==docForm.type){
+            const detLabel=docTypes.find(d=>d.v===det.type)?.l||det.type;
+            const prevLabel=docTypes.find(d=>d.v===docForm.type)?.l||docForm.type;
+            notify(lang==='es'?`🤖 Detectado como ${detLabel} (habías elegido ${prevLabel}). Si es incorrecto, cambia el tipo abajo.`:`🤖 Detected as ${detLabel} (you had selected ${prevLabel}). If wrong, change the type below.`,'info');
+          }
+          const autoFields=extractFields(text,finalType);
+          setDocForm(f=>({...f,type:finalType,name:file.name,fields:{...f.fields,...autoFields}}));
           setShowDocForm(true);
           if(Object.keys(autoFields).length>0) notify(lang==='es'?`${Object.keys(autoFields).length} campos extraídos automáticamente`:`${Object.keys(autoFields).length} fields auto-extracted`);
           else if(text.trim().length>20){notify(lang==='es'?'🤖 Leyendo con IA…':'🤖 Reading with AI…','info');extractWithAI(text);}
@@ -2747,6 +2825,11 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">{curType?.l} <span className="text-[10px] text-slate-400">{docForm.name}</span></h3>
           <button onClick={()=>{setShowDocForm(false);setExtractedText('');setDocFile(null)}} className="text-slate-400 hover:text-slate-600"><X size={18}/></button>
+        </div>
+        {/* Selector de tipo — permite corregir si la auto-detección se equivocó (re-extrae los campos) */}
+        <div className="mb-4">
+          <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-2">{lang==='es'?'Tipo de documento (cambiar si es incorrecto)':'Document type (change if incorrect)'}</label>
+          <div className="flex flex-wrap gap-2">{docTypes.map(dt=><button key={dt.v} onClick={()=>{const newFields=extractedText?extractFields(extractedText,dt.v):{};setDocForm(f=>({...f,type:dt.v,fields:newFields}))}} className={`px-2.5 py-1.5 rounded-lg border-2 text-[11px] font-semibold transition ${docForm.type===dt.v?'border-blue-500 bg-blue-50 text-blue-700':'border-slate-200 text-slate-500 hover:border-blue-300'}`}>{dt.l}</button>)}</div>
         </div>
         {Object.values(docForm.fields||{}).some(v=>v)
           ?<div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 mb-4 text-[11px] text-emerald-700">🤖 {lang==='es'?'Datos extraídos automáticamente. Verifica y corrige lo que sea necesario.':'Data extracted automatically. Verify and correct as needed.'}</div>
