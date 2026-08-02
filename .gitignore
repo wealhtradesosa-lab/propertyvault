@@ -3,3 +3,5 @@ dist/
 .env
 functions/.env
 functions/node_modules
+.firebase/
+*.save
