@@ -2587,6 +2587,59 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           if(/water\s*damage|daño\s*por\s*agua|tubería/i.test(text))coverages.push('💧 Water Damage');
           if(/medical|m[eé]dic/i.test(text))coverages.push('🏥 Medical Payments');
           if(coverages.length>0)f.coberturas=coverages.join('\n');
+        // ═══ US DOCUMENT TYPES ═══
+        } else if(type==='hoa'){
+          // HOA Name
+          const hn=text.match(/(?:The\s+)?(\w[\w\s]+?)\s*[-–—]\s*(?:Assessment|HOA|Homeowner)/i);
+          if(hn)f.hoaName=hn[1].trim();
+          if(!f.hoaName){const hn2=text.match(/(\w[\w\s]+?)\s+(?:HOA|Homeowners?\s*Association)/i);if(hn2)f.hoaName=hn2[1].trim();}
+          // Monthly Dues — find all "$ X.XX Per Month" and sum them
+          const duesMatches=[...text.matchAll(/\$\s*([\d,.]+)\s*(?:Per\s+Month|\/\s*month|monthly)/gi)];
+          if(duesMatches.length>0){
+            const total=duesMatches.reduce((s,m)=>s+(parseFloat(m[1].replace(/,/g,''))||0),0);
+            const breakdown=duesMatches.map(m=>'$'+m[1]).join(' + ');
+            f.monthlyDues=duesMatches.length>1?`$${total.toFixed(2)} (${breakdown})`:`$${duesMatches[0][1]}`;
+          }
+          // Special Assessment
+          const sa=[...text.matchAll(/(?:Capital\s+Contribution|Special\s+Assessment|One\s+Time)[^$]*?\$\s*([\d,.]+)/gi)];
+          if(sa.length>0)f.specialAssessment=sa.map(m=>'$'+m[1]).join(' + ');
+          // Included Features
+          const inc=text.match(/(?:Included\s+Features|Includes?)\s*[:\-]?\s*((?:[^\n])+)/i);
+          if(inc)f.restrictions=inc[1].trim().slice(0,200);
+          // Contact
+          const ct=text.match(/(?:contact|phone|email)\s*[:\-]?\s*([\w\s@.()\-+]+)/i);
+          if(ct)f.contactInfo=ct[1].trim().slice(0,100);
+        } else if(type==='deed'){
+          const dt=text.match(/(?:WARRANTY|QUITCLAIM|GRANT|SPECIAL WARRANTY)\s*DEED/i);
+          if(dt)f.deedType=dt[0].trim();
+          const gr=text.match(/(?:GRANTOR|FROM)\s*[:\-]?\s*([A-Z][A-Za-z\s.,]{3,60})/);if(gr)f.grantor=gr[1].trim();
+          const ge=text.match(/(?:GRANTEE|TO)\s*[:\-]?\s*([A-Z][A-Za-z\s.,]{3,60})/);if(ge)f.grantee=ge[1].trim();
+          const cn=text.match(/(?:County|COUNTY)\s*(?:of)?\s*[:\-]?\s*([A-Z][a-zA-Z\s]+?)(?:\s|,|\.|$)/);if(cn)f.county=cn[1].trim();
+          const pn=text.match(/(?:Parcel|APN|PIN|Tax\s*ID)\s*(?:Number|No|#)?\s*[:\-]?\s*([\d\s\-.]+)/i);if(pn)f.parcelNumber=pn[1].trim();
+          const sp=text.match(/(?:consideration|sale\s*price|amount)\s*[^$]*?\$\s*([\d,]+(?:\.\d{2})?)/i);if(sp)f.salePrice='$'+sp[1];
+        } else if(type==='insurance'){
+          const ins=text.match(/(?:insured\s+by|insurer|company)\s*[:\-]?\s*([A-Z][\w\s&.,]+?)(?:\n|$|policy)/i);if(ins)f.insurer=ins[1].trim();
+          const pol=text.match(/(?:policy\s*(?:number|no|#))\s*[:\-]?\s*([\w\d\-]+)/i);if(pol)f.policyNumber=pol[1];
+          const dw=text.match(/(?:dwelling|coverage\s*a)\s*[^$]*?\$\s*([\d,]+)/i);if(dw)f.dwellingCoverage='$'+dw[1];
+          const pr=text.match(/(?:annual\s*premium|total\s*premium)\s*[^$]*?\$\s*([\d,]+(?:\.\d{2})?)/i);if(pr)f.annualPremium='$'+pr[1];
+          const ded=text.match(/(?:deductible)\s*[^$]*?\$\s*([\d,]+)/i);if(ded)f.deductible='$'+ded[1];
+          const eff=text.match(/(?:effective|inception)\s*(?:date)?\s*[:\-]?\s*(\d{1,2}[\s/.-]\d{1,2}[\s/.-]\d{2,4})/i);if(eff)f.effectiveDate=eff[1];
+          const exp=text.match(/(?:expir(?:ation|es?))\s*(?:date)?\s*[:\-]?\s*(\d{1,2}[\s/.-]\d{1,2}[\s/.-]\d{2,4})/i);if(exp)f.expirationDate=exp[1];
+          const coverages=[];
+          if(/dwelling|structure/i.test(text))coverages.push('🏠 Dwelling');
+          if(/liability/i.test(text))coverages.push('⚖️ Liability');
+          if(/personal\s*property/i.test(text))coverages.push('📦 Personal Property');
+          if(/loss\s*of\s*(?:use|rent)/i.test(text))coverages.push('💰 Loss of Use/Rent');
+          if(/flood/i.test(text))coverages.push('🌊 Flood');
+          if(/wind|hurricane/i.test(text))coverages.push('🌪️ Wind/Hurricane');
+          if(coverages.length>0)f.coverages=coverages.join('\n');
+        } else if(type==='propertyTax'){
+          const pn=text.match(/(?:Parcel|APN|Folio|Account)\s*(?:Number|No|#|ID)?\s*[:\-]?\s*([\d\s\-.]+)/i);if(pn)f.parcelNumber=pn[1].trim();
+          const av=text.match(/(?:assessed|taxable)\s*(?:value)?\s*[^$]*?\$\s*([\d,]+)/i);if(av)f.assessedValue='$'+av[1];
+          const at=text.match(/(?:total\s*(?:tax|amount)|annual\s*tax|amount\s*due)\s*[^$]*?\$\s*([\d,]+(?:\.\d{2})?)/i);if(at)f.annualTax='$'+at[1];
+          const ty=text.match(/(?:tax\s*year|fiscal\s*year)\s*[:\-]?\s*(\d{4})/i);if(ty)f.taxYear=ty[1];
+          const dd=text.match(/(?:due\s*date|pay\s*by)\s*[:\-]?\s*(\d{1,2}[\s/.-]\d{1,2}[\s/.-]\d{2,4})/i);if(dd)f.dueDate=dd[1];
+          const co=text.match(/(?:County|COUNTY)\s*(?:of)?\s*[:\-]?\s*([A-Z][a-zA-Z\s]+?)(?:\s|,|\.|$)/);if(co)f.county=co[1].trim();
         }
         return f;
       };
