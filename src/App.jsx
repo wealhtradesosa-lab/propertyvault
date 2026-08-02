@@ -2626,17 +2626,19 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           setDocForm(f=>({...f,name:file.name,fields:{...f.fields,...autoFields}}));
           setShowDocForm(true);
           if(Object.keys(autoFields).length>0) notify(lang==='es'?`${Object.keys(autoFields).length} campos extraídos automáticamente`:`${Object.keys(autoFields).length} fields auto-extracted`);
+          else if(text.trim().length>20){notify(lang==='es'?'🤖 Leyendo con IA…':'🤖 Reading with AI…','info');extractWithAI(text);}
           else notify(lang==='es'?'PDF leído. Completa los campos manualmente.':'PDF read. Fill fields manually.','warn');
         }catch(err){notify('Error leyendo PDF: '+err.message,'error')}
         setUploadingDoc(false);setOcrProgress('');
       };
 
-      const extractWithAI=async()=>{
-        if(!extractedText||extractedText.trim().length<20){notify(lang==='es'?'No hay texto suficiente':'Not enough text','error');return;}
+      const extractWithAI=async(textArg)=>{
+        const txt=(typeof textArg==='string'&&textArg)||extractedText;
+        if(!txt||txt.trim().length<20){notify(lang==='es'?'No hay texto suficiente':'Not enough text','error');return;}
         setAiExtracting(true);
         try{
           const call=httpsCallable(fbFunctions,'extractDocumentFields');
-          const res=await call({text:extractedText,docType:docForm.type});
+          const res=await call({text:txt,docType:docForm.type});
           const aiFields=res.data?.fields||{};
           const count=Object.keys(aiFields).length;
           setDocForm(f=>({...f,fields:{...f.fields,...aiFields}}));
@@ -2700,7 +2702,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <summary className="cursor-pointer px-3 py-2 text-[11px] font-semibold text-slate-600 select-none">🔍 {lang==='es'?'Texto detectado en el PDF':'Text detected in PDF'} ({extractedText.length} {lang==='es'?'caracteres':'chars'})</summary>
           <pre className="px-3 py-2 text-[10px] text-slate-500 max-h-48 overflow-auto whitespace-pre-wrap font-mono border-t border-slate-200">{extractedText.slice(0,3000)}{extractedText.length>3000?'\n…':''}</pre>
         </details>}
-        {extractedText&&['escritura','tradicion','predial','contrato','poliza'].includes(docForm.type)&&<button onClick={extractWithAI} disabled={aiExtracting} className="w-full mb-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50">{aiExtracting?<><Loader2 size={16} className="animate-spin"/>{lang==='es'?'IA leyendo el documento…':'AI reading document…'}</>:<>✨ {lang==='es'?'Extraer con IA (Claude)':'Extract with AI (Claude)'}</>}</button>}
+        {extractedText&&extractedText.trim().length>20&&<button onClick={()=>extractWithAI()} disabled={aiExtracting} className="w-full mb-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50">{aiExtracting?<><Loader2 size={16} className="animate-spin"/>{lang==='es'?'IA leyendo el documento…':'AI reading document…'}</>:<>✨ {lang==='es'?'Extraer con IA (Claude)':'Extract with AI (Claude)'}</>}</button>}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {curType?.fields.map(fk=><div key={fk}>
             <label className="block text-[10px] font-semibold text-slate-500 uppercase mb-1">{fieldLabels[fk]||fk}</label>
