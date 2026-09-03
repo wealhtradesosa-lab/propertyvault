@@ -125,6 +125,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);const [tenants,setTenants]=useState([]);const [documents,setDocuments]=useState([]);const [providers,setProviders]=useState([]);const [reservations,setReservations]=useState([]);const [maintenance,setMaintenance]=useState([]);
   const [tenantForm,setTenantForm]=useState({name:'',idNumber:'',phone:'',email:'',unit:'',monthlyRent:'',deposit:'',startDate:'',endDate:'',incrementPct:'3',status:'active',notes:''});const utn=useCallback((k,v)=>setTenantForm(x=>({...x,[k]:v})),[]);
   const [uploadingDoc,setUploadingDoc]=useState(false);const [docForm,setDocForm]=useState({type:'escritura',name:'',notes:'',fields:{}});const [showDocForm,setShowDocForm]=useState(false);const [extractedText,setExtractedText]=useState('');const [ocrProgress,setOcrProgress]=useState('');const [aiExtracting,setAiExtracting]=useState(false);const [docFile,setDocFile]=useState(null);
+  const [openFolders,setOpenFolders]=useState([]);const [openDocId,setOpenDocId]=useState(null);const [docSearch,setDocSearch]=useState('');
   const [provForm,setProvForm]=useState({name:'',service:'plumbing',phone:'',email:'',rating:'5',notes:''});
   const [resForm,setResForm]=useState({guest:'',checkin:'',checkout:'',nights:'',amount:'',source:'airbnb',status:'confirmed',notes:'',currency:'USD'});
   const [dark,setDark]=useState(()=>{try{return localStorage.getItem('od-dark')==='1'}catch{return false}});
@@ -251,6 +252,25 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       await addDoc(collection(db,'properties',propertyId,'expenses'),{date:today,concept:task.title+(task.notes?' — '+task.notes:''),amount:parseFloat(task.amount),category:catMap[task.title]||'otros',type:'fixed',paidBy:task.paidBy||'property',createdAt:serverTimestamp()});
       notify(task.title+' pagado · próximo: '+(nextDue?fmDate(nextDue):'—'));
     } else { notify(task.title+' marcado como pagado') }
+  };
+  // ═══ Documentos: ver el PDF en pestaña nueva o bajarlo al disco ═══
+  const openDoc=(url)=>{if(url)window.open(url,'_blank','noopener,noreferrer')};
+  const downloadDoc=async(url,name)=>{
+    if(!url)return;
+    try{
+      const r=await fetch(url);
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const blob=await r.blob();
+      const u=URL.createObjectURL(blob);
+      const a=document.createElement('a');
+      a.href=u;a.download=name||'documento.pdf';
+      document.body.appendChild(a);a.click();a.remove();
+      setTimeout(()=>URL.revokeObjectURL(u),2000);
+    }catch(e){
+      // Storage sin CORS o red caída: abrimos el visor y que el navegador lo guarde
+      notify(lang==='es'?'Abriendo el PDF — guardalo desde el visor':'Opening PDF — save it from the viewer','info');
+      openDoc(url);
+    }
   };
   // ═══ Mantenimientos programados: marcar realizado → reprograma y registra gasto ═══
   const addMonths=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setMonth(d.getMonth()+n);return d.toISOString().split('T')[0]};
@@ -3021,88 +3041,177 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       </div>}
 
       {/* Document list */}
-      {documents.length>0?<div className="space-y-4">
-        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mt-6 mb-2">{lang==='es'?`Mis Documentos (${documents.length})`:`My Documents (${documents.length})`}</h3>
-        {documents.sort((a,b)=>(b.uploadDate||'').localeCompare(a.uploadDate||'')).map(d=>{
-          const dt=docTypes.find(t=>t.v===d.type);
-          const isTradicion=d.type==='tradicion';
-          const daysSinceUpload=d.uploadDate?Math.floor((Date.now()-new Date(d.uploadDate+'T00:00:00'))/(1000*60*60*24)):999;
-          const fields=Object.entries(d.fields||{}).filter(([k,v])=>v&&k!=='estado');
-          const longFieldKeys=['linderos','gravamenes','descripcion','coberturas','legalDescription','boundaries','restrictions','majorFindings','recommendations','exceptions','comparables'];
-          // HIGHLIGHTS por tipo de documento — campos más críticos
-          const highlightsByType={
-            escritura:['naturalezaActo','valorVenta','propietarios','fechaRegistro','matriculaInmobiliaria'],
-            tradicion:['estadoFolio','propietarios','gravamenes','fechaExpedicion','matricula'],
-            predial:['avaluoCatastral','impuestoAnual','vigencia','cedulaCatastral'],
-            contrato:['inquilino','canon','fechaInicio','fechaFin'],
-            poliza:['aseguradora','valorAsegurado','prima','vigenciaFin'],
-            deed:['deedType','salePrice','grantee','recordedDate'],
-            titlePolicy:['titleInsurer','coverageAmount','effectiveDate'],
-            propertyTax:['assessedValue','annualTax','taxYear'],
-            mortgage:['lender','loanAmount','interestRate','firstPaymentDate'],
-            insurance:['insurer','dwellingCoverage','annualPremium','expirationDate'],
-            lease:['tenant','monthlyRent','startDate','endDate'],
-            closingDisclosure:['salePrice','closingDate','loanAmount'],
-            hoa:['hoaName','monthlyDues'],
-            inspection:['inspector','inspectionDate','overallCondition'],
-            appraisal:['appraiser','appraisedValue','appraisalDate'],
-            survey:['surveyor','lotArea','surveyDate']
-          };
-          const highlightKeys=highlightsByType[d.type]||[];
-          const highlights=highlightKeys.map(k=>[k,d.fields?.[k]]).filter(([,v])=>v);
-          const highlightSet=new Set(highlightKeys);
-          const shortFields=fields.filter(([k])=>!longFieldKeys.includes(k)&&!highlightSet.has(k));
-          const longFields=fields.filter(([k])=>longFieldKeys.includes(k));
-          return <div key={d.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition overflow-hidden">
-            {/* Header con gradiente por tipo */}
-            <div className="bg-gradient-to-r from-slate-50 to-blue-50 px-5 py-3 border-b border-slate-100 flex justify-between items-center">
-              <div className="flex items-center gap-2 flex-wrap min-w-0">
-                <span className="text-base font-extrabold text-slate-800 truncate">{dt?.l||d.type}</span>
-                {isTradicion&&daysSinceUpload>30&&<span className="text-[10px] font-bold bg-rose-100 text-rose-600 px-2 py-1 rounded-full whitespace-nowrap">⚠️ {lang==='es'?'Vencido':'Expired'}</span>}
-                {d.fields?.estado&&<span className={`text-[10px] font-bold px-2 py-1 rounded-full whitespace-nowrap ${d.fields.estado.includes('✅')?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}`}>{d.fields.estado}</span>}
-              </div>
-              <div className="flex gap-1.5 shrink-0">
-                {d.fileURL&&<a href={d.fileURL} target="_blank" rel="noopener noreferrer" title={lang==='es'?'Ver / Descargar PDF':'View / Download PDF'} className="px-3 py-1.5 text-blue-600 hover:text-white hover:bg-blue-600 rounded-lg border border-blue-200 hover:border-blue-600 transition flex items-center gap-1.5 text-[11px] font-bold"><Download size={13}/>{lang==='es'?'Ver PDF':'View PDF'}</a>}
-                <button onClick={async()=>{if(!confirm(lang==='es'?`¿Eliminar este documento?\n\n${d.name||d.type}`:`Delete this document?\n\n${d.name||d.type}`))return;if(d.filePath){try{await deleteObject(storageRef(storage,d.filePath))}catch(e){/* file may not exist */}}del('documents',d.id)}} title={lang==='es'?'Eliminar documento':'Delete document'} className="px-3 py-1.5 text-rose-500 hover:text-white hover:bg-rose-500 rounded-lg border border-rose-200 hover:border-rose-500 transition flex items-center gap-1.5 text-[11px] font-bold"><Trash2 size={13}/>{lang==='es'?'Eliminar':'Delete'}</button>
-              </div>
-            </div>
-            {/* Body: campos extraídos en formato ficha */}
-            <div className="p-5">
-              {fields.length===0?<div className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">⚠️ {lang==='es'?'No se extrajeron datos automáticamente — abre el documento para verlo.':'No data was auto-extracted — open the document to view it.'}</div>
-              :<>
-                {/* HIGHLIGHTS — datos críticos en grande */}
-                {highlights.length>0&&<div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 mb-4">
-                  <div className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-2">⭐ {lang==='es'?'Datos Clave':'Key Highlights'}</div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {highlights.map(([k,v])=><div key={k}>
-                      <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">{fieldLabels[k]||k}</div>
-                      <div className="text-[15px] font-extrabold text-slate-800 break-words leading-tight">{v}</div>
-                    </div>)}
-                  </div>
-                </div>}
-                {/* Resto de campos cortos */}
-                {shortFields.length>0&&<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 mb-4">
-                  {shortFields.map(([k,v])=><div key={k} className="border-l-2 border-slate-200 pl-3">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{fieldLabels[k]||k}</div>
-                    <div className="text-[13px] font-semibold text-slate-700 break-words">{v}</div>
-                  </div>)}
-                </div>}
-                {/* Campos largos: linderos, gravámenes, etc. */}
-                {longFields.length>0&&<div className="space-y-3 mt-3 pt-3 border-t border-slate-100">
-                  {longFields.map(([k,v])=><div key={k}>
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{fieldLabels[k]||k}</div>
-                    <div className="text-[12px] text-slate-700 bg-slate-50 rounded-lg p-3 whitespace-pre-wrap break-words leading-relaxed">{v}</div>
-                  </div>)}
-                </div>}
-              </>}
-              {d.notes&&<div className="text-[11px] text-slate-500 mt-3 pt-3 border-t border-slate-100">📝 {d.notes}</div>}
-              <div className="text-[10px] text-slate-300 mt-3 flex justify-between items-center">
-                <span className="truncate">📎 {d.name}</span>
-                <span className="whitespace-nowrap ml-2">{d.uploadDate?fmDate(d.uploadDate):''}</span>
-              </div>
-            </div>
+      {documents.length>0?(()=>{
+        // ── Año del documento: se toma del contenido, no de la fecha de subida ──
+        const yearFrom=(v)=>{const m=String(v||'').match(/(19|20)\d{2}/);return m?m[0]:''};
+        const yearKeysByType={
+          predial:['vigencia','fechaExpedicion'],propertyTax:['taxYear','dueDate'],
+          escritura:['fechaRegistro'],deed:['recordedDate'],
+          tradicion:['fechaExpedicion','ultimaTransaccion'],
+          poliza:['vigenciaInicio','vigenciaFin'],insurance:['effectiveDate','expirationDate'],
+          titlePolicy:['effectiveDate'],contrato:['fechaInicio'],lease:['startDate'],
+          mortgage:['firstPaymentDate'],closingDisclosure:['closingDate'],
+          inspection:['inspectionDate'],appraisal:['appraisalDate'],survey:['surveyDate'],
+        };
+        const docYear=(d)=>{
+          for(const k of (yearKeysByType[d.type]||[])){const y=yearFrom(d.fields?.[k]);if(y)return y}
+          return yearFrom(d.uploadDate)||(lang==='es'?'Sin año':'No year');
+        };
+        // ── Filtro de búsqueda ──
+        const q=docSearch.trim().toLowerCase();
+        const visible=q?documents.filter(d=>{
+          const hay=[d.name,d.notes,docTypes.find(t=>t.v===d.type)?.l,docYear(d),...Object.values(d.fields||{})].join(' ').toLowerCase();
+          return hay.includes(q);
+        }):documents;
+        // ── Agrupar por tipo, y dentro de cada tipo por año ──
+        const order=docTypes.map(t=>t.v);
+        const byType={};
+        visible.forEach(d=>{(byType[d.type]=byType[d.type]||[]).push(d)});
+        const folders=Object.keys(byType).sort((a,b)=>{
+          const ia=order.indexOf(a),ib=order.indexOf(b);
+          return (ia<0?99:ia)-(ib<0?99:ib);
+        }).map(type=>{
+          const docs=byType[type];
+          const years={};
+          docs.forEach(d=>{const y=docYear(d);(years[y]=years[y]||[]).push(d)});
+          const yearList=Object.keys(years).sort((a,b)=>b.localeCompare(a));
+          yearList.forEach(y=>years[y].sort((a,b)=>(b.uploadDate||'').localeCompare(a.uploadDate||'')));
+          return {type,docs,years,yearList,label:docTypes.find(t=>t.v===type)?.l||type};
+        });
+        const toggleFolder=(t)=>setOpenFolders(f=>f.includes(t)?f.filter(x=>x!==t):[...f,t]);
+        const isOpen=(t)=>openFolders.includes(t)||!!q;
+        const allOpen=folders.length>0&&folders.every(f=>openFolders.includes(f.type));
+
+        return <div className="space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-6 mb-1">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex-1">{lang==='es'?`Repositorio (${documents.length} documento${documents.length===1?'':'s'})`:`Repository (${documents.length})`}</h3>
+          <div className="flex gap-2">
+            <input value={docSearch} onChange={e=>setDocSearch(e.target.value)} placeholder={lang==='es'?'Buscar por año, notaría, matrícula…':'Search year, number, notes…'} className="px-3 py-2 text-xs border border-slate-200 rounded-xl w-full sm:w-64 focus:outline-none focus:border-blue-400"/>
+            <button onClick={()=>setOpenFolders(allOpen?[]:folders.map(f=>f.type))} className="px-3 py-2 text-[11px] font-bold text-slate-500 border border-slate-200 rounded-xl hover:bg-slate-50 whitespace-nowrap">{allOpen?(lang==='es'?'Cerrar todo':'Collapse'):(lang==='es'?'Abrir todo':'Expand')}</button>
+          </div>
+        </div>
+
+        {folders.length===0&&<div className="text-center text-xs text-slate-400 py-8 bg-white rounded-2xl border border-slate-200">{lang==='es'?'Ningún documento coincide con la búsqueda.':'No documents match your search.'}</div>}
+
+        {folders.map(F=>{
+          const open=isOpen(F.type);
+          const yearsTxt=F.yearList.length>1?`${F.yearList[F.yearList.length-1]}–${F.yearList[0]}`:F.yearList[0];
+          // Alerta de vigencia a nivel carpeta (certificado de tradición: 30 días)
+          const stale=F.type==='tradicion'&&F.docs.every(d=>{const days=d.uploadDate?Math.floor((Date.now()-new Date(d.uploadDate+'T00:00:00'))/86400000):999;return days>30});
+          return <div key={F.type} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            {/* Carpeta */}
+            <button onClick={()=>toggleFolder(F.type)} className="w-full px-5 py-4 flex items-center gap-3 hover:bg-slate-50 transition text-left">
+              <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform ${open?'':'-rotate-90'}`}/>
+              <span className="text-sm font-extrabold text-slate-800 flex-1 min-w-0 truncate">{F.label}</span>
+              {stale&&<span className="text-[10px] font-bold bg-rose-100 text-rose-600 px-2 py-1 rounded-full whitespace-nowrap">⚠️ {lang==='es'?'Desactualizado':'Outdated'}</span>}
+              <span className="text-[10px] text-slate-400 whitespace-nowrap hidden sm:inline">{yearsTxt}</span>
+              <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full whitespace-nowrap">{F.docs.length}</span>
+            </button>
+
+            {open&&<div className="border-t border-slate-100">
+              {F.yearList.map(Y=><div key={Y}>
+                <div className="px-5 py-2 bg-slate-50/70 flex items-center gap-2 border-b border-slate-100">
+                  <span className="text-[11px] font-extrabold text-slate-600 tracking-wide">{Y}</span>
+                  <span className="text-[10px] text-slate-400">{F.years[Y].length} {lang==='es'?(F.years[Y].length===1?'documento':'documentos'):'docs'}</span>
+                </div>
+                {F.years[Y].map(d=>{
+                  const dt=docTypes.find(t=>t.v===d.type);
+                  const expanded=openDocId===d.id;
+                  const isTradicion=d.type==='tradicion';
+                  const daysSinceUpload=d.uploadDate?Math.floor((Date.now()-new Date(d.uploadDate+'T00:00:00'))/86400000):999;
+                  const fields=Object.entries(d.fields||{}).filter(([k,v])=>v&&k!=='estado');
+                  const longFieldKeys=['linderos','gravamenes','descripcion','coberturas','legalDescription','boundaries','restrictions','majorFindings','recommendations','exceptions','comparables'];
+                  const highlightsByType={
+                    escritura:['naturalezaActo','valorVenta','propietarios','fechaRegistro','matriculaInmobiliaria'],
+                    tradicion:['estadoFolio','propietarios','gravamenes','fechaExpedicion','matricula'],
+                    predial:['avaluoCatastral','impuestoAnual','vigencia','cedulaCatastral'],
+                    contrato:['inquilino','canon','fechaInicio','fechaFin'],
+                    poliza:['aseguradora','valorAsegurado','prima','vigenciaFin'],
+                    deed:['deedType','salePrice','grantee','recordedDate'],
+                    titlePolicy:['titleInsurer','coverageAmount','effectiveDate'],
+                    propertyTax:['assessedValue','annualTax','taxYear'],
+                    mortgage:['lender','loanAmount','interestRate','firstPaymentDate'],
+                    insurance:['insurer','dwellingCoverage','annualPremium','expirationDate'],
+                    lease:['tenant','monthlyRent','startDate','endDate'],
+                    closingDisclosure:['salePrice','closingDate','loanAmount'],
+                    hoa:['hoaName','monthlyDues'],
+                    inspection:['inspector','inspectionDate','overallCondition'],
+                    appraisal:['appraiser','appraisedValue','appraisalDate'],
+                    survey:['surveyor','lotArea','surveyDate']
+                  };
+                  const highlightKeys=highlightsByType[d.type]||[];
+                  const highlights=highlightKeys.map(k=>[k,d.fields?.[k]]).filter(([,v])=>v);
+                  const highlightSet=new Set(highlightKeys);
+                  const shortFields=fields.filter(([k])=>!longFieldKeys.includes(k)&&!highlightSet.has(k));
+                  const longFields=fields.filter(([k])=>longFieldKeys.includes(k));
+                  // Resumen de una línea para la fila cerrada
+                  const preview=highlights.slice(0,2).map(([k,v])=>`${fieldLabels[k]||k}: ${String(v).slice(0,40)}`).join(' · ');
+                  return <div key={d.id} className="border-b border-slate-100 last:border-b-0">
+                    {/* Fila compacta */}
+                    <div className="px-5 py-3 flex items-center gap-3 hover:bg-blue-50/40 transition">
+                      <button onClick={()=>setOpenDocId(expanded?null:d.id)} className="flex-1 min-w-0 text-left flex items-center gap-3">
+                        <ChevronDown size={13} className={`text-slate-300 shrink-0 transition-transform ${expanded?'':'-rotate-90'}`}/>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[13px] font-bold text-slate-700 truncate">{d.name||dt?.l||d.type}</span>
+                            {isTradicion&&daysSinceUpload>30&&<span className="text-[9px] font-bold bg-rose-100 text-rose-600 px-1.5 py-0.5 rounded-full whitespace-nowrap">{lang==='es'?'Vencido':'Expired'}</span>}
+                            {d.fields?.estado&&<span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap ${d.fields.estado.includes('✅')?'bg-emerald-100 text-emerald-700':'bg-amber-100 text-amber-700'}`}>{d.fields.estado}</span>}
+                            {fields.length===0&&<span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">{lang==='es'?'Sin datos':'No data'}</span>}
+                          </div>
+                          {preview&&<div className="text-[10px] text-slate-400 truncate mt-0.5">{preview}</div>}
+                        </div>
+                      </button>
+                      <span className="text-[10px] text-slate-300 whitespace-nowrap hidden md:inline">{d.uploadDate?fmDate(d.uploadDate):''}</span>
+                      {d.fileURL?<><a href={d.fileURL} target="_blank" rel="noopener noreferrer" title={lang==='es'?'Ver el PDF':'View PDF'} aria-label={lang==='es'?'Ver el PDF':'View PDF'} className="p-2 text-blue-600 hover:text-white hover:bg-blue-600 rounded-lg border border-blue-200 transition shrink-0"><Eye size={13}/></a>
+                      <button onClick={()=>downloadDoc(d.fileURL,d.name)} title={lang==='es'?'Descargar el PDF':'Download PDF'} aria-label={lang==='es'?'Descargar el PDF':'Download PDF'} className="p-2 text-emerald-600 hover:text-white hover:bg-emerald-600 rounded-lg border border-emerald-200 transition shrink-0"><Download size={13}/></button></>
+                      :<span title={lang==='es'?'Este registro no tiene archivo adjunto':'No file attached'} className="text-[9px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-full whitespace-nowrap shrink-0 hidden sm:inline">{lang==='es'?'Sin archivo':'No file'}</span>}
+                      <button aria-label={lang==='es'?'Eliminar documento':'Delete document'} onClick={async()=>{if(!confirm(lang==='es'?`¿Eliminar este documento?\n\n${d.name||d.type}`:`Delete this document?\n\n${d.name||d.type}`))return;if(d.filePath){try{await deleteObject(storageRef(storage,d.filePath))}catch(e){/* el archivo puede no existir */}}del('documents',d.id)}} className="p-2 text-slate-300 hover:text-rose-500 rounded-lg hover:bg-rose-50 shrink-0"><Trash2 size={13}/></button>
+                    </div>
+
+                    {/* Ficha expandida */}
+                    {expanded&&<div className="px-5 pb-5 bg-slate-50/50">
+                      {/* Acciones sobre el archivo */}
+                      <div className="flex flex-wrap items-center gap-2 py-3 mb-1">
+                        {d.fileURL?<>
+                          <a href={d.fileURL} target="_blank" rel="noopener noreferrer" className="px-3 py-2 bg-blue-600 text-white rounded-xl font-bold text-[11px] hover:bg-blue-700 transition flex items-center gap-1.5"><Eye size={13}/>{lang==='es'?'Ver PDF':'View PDF'}</a>
+                          <button onClick={()=>downloadDoc(d.fileURL,d.name)} className="px-3 py-2 bg-emerald-600 text-white rounded-xl font-bold text-[11px] hover:bg-emerald-700 transition flex items-center gap-1.5"><Download size={13}/>{lang==='es'?'Descargar':'Download'}</button>
+                        </>:<span className="text-[11px] text-slate-400 italic">{lang==='es'?'Este registro no tiene archivo adjunto.':'No file attached to this record.'}</span>}
+                      </div>
+                      {fields.length===0?<div className="text-[12px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">⚠️ {lang==='es'?'No se extrajeron datos automáticamente — abre el PDF para verlo.':'No data was auto-extracted — open the PDF.'}</div>
+                      :<>
+                        {highlights.length>0&&<div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 mb-4">
+                          <div className="text-[10px] font-bold text-blue-600 uppercase tracking-widest mb-2">⭐ {lang==='es'?'Datos Clave':'Key Highlights'}</div>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {highlights.map(([k,v])=><div key={k}>
+                              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">{fieldLabels[k]||k}</div>
+                              <div className="text-[15px] font-extrabold text-slate-800 break-words leading-tight">{v}</div>
+                            </div>)}
+                          </div>
+                        </div>}
+                        {shortFields.length>0&&<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-3 mb-4">
+                          {shortFields.map(([k,v])=><div key={k} className="border-l-2 border-slate-200 pl-3">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{fieldLabels[k]||k}</div>
+                            <div className="text-[13px] font-semibold text-slate-700 break-words">{v}</div>
+                          </div>)}
+                        </div>}
+                        {longFields.length>0&&<div className="space-y-3 mt-3 pt-3 border-t border-slate-200">
+                          {longFields.map(([k,v])=><div key={k}>
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">{fieldLabels[k]||k}</div>
+                            <div className="text-[12px] text-slate-700 bg-white rounded-lg p-3 whitespace-pre-wrap break-words leading-relaxed border border-slate-200">{v}</div>
+                          </div>)}
+                        </div>}
+                      </>}
+                      {d.notes&&<div className="text-[11px] text-slate-500 mt-3 pt-3 border-t border-slate-200">📝 {d.notes}</div>}
+                      <div className="text-[10px] text-slate-300 mt-3 flex justify-between items-center">
+                        <span className="truncate">📎 {d.name}</span>
+                        <span className="whitespace-nowrap ml-2">{lang==='es'?'Subido':'Uploaded'} {d.uploadDate?fmDate(d.uploadDate):''}</span>
+                      </div>
+                    </div>}
+                  </div>})}
+              </div>)}
+            </div>}
           </div>})}
-      </div>
+        </div>})()
       :!showDocForm&&<div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-center">
         <div className="text-3xl mb-3">📄</div>
         <div className="text-sm font-bold text-blue-700 mb-1">{lang==='es'?'No hay documentos registrados':'No documents registered'}</div>
