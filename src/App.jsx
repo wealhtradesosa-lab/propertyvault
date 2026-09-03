@@ -5,7 +5,7 @@ import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'fi
 import { collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, serverTimestamp, where, updateDoc, getDocs, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart, Line, LineChart } from 'recharts';
-import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer, MessageSquare, Send, Moon, Sun, Calculator, FileText, Download } from 'lucide-react';
+import { Home, DollarSign, Users, Plus, Building2, X, Trash2, Loader2, LogOut, Lock, Mail, Receipt, Landmark, UserPlus, ClipboardList, Eye, EyeOff, ChevronDown, Upload, TrendingUp, BarChart3, Calendar, Layers, ArrowUpRight, ArrowDownRight, AlertTriangle, CheckCircle, Settings, Target, Pencil, Menu, Wrench, Clock, Printer, MessageSquare, Send, Moon, Sun, Calculator, FileText, Download, ShieldCheck } from 'lucide-react';
 
 import { ADMIN_EMAILS, VIP_EMAILS, C, M, fm, fmCurrency, fmDate, pct, CATS, getCats, getTerms, COUNTRIES, CURRENCY_LIST, US_STATES as US, PROPERTY_TYPES as PT } from './lib/constants';
 import { createT } from './lib/i18n';
@@ -122,7 +122,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
   const [parsedPreview,setParsedPreview]=useState(null);
-  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);const [tenants,setTenants]=useState([]);const [documents,setDocuments]=useState([]);const [providers,setProviders]=useState([]);const [reservations,setReservations]=useState([]);
+  const [valuations,setValuations]=useState([]);const [mobileNav,setMobileNav]=useState(false);const [repairs,setRepairs]=useState([]);const [tasks,setTasks]=useState([]);const [tenants,setTenants]=useState([]);const [documents,setDocuments]=useState([]);const [providers,setProviders]=useState([]);const [reservations,setReservations]=useState([]);const [maintenance,setMaintenance]=useState([]);
   const [tenantForm,setTenantForm]=useState({name:'',idNumber:'',phone:'',email:'',unit:'',monthlyRent:'',deposit:'',startDate:'',endDate:'',incrementPct:'3',status:'active',notes:''});const utn=useCallback((k,v)=>setTenantForm(x=>({...x,[k]:v})),[]);
   const [uploadingDoc,setUploadingDoc]=useState(false);const [docForm,setDocForm]=useState({type:'escritura',name:'',notes:'',fields:{}});const [showDocForm,setShowDocForm]=useState(false);const [extractedText,setExtractedText]=useState('');const [ocrProgress,setOcrProgress]=useState('');const [aiExtracting,setAiExtracting]=useState(false);const [docFile,setDocFile]=useState(null);
   const [provForm,setProvForm]=useState({name:'',service:'plumbing',phone:'',email:'',rating:'5',notes:''});
@@ -166,6 +166,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   };
   const [valForm,setValForm]=useState({date:'',value:'',source:'manual',notes:''});const uv=useCallback((k,v)=>setValForm(x=>({...x,[k]:v})),[]);
   const [repairForm,setRepairForm]=useState({date:'',title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:''});const ur=useCallback((k,v)=>setRepairForm(x=>({...x,[k]:v})),[]);
+  const [maintForm,setMaintForm]=useState({title:'',category:'general',everyMonths:'12',lastDone:'',nextDue:'',estCost:'',vendor:'',notes:'',active:true});const um=useCallback((k,v)=>setMaintForm(x=>({...x,[k]:v})),[]);
   const [incForm,setIncForm]=useState({date:'',amount:'',source:'direct',concept:'',currency:'USD',nights:''});const uif=useCallback((k,v)=>setIncForm(x=>({...x,[k]:v})),[]);
   const [taskForm,setTaskForm]=useState({title:'',dueDate:'',priority:'medium',status:'pending',notes:'',amount:'',frequency:'annual',payer:'owner',reminderDays:'30',paidBy:'property'});const ut=useCallback((k,v)=>setTaskForm(x=>({...x,[k]:v})),[]);
   const [settingsForm,setSettingsForm]=useState(null);
@@ -205,7 +206,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
 
   useEffect(()=>{const b=`properties/${propertyId}`,u=[];
     const L=(s,fn)=>{u.push(onSnapshot(collection(db,b,s),snap=>{const docs=snap.docs.map(d=>({id:d.id,...d.data()}));docs.sort((a,b)=>{const ta=a.createdAt?.toMillis?.()||0,tb=b.createdAt?.toMillis?.()||0;return tb-ta});fn(docs)}))};
-    L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);L('tenants',setTenants);L('documents',setDocuments);L('providers',setProviders);L('reservations',setReservations);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
+    L('expenses',setExpenses);L('income',setIncome);L('contributions',setContribs);L('statements',setStmts);L('valuations',setValuations);L('repairs',setRepairs);L('tasks',setTasks);L('tenants',setTenants);L('documents',setDocuments);L('providers',setProviders);L('reservations',setReservations);L('maintenance',setMaintenance);setTimeout(()=>setLoading(false),700);return()=>u.forEach(x=>x())},[propertyId]);
   // Reset forms when switching property
   useEffect(()=>{setSettingsForm(null);setEditPartners(null);setView('dashboard');setDashYear('all');setEditId(null);setModal(null)},[propertyId]);
 
@@ -250,6 +251,23 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       await addDoc(collection(db,'properties',propertyId,'expenses'),{date:today,concept:task.title+(task.notes?' — '+task.notes:''),amount:parseFloat(task.amount),category:catMap[task.title]||'otros',type:'fixed',paidBy:task.paidBy||'property',createdAt:serverTimestamp()});
       notify(task.title+' pagado · próximo: '+(nextDue?fmDate(nextDue):'—'));
     } else { notify(task.title+' marcado como pagado') }
+  };
+  // ═══ Mantenimientos programados: marcar realizado → reprograma y registra gasto ═══
+  const addMonths=(iso,n)=>{const d=new Date(iso+'T00:00:00');d.setMonth(d.getMonth()+n);return d.toISOString().split('T')[0]};
+  const markMaintDone=async(m,realCost)=>{
+    const today=new Date().toISOString().split('T')[0];
+    const every=parseInt(m.everyMonths)||12;
+    const next=addMonths(today,every);
+    const cost=realCost!==undefined?realCost:(parseFloat(m.estCost)||0);
+    try{
+      const hist=[...(m.history||[]),{date:today,cost,vendor:m.vendor||''}].slice(-24);
+      await updateDoc(doc(db,'properties',propertyId,'maintenance',m.id),{lastDone:today,nextDue:next,history:hist});
+      if(cost>0){
+        await addDoc(collection(db,'properties',propertyId,'expenses'),{date:today,concept:'Mantenimiento — '+m.title,amount:cost,category:'maintenance',type:'variable',paidBy:'property',vendor:m.vendor||'',createdAt:serverTimestamp()});
+      }
+      await addDoc(collection(db,'properties',propertyId,'repairs'),{date:today,title:m.title,description:'Mantenimiento preventivo programado'+(m.notes?' — '+m.notes:''),amount:cost,vendor:m.vendor||'',category:'preventive',status:'done',paidBy:'property',createdAt:serverTimestamp()});
+      notify(m.title+' · '+(lang==='es'?'próximo':'next')+': '+fmDate(next),'success');
+    }catch(e){notify('Error: '+e.message,'error')}
   };
   const update=async(sub,id,data)=>{await updateDoc(doc(db,'properties',propertyId,sub,id),data);setModal(null);setEditId(null)};
   const del=async(sub,id)=>{if(!confirm('¿Eliminar?'))return;await deleteDoc(doc(db,'properties',propertyId,sub,id))};
@@ -526,7 +544,8 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       items:[
         {id:'documents',icon:<FileText size={18}/>,l:lang==='es'?'Títulos y Documentos':'Title & Documents'},
         {id:'valuation',icon:<TrendingUp size={18}/>,l:t('appreciationNav')},
-        {id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')}
+        {id:'repairs',icon:<Wrench size={18}/>,l:t('repairs')},
+        {id:'maintenance',icon:<ShieldCheck size={18}/>,l:lang==='es'?'Mantenimientos':'Maintenance'}
       ]
     },
     {
@@ -2084,6 +2103,100 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
       :<Empty icon={Wrench} title="Sin reparaciones" desc="Registra mantenimientos, reparaciones y mejoras de capital (CapEx) de tu propiedad." action="Crear Ticket" onAction={()=>{setRepairForm({date:new Date().toISOString().split('T')[0],title:'',description:'',amount:'',vendor:'',category:'repair',status:'pending',paidBy:partners[0]?.id||''});setModal('repair')}}/>}
     </>}
 
+    {/* ═══ MANTENIMIENTOS PROGRAMADOS ═══ */}
+    {view==='maintenance'&&(()=>{
+      const today=new Date().toISOString().split('T')[0];
+      const daysTo=(d)=>d?Math.ceil((new Date(d+'T00:00:00')-new Date(today+'T00:00:00'))/86400000):null;
+      const plans=maintenance.filter(m=>m.active!==false).map(m=>({...m,d:daysTo(m.nextDue)}))
+        .sort((a,b)=>(a.d===null?9999:a.d)-(b.d===null?9999:b.d));
+      const overdue=plans.filter(p=>p.d!==null&&p.d<0);
+      const soon=plans.filter(p=>p.d!==null&&p.d>=0&&p.d<=30);
+      const ok=plans.filter(p=>p.d===null||p.d>30);
+      const annualCost=plans.reduce((s,p)=>s+((parseFloat(p.estCost)||0)*(12/(parseInt(p.everyMonths)||12))),0);
+      const MCATS=[{v:'gas',l:'🔥 Gas'},{v:'electrico',l:'⚡ Eléctrico'},{v:'hidraulico',l:'🚿 Hidráulico'},{v:'pintura',l:'🎨 Pintura'},{v:'clima',l:'❄️ Aire / Calefacción'},{v:'techo',l:'🏠 Techo / Fachada'},{v:'fumigacion',l:'🐜 Fumigación'},{v:'jardin',l:'🌿 Jardín / Piscina'},{v:'seguridad',l:'🧯 Seguridad'},{v:'general',l:'🔧 General'}];
+      const mcl=(v)=>MCATS.find(c=>c.v===v)?.l||v;
+      const PRESETS=(prop.country==='CO'?[
+        {title:'Revisión de gas (certificación)',category:'gas',everyMonths:12},
+        {title:'Lavado de tanque de agua',category:'hidraulico',everyMonths:6},
+        {title:'Fumigación',category:'fumigacion',everyMonths:6},
+        {title:'Pintura interior',category:'pintura',everyMonths:24},
+        {title:'Recarga de extintores',category:'seguridad',everyMonths:12},
+        {title:'Mantenimiento de aire acondicionado',category:'clima',everyMonths:6},
+      ]:[
+        {title:'HVAC service',category:'clima',everyMonths:6},
+        {title:'Water heater flush',category:'hidraulico',everyMonths:12},
+        {title:'Gutter cleaning',category:'techo',everyMonths:6},
+        {title:'Pest control',category:'fumigacion',everyMonths:3},
+        {title:'Interior paint',category:'pintura',everyMonths:24},
+        {title:'Smoke detector batteries',category:'seguridad',everyMonths:12},
+      ]).filter(p=>!maintenance.some(m=>(m.title||'').toLowerCase()===p.title.toLowerCase()));
+      const openNew=(preset)=>{const t=new Date().toISOString().split('T')[0];setMaintForm({title:preset?.title||'',category:preset?.category||'general',everyMonths:String(preset?.everyMonths||12),lastDone:'',nextDue:t,estCost:'',vendor:'',notes:'',active:true});setEditId(null);setModal('maint')};
+      return <>
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-5">
+        <div>
+          <h1 className="text-lg md:text-[22px] font-extrabold text-slate-800">🛡️ {lang==='es'?'Mantenimientos Programados':'Scheduled Maintenance'} <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1>
+          <p className="text-xs text-slate-400 mt-1">{lang==='es'?'Cada cuánto toca, cuándo se hizo la última vez y cuándo vence el siguiente.':'Recurrence, last done and next due date.'}</p>
+        </div>
+        <button onClick={()=>openNew()} className="px-4 py-2.5 bg-teal-600 text-white text-xs rounded-xl font-bold hover:bg-teal-700 transition shadow-lg shadow-teal-500/20 flex items-center gap-1.5"><Plus size={14}/>{lang==='es'?'Nuevo mantenimiento':'New maintenance'}</button>
+      </div>
+
+      {plans.length>0&&<div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <KPI label={lang==='es'?'Vencidos':'Overdue'} value={String(overdue.length)} color="red" alert={overdue.length>0?'red':null}/>
+        <KPI label={lang==='es'?'Próximos 30 días':'Next 30 days'} value={String(soon.length)} color="amber"/>
+        <KPI label={lang==='es'?'Al día':'On track'} value={String(ok.length)} color="green"/>
+        <KPI label={lang==='es'?'Costo anual estimado':'Est. annual cost'} value={gFm(annualCost)} sub={plans.length+(lang==='es'?' rutinas':' routines')} color="blue"/>
+      </div>}
+
+      {overdue.length>0&&<div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 mb-5">
+        <div className="text-xs font-bold text-rose-700 mb-2">⚠️ {lang==='es'?'Mantenimientos vencidos':'Overdue maintenance'}</div>
+        {overdue.map(m=><div key={m.id} className="flex items-center justify-between py-1.5 text-sm">
+          <span><span className="font-bold text-slate-700">{m.title}</span> <span className="text-slate-400 text-xs">{mcl(m.category)}</span></span>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">{lang==='es'?`Vencido hace ${Math.abs(m.d)}d`:`${Math.abs(m.d)}d overdue`}</span>
+        </div>)}
+      </div>}
+
+      {plans.length>0?<div className="space-y-3 mb-5">
+        {plans.map(m=>{
+          const st=m.d===null?'none':m.d<0?'overdue':m.d<=30?'soon':'ok';
+          const badge=st==='overdue'?'bg-rose-100 text-rose-700':st==='soon'?'bg-amber-100 text-amber-700':st==='ok'?'bg-emerald-100 text-emerald-700':'bg-slate-100 text-slate-500';
+          const label=m.d===null?(lang==='es'?'Sin fecha':'No date'):m.d<0?(lang==='es'?`Vencido ${Math.abs(m.d)}d`:`${Math.abs(m.d)}d overdue`):(lang==='es'?`En ${m.d}d`:`In ${m.d}d`);
+          const every=parseInt(m.everyMonths)||12;
+          const freqTxt=every===1?(lang==='es'?'Mensual':'Monthly'):every===12?(lang==='es'?'Anual':'Yearly'):every%12===0?(lang==='es'?`Cada ${every/12} años`:`Every ${every/12} years`):(lang==='es'?`Cada ${every} meses`:`Every ${every} months`);
+          return <div key={m.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-bold text-slate-800">{m.title}</span>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${badge}`}>{label}</span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-1 flex flex-wrap gap-x-3">
+                  <span>{mcl(m.category)}</span>
+                  <span>🔁 {freqTxt}</span>
+                  <span>📅 {lang==='es'?'Próximo':'Next'}: {m.nextDue?fmDate(m.nextDue):'—'}</span>
+                  <span>✓ {lang==='es'?'Última vez':'Last'}: {m.lastDone?fmDate(m.lastDone):(lang==='es'?'Nunca':'Never')}</span>
+                  {parseFloat(m.estCost)>0&&<span>💵 {gFm(m.estCost)}</span>}
+                  {m.vendor&&<span>👷 {m.vendor}</span>}
+                </div>
+                {m.history?.length>0&&<div className="text-[10px] text-slate-300 mt-1">{lang==='es'?'Historial':'History'}: {m.history.slice(-4).reverse().map(h=>fmDate(h.date)).join(' · ')}</div>}
+              </div>
+              <div className="flex gap-1.5 shrink-0">
+                <button onClick={()=>{const c=prompt((lang==='es'?'Costo real de este mantenimiento (deja vacío para usar el estimado):':'Actual cost (blank = estimate):'),String(m.estCost||''));if(c===null)return;markMaintDone(m,parseFloat(c)||0)}} className="px-3 py-2 bg-emerald-600 text-white rounded-xl font-bold text-[11px] hover:bg-emerald-700 flex items-center gap-1"><CheckCircle size={13}/>{lang==='es'?'Ya se hizo':'Mark done'}</button>
+                <button onClick={()=>{setMaintForm({title:m.title||'',category:m.category||'general',everyMonths:String(m.everyMonths||12),lastDone:m.lastDone||'',nextDue:m.nextDue||'',estCost:String(m.estCost||''),vendor:m.vendor||'',notes:m.notes||'',active:m.active!==false});setEditId(m.id);setModal('maint')}} className="p-2 text-slate-300 hover:text-blue-500 rounded-lg hover:bg-blue-50"><Pencil size={14}/></button>
+                <button onClick={()=>del('maintenance',m.id)} className="p-2 text-slate-300 hover:text-rose-500 rounded-lg hover:bg-rose-50"><Trash2 size={14}/></button>
+              </div>
+            </div>
+          </div>})}
+      </div>:<Empty icon={ShieldCheck} title={lang==='es'?'Sin mantenimientos programados':'No scheduled maintenance'} desc={lang==='es'?'Programa las rutinas que se repiten: gas cada año, pintura cada 2 años, lavado de tanque cada 6 meses.':'Schedule recurring routines: yearly gas check, paint every 2 years, tank cleaning every 6 months.'} action={lang==='es'?'Crear el primero':'Create first'} onAction={()=>openNew()}/>}
+
+      {PRESETS.length>0&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+        <h3 className="text-sm font-bold text-slate-700 mb-1">{lang==='es'?'Rutinas comunes':'Common routines'}</h3>
+        <p className="text-xs text-slate-400 mb-4">{lang==='es'?'Un clic para agregarlas con su frecuencia sugerida:':'One click to add with suggested frequency:'}</p>
+        <div className="flex flex-wrap gap-2">
+          {PRESETS.map(p=><button key={p.title} onClick={()=>openNew(p)} className="px-3 py-2 bg-slate-50 hover:bg-teal-50 border border-slate-200 hover:border-teal-300 rounded-xl text-[11px] font-semibold text-slate-600 hover:text-teal-700 transition">+ {p.title} <span className="text-slate-400">· {p.everyMonths===12?'anual':p.everyMonths+'m'}</span></button>)}
+        </div>
+      </div>}
+      </>})()}
+
     {/* ═══ VALUATION & EQUITY ═══ */}
     {view==='valuation'&&<>
       <div className="flex justify-between items-center mb-6"><h1 className="text-[22px] font-extrabold text-slate-800">📈 Appreciation & Equity <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full">{gVc}</span> <CurToggle/></h1><button onClick={()=>{setValForm({date:new Date().toISOString().split('T')[0],value:'',source:'manual',notes:''});setEditId(null);setModal('valuation')}} className="px-4 py-2.5 bg-blue-600 text-white text-xs rounded-xl font-bold hover:bg-blue-700 flex items-center gap-1.5 shadow-sm"><Plus size={14}/> Registrar Valor</button></div>
@@ -3452,6 +3565,30 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={!!mortConfig.includesInsurance} onChange={e=>umc('includesInsurance',e.target.checked)} className="w-4 h-4 rounded border-blue-300 text-blue-600"/><span className="text-[11px] text-slate-700">{lang==='es'?'🛡️ Incluye Homeowner\'s Insurance':'🛡️ Includes Homeowner\'s Insurance'}</span></label>
         </div>
       </div>
+    </Mdl>}
+
+    {modal==='maint'&&<Mdl title={editId?(lang==='es'?'✏️ Editar mantenimiento':'✏️ Edit maintenance'):(lang==='es'?'🛡️ Nuevo mantenimiento programado':'🛡️ New scheduled maintenance')} grad="from-teal-500 to-teal-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">{lang==='es'?'Cancelar':'Cancel'}</button><button onClick={()=>{
+      const every=parseInt(maintForm.everyMonths)||12;
+      let next=maintForm.nextDue;
+      if(!next&&maintForm.lastDone)next=addMonths(maintForm.lastDone,every);
+      const data={title:maintForm.title.trim(),category:maintForm.category||'general',everyMonths:every,lastDone:maintForm.lastDone||'',nextDue:next||'',estCost:parseFloat(maintForm.estCost)||0,vendor:maintForm.vendor||'',notes:maintForm.notes||'',active:maintForm.active!==false};
+      if(editId){update('maintenance',editId,data)}else{save('maintenance',data)}
+    }} disabled={!maintForm.title.trim()} className="flex-1 py-2.5 bg-teal-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
+      <Inp label={lang==='es'?'¿Qué mantenimiento es?':'What maintenance?'} value={maintForm.title} onChange={v=>um('title',v)} placeholder={lang==='es'?'Ej: Revisión de gas, Pintura interior':'e.g. HVAC service'} required/>
+      <div className="grid grid-cols-2 gap-3">
+        <Sel label={lang==='es'?'Categoría':'Category'} value={maintForm.category} onChange={v=>um('category',v)} options={[{v:'gas',l:'🔥 Gas'},{v:'electrico',l:'⚡ Eléctrico'},{v:'hidraulico',l:'🚿 Hidráulico'},{v:'pintura',l:'🎨 Pintura'},{v:'clima',l:'❄️ Aire / Calefacción'},{v:'techo',l:'🏠 Techo / Fachada'},{v:'fumigacion',l:'🐜 Fumigación'},{v:'jardin',l:'🌿 Jardín / Piscina'},{v:'seguridad',l:'🧯 Seguridad'},{v:'general',l:'🔧 General'}]}/>
+        <Sel label={lang==='es'?'¿Cada cuánto?':'How often?'} value={String(maintForm.everyMonths)} onChange={v=>um('everyMonths',v)} options={[{v:'1',l:lang==='es'?'Cada mes':'Monthly'},{v:'3',l:lang==='es'?'Cada 3 meses':'Every 3 months'},{v:'6',l:lang==='es'?'Cada 6 meses':'Every 6 months'},{v:'12',l:lang==='es'?'Cada año':'Yearly'},{v:'24',l:lang==='es'?'Cada 2 años':'Every 2 years'},{v:'36',l:lang==='es'?'Cada 3 años':'Every 3 years'},{v:'60',l:lang==='es'?'Cada 5 años':'Every 5 years'}]}/>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Inp label={lang==='es'?'Última vez que se hizo':'Last done'} value={maintForm.lastDone} onChange={v=>{um('lastDone',v);if(v&&!maintForm.nextDue)um('nextDue',addMonths(v,parseInt(maintForm.everyMonths)||12))}} type="date"/>
+        <Inp label={lang==='es'?'Próximo vencimiento':'Next due'} value={maintForm.nextDue} onChange={v=>um('nextDue',v)} type="date"/>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Inp label={lang==='es'?'Costo estimado':'Estimated cost'} value={maintForm.estCost} onChange={v=>um('estCost',v)} prefix="$" type="number" min="0"/>
+        <Inp label={lang==='es'?'Proveedor':'Vendor'} value={maintForm.vendor} onChange={v=>um('vendor',v)} placeholder={lang==='es'?'Ej: Gases de Occidente':'e.g. ABC HVAC'}/>
+      </div>
+      <Inp label={lang==='es'?'Notas (opcional)':'Notes (optional)'} value={maintForm.notes} onChange={v=>um('notes',v)} placeholder={lang==='es'?'Ej: exigido por la aseguradora':'e.g. required by insurer'}/>
+      <p className="text-[10px] text-slate-400">{lang==='es'?'Al marcar "Ya se hizo" se reprograma la próxima fecha automáticamente, se registra el gasto y queda el histórico.':'Marking as done reschedules the next date, logs the expense and keeps history.'}</p>
     </Mdl>}
 
     {modal==='repair'&&<Mdl title={editId?'✏️ Editar Ticket':'🔧 Nuevo Ticket de Reparación'} grad="from-amber-500 to-amber-600" onClose={()=>{setModal(null);setEditId(null)}} footer={<><button onClick={()=>{setModal(null);setEditId(null)}} className="flex-1 py-2.5 border-2 border-slate-200 rounded-xl font-semibold text-sm text-slate-500">Cancel</button><button onClick={()=>{const data={...repairForm,amount:parseFloat(repairForm.amount)||0};if(editId){update('repairs',editId,data)}else{save('repairs',data)}}} disabled={!repairForm.title} className="flex-1 py-2.5 bg-amber-600 text-white rounded-xl font-bold text-sm disabled:opacity-30">{editId?(lang==='es'?'Actualizar':'Update'):(lang==='es'?'Guardar':'Save')}</button></>}>
