@@ -117,7 +117,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
   const plan=isAdmin?'pro':userPlan;
   const canUse=(feature)=>{if(isAdmin||isVIP)return true;const access={free:['dashboard_basic','upload','expenses','income'],starter:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality'],pro:['dashboard_basic','upload','expenses','income','insights','str_metrics','breakeven','annual','partners','mortgage','history','seasonality','reports','valuation','pipeline','repairs','portfolio','taxes','tenants','documents','providers','reservations']};return(access[plan]||access.free).includes(feature);};
   const [view,setView]=useState('dashboard');const [modal,setModal]=useState(null);const [rptTab,setRptTab]=useState('performance');const [stmtPage,setStmtPage]=useState(0);const [stmtYearFilter,setStmtYearFilter]=useState('all');const PER_PAGE=12;const [dashYear,setDashYear]=useState('all');const [viewCur,setViewCur]=useState(null);const [dashMode,setDashMode]=useState('real');
-  const [portData,setPortData]=useState(null);const [portLoading,setPortLoading]=useState(false);
+  const [portData,setPortData]=useState(null);const [portLoading,setPortLoading]=useState(false);const [portfolioYear,setPortfolioYear]=useState('all');
   const [taxYear,setTaxYear]=useState(new Date().getFullYear()-1);const [landRatio,setLandRatio]=useState(20);const [taxRate,setTaxRate]=useState(24);
   const [expenses,setExpenses]=useState([]);const [income,setIncome]=useState([]);const [contribs,setContribs]=useState([]);const [stmts,setStmts]=useState([]);
   const [loading,setLoading]=useState(true);const [extraP,setExtraP]=useState('');const [extraPA,setExtraPA]=useState('');const [uploadLog,setUploadLog]=useState([]);const fileRef=useRef(null);
@@ -591,7 +591,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
     <ViewGuard>
 
     {/* ═══ PROPERTY BANNER ═══ */}
-    <div className={`rounded-2xl mb-5 overflow-hidden ${prop.photoURL?'':'bg-gradient-to-r from-slate-800 to-slate-700'}`} style={prop.photoURL?{background:`linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.7)),url(${prop.photoURL}) center/cover`}:{}}>
+    {view!=='portfolio'&&<div className={`rounded-2xl mb-5 overflow-hidden ${prop.photoURL?'':'bg-gradient-to-r from-slate-800 to-slate-700'}`} style={prop.photoURL?{background:`linear-gradient(rgba(0,0,0,0.5),rgba(0,0,0,0.7)),url(${prop.photoURL}) center/cover`}:{}}>
       <div className="px-5 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-white font-extrabold text-xl">{prop.name||'Mi Propiedad'}</h1>
@@ -606,7 +606,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
           <span className="text-white/40 text-[10px]">{propCurrency}</span>
         </div>
       </div>
-    </div>
+    </div>}
 
     {/* ═══ DASHBOARD VIEW ═══ */}
     {view==='dashboard'&&(()=>{try{
@@ -1323,36 +1323,83 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         const data=[];
         for(const p of allProperties){
           try{
-            const snap=await getDocs(collection(db,'properties',p.id,'statements'));
-            const stmts=snap.docs.map(d=>({...d.data(),id:d.id}));
+            const pCur=p.currency||'USD';
+            const xr=p.exchangeRate||(liveTRM&&liveTRM.COP?liveTRM.COP:0);
+            // Convierte a USD desde la moneda de un valor. Para statements y equity la moneda es la de la propiedad.
+            const toUSD=(v,cur)=>{const c=cur||pCur;if(c==='USD')return v;if(xr>0)return v/xr;return v;};
+            const [stmtsSnap,incSnap,valsSnap]=await Promise.all([
+              getDocs(collection(db,'properties',p.id,'statements')),
+              getDocs(collection(db,'properties',p.id,'income')),
+              getDocs(collection(db,'properties',p.id,'valuations')),
+            ]);
+            const stmts=stmtsSnap.docs.map(d=>({...d.data(),id:d.id}));
+            const incs=incSnap.docs.map(d=>({...d.data(),id:d.id}));
+            const vals=valsSnap.docs.map(d=>({...d.data(),id:d.id})).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
             const curYear=new Date().getFullYear();
-            const ytd=stmts.filter(s=>s.year===curYear);
-            const allRev=stmts.reduce((s,x)=>s+(x.revenue||0),0);
-            const allNet=stmts.reduce((s,x)=>s+(x.net||0),0);
-            const ytdRev=ytd.reduce((s,x)=>s+(x.revenue||0),0);
-            const ytdNet=ytd.reduce((s,x)=>s+(x.net||0),0);
+            // Statements: revenue/net están en USD (formato Airbnb/PM). No requieren conversión.
+            const stmtRev=stmts.reduce((s,x)=>s+(x.revenue||0),0);
+            const stmtNet=stmts.reduce((s,x)=>s+(x.net||0),0);
+            const ytdStmts=stmts.filter(s=>s.year===curYear);
+            const ytdStmtRev=ytdStmts.reduce((s,x)=>s+(x.revenue||0),0);
+            const ytdStmtNet=ytdStmts.reduce((s,x)=>s+(x.net||0),0);
+            // Income: reservas directas + canon tradicional. Cada entrada tiene su currency.
+            const incRev=incs.reduce((s,i)=>s+toUSD(i.amount||0,i.currency),0);
+            const incNet=incs.reduce((s,i)=>s+toUSD(i.netAmount||i.amount||0,i.currency),0);
+            const ytdIncs=incs.filter(i=>String(i.date||'').startsWith(String(curYear)));
+            const ytdIncRev=ytdIncs.reduce((s,i)=>s+toUSD(i.amount||0,i.currency),0);
+            const ytdIncNet=ytdIncs.reduce((s,i)=>s+toUSD(i.netAmount||i.amount||0,i.currency),0);
+            const allRev=stmtRev+incRev;
+            const allNet=stmtNet+incNet;
+            const ytdRev=ytdStmtRev+ytdIncRev;
+            const ytdNet=ytdStmtNet+ytdIncNet;
             const mort=p.mortgage||{};
-            const mortMonthly=mort.monthlyPayment||0;
-            const equity=(p.purchasePrice||0)-(mort.balance||0);
-            data.push({id:p.id,name:p.name||'Sin nombre',city:p.city||'',country:p.country||'US',currency:p.currency||'USD',totalStmts:stmts.length,allRev,allNet,ytdRev,ytdNet,ytdMonths:ytd.length,mortMonthly,balance:mort.balance||0,equity,purchasePrice:p.purchasePrice||0,rate:mort.rate||0});
+            // Equity, deuda, hipoteca: valores en moneda de la propiedad → USD.
+            const mortMonthlyUSD=toUSD(mort.monthlyPayment||0,pCur);
+            const balanceUSD=toUSD(mort.balance||0,pCur);
+            const purchaseUSD=toUSD(p.purchasePrice||0,pCur);
+            const latestVal=vals[0];
+            const marketUSD=latestVal?toUSD(parseFloat(latestVal.value)||0,pCur):purchaseUSD;
+            const appreciation=marketUSD-purchaseUSD;
+            const appreciationPct=purchaseUSD>0?(appreciation/purchaseUSD*100):0;
+            // Equity real usa marketValue si existe (no purchasePrice), igual que el dashboard.
+            const equity=marketUSD-balanceUSD;
+            const _stmts=stmts.map(s=>({year:s.year,month:s.month,revenue:s.revenue||0,net:s.net||0}));
+            const _incs=incs.map(i=>({date:i.date||'',amountUSD:toUSD(i.amount||0,i.currency),netUSD:toUSD(i.netAmount||i.amount||0,i.currency)}));
+            data.push({id:p.id,name:p.name||'Sin nombre',city:p.city||'',country:p.country||'US',currency:pCur,totalStmts:stmts.length,totalInc:incs.length,allRev,allNet,ytdRev,ytdNet,ytdMonths:ytdStmts.length,mortMonthly:mortMonthlyUSD,balance:balanceUSD,equity,purchasePrice:purchaseUSD,marketValue:marketUSD,appreciation,appreciationPct,rate:mort.rate||0,_stmts,_incs});
           }catch(e){data.push({id:p.id,name:p.name||'Sin nombre',city:p.city||'',error:e.message})}
         }
         setPortData(data);setPortLoading(false);
       };
       if(!portData&&!portLoading)loadPortfolio();
-      const totals=portData?{rev:portData.reduce((s,p)=>s+(p.allRev||0),0),net:portData.reduce((s,p)=>s+(p.allNet||0),0),ytdRev:portData.reduce((s,p)=>s+(p.ytdRev||0),0),ytdNet:portData.reduce((s,p)=>s+(p.ytdNet||0),0),equity:portData.reduce((s,p)=>s+(p.equity||0),0),mort:portData.reduce((s,p)=>s+(p.mortMonthly||0),0),debt:portData.reduce((s,p)=>s+(p.balance||0),0)}:null;
+      const portYears=portData?[...new Set(portData.flatMap(p=>(p._stmts||[]).map(s=>s.year)).filter(Boolean))].sort((a,b)=>a-b):[];
+      const viewData=portData?portData.map(p=>{
+        if(portfolioYear==='all')return p;
+        const fs=(p._stmts||[]).filter(s=>s.year===portfolioYear);
+        const fi=(p._incs||[]).filter(i=>String(i.date||'').startsWith(String(portfolioYear)));
+        const allRev=fs.reduce((s,x)=>s+(x.revenue||0),0)+fi.reduce((s,i)=>s+(i.amountUSD||0),0);
+        const allNet=fs.reduce((s,x)=>s+(x.net||0),0)+fi.reduce((s,i)=>s+(i.netUSD||0),0);
+        return{...p,allRev,allNet,totalStmts:fs.length,totalInc:fi.length};
+      }):null;
+      const totals=viewData?{rev:viewData.reduce((s,p)=>s+(p.allRev||0),0),net:viewData.reduce((s,p)=>s+(p.allNet||0),0),ytdRev:viewData.reduce((s,p)=>s+(p.ytdRev||0),0),ytdNet:viewData.reduce((s,p)=>s+(p.ytdNet||0),0),equity:viewData.reduce((s,p)=>s+(p.equity||0),0),mort:viewData.reduce((s,p)=>s+(p.mortMonthly||0),0),debt:viewData.reduce((s,p)=>s+(p.balance||0),0),appreciation:viewData.reduce((s,p)=>s+(p.appreciation||0),0),purchase:viewData.reduce((s,p)=>s+(p.purchasePrice||0),0),market:viewData.reduce((s,p)=>s+(p.marketValue||0),0)}:null;
       return <>
       <h1 className="text-[22px] font-extrabold text-slate-800 mb-2">🏘️ {lang==='es'?'Portafolio Consolidado':'Consolidated Portfolio'}</h1>
-      <p className="text-sm text-slate-400 mb-5">{lang==='es'?`${allProperties.length} propiedades · Vista general de todo tu patrimonio inmobiliario`:`${allProperties.length} properties · Overview of your entire real estate portfolio`}</p>
+      <p className="text-sm text-slate-400 mb-1">{lang==='es'?`${allProperties.length} propiedades · Vista general de todo tu patrimonio inmobiliario`:`${allProperties.length} properties · Overview of your entire real estate portfolio`}</p>
+      <p className="text-[11px] text-slate-400 mb-5 italic">{lang==='es'?'Todos los valores en USD (convertidos con TRM o tasa por propiedad). Revenue = renta + reservas. Valorización = ganancia de capital no realizada.':'All values in USD (converted at property rate or live TRM). Revenue = rent + bookings. Appreciation = unrealized capital gain.'}</p>
 
       {portLoading&&<div className="flex items-center gap-3 py-12 justify-center"><Loader2 size={20} className="animate-spin text-blue-500"/><span className="text-sm text-slate-400">{lang==='es'?'Cargando datos del portafolio...':'Loading portfolio data...'}</span></div>}
 
-      {portData&&totals&&<>
+      {portData&&portYears.length>0&&<div className="flex items-center gap-1.5 mb-4 no-print overflow-x-auto pb-1">
+        <button onClick={()=>setPortfolioYear('all')} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${portfolioYear==='all'?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{t('allTime')}</button>
+        {portYears.map(y=><button key={y} onClick={()=>setPortfolioYear(y)} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${portfolioYear===y?'bg-slate-800 text-white':'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}>{y}</button>)}
+      </div>}
+
+      {viewData&&totals&&<>
         {/* KPIs */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
-          <KPI label={lang==='es'?'Revenue Total':'Total Revenue'} value={fm(totals.rev)} sub={`${portData.reduce((s,p)=>s+(p.totalStmts||0),0)} months`} color="blue"/>
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-5">
+          <KPI label={lang==='es'?'Revenue Total':'Total Revenue'} value={fm(totals.rev)} sub={lang==='es'?'renta + reservas':'rent + bookings'} color="blue"/>
           <KPI label={lang==='es'?'Neto Total':'Total Net'} value={fm(totals.net)} sub={totals.rev>0?`${(totals.net/totals.rev*100).toFixed(0)}% margin`:''} color="green"/>
           <KPI label={`YTD ${new Date().getFullYear()}`} value={fm(totals.ytdRev)} sub={fm(totals.ytdNet)+' net'} color="cyan"/>
+          <KPI label={lang==='es'?'Valorización':'Appreciation'} value={fm(totals.appreciation)} sub={totals.purchase>0?`${(totals.appreciation/totals.purchase*100).toFixed(1)}% vs compra`:''} color={totals.appreciation>=0?'purple':'red'}/>
           <KPI label={lang==='es'?'Equity Total':'Total Equity'} value={fm(totals.equity)} color="emerald"/>
           <KPI label={lang==='es'?'Deuda Total':'Total Debt'} value={fm(totals.debt)} sub={fm(totals.mort)+'/mo'} color="red"/>
         </div>
@@ -1367,16 +1414,18 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                 <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">Net</th>
                 <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Margen':'Margin'}</th>
                 <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">YTD Rev</th>
+                <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Valorización':'Appreciation'}</th>
                 <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">{lang==='es'?'Hipoteca':'Mortgage'}</th>
                 <th className="text-right px-3 py-3 text-[10px] font-bold text-slate-500 uppercase">Equity</th>
                 <th className="px-3 py-3"></th>
               </tr></thead>
-              <tbody>{portData.map(p=>{const margin=p.allRev>0?(p.allNet/p.allRev*100):0;return<tr key={p.id} className={`border-b border-slate-50 hover:bg-blue-50/50 transition cursor-pointer ${p.id===propertyId?'bg-blue-50':''}`} onClick={()=>{onSwitchProperty(p.id);setView('dashboard')}}>
-                <td className="px-4 py-3"><div className="font-bold text-slate-800">{p.name}</div><div className="text-[10px] text-slate-400">{p.city}{p.country?` · ${p.country}`:''} · {p.totalStmts||0}m</div></td>
+              <tbody>{viewData.map(p=>{const margin=p.allRev>0?(p.allNet/p.allRev*100):0;const dataPoints=(p.totalStmts||0)>0?`${p.totalStmts}m stmt`:(p.totalInc||0)>0?`${p.totalInc} direct`:(lang==='es'?'sin ingresos':'no income');return<tr key={p.id} className={`border-b border-slate-50 hover:bg-blue-50/50 transition cursor-pointer ${p.id===propertyId?'bg-blue-50':''}`} onClick={()=>{onSwitchProperty(p.id);setView('dashboard')}}>
+                <td className="px-4 py-3"><div className="font-bold text-slate-800">{p.name}</div><div className="text-[10px] text-slate-400">{p.city}{p.country?` · ${p.country}`:''} · {dataPoints}</div></td>
                 <td className="text-right px-3 py-3 font-semibold text-blue-600">{fm(p.allRev)}</td>
                 <td className="text-right px-3 py-3 font-semibold text-emerald-600">{fm(p.allNet)}</td>
-                <td className="text-right px-3 py-3"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${margin>=50?'bg-emerald-100 text-emerald-700':margin>=30?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{margin.toFixed(0)}%</span></td>
+                <td className="text-right px-3 py-3"><span className={`text-xs font-bold px-2 py-0.5 rounded-full ${margin>=50?'bg-emerald-100 text-emerald-700':margin>=30?'bg-amber-100 text-amber-700':'bg-rose-100 text-rose-700'}`}>{p.allRev>0?margin.toFixed(0)+'%':'—'}</span></td>
                 <td className="text-right px-3 py-3 font-semibold text-cyan-600">{fm(p.ytdRev)}</td>
+                <td className="text-right px-3 py-3"><div className={`font-semibold ${p.appreciation>=0?'text-purple-600':'text-rose-500'}`}>{p.appreciation===0?'—':fm(p.appreciation)}</div>{p.appreciation!==0&&<div className={`text-[10px] ${p.appreciation>=0?'text-purple-400':'text-rose-400'}`}>{p.appreciationPct>=0?'+':''}{p.appreciationPct.toFixed(1)}%</div>}</td>
                 <td className="text-right px-3 py-3 text-slate-500">{p.mortMonthly?fm(p.mortMonthly)+'/mo':'—'}</td>
                 <td className="text-right px-3 py-3 font-bold text-emerald-600">{p.equity>0?fm(p.equity):'—'}</td>
                 <td className="px-3 py-3"><span className="text-[10px] text-blue-500 font-bold">→</span></td>
@@ -1387,6 +1436,7 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
                 <td className="text-right px-3 py-3 font-bold">{fm(totals.net)}</td>
                 <td className="text-right px-3 py-3"><span className="text-xs font-bold">{totals.rev>0?(totals.net/totals.rev*100).toFixed(0):0}%</span></td>
                 <td className="text-right px-3 py-3 font-bold">{fm(totals.ytdRev)}</td>
+                <td className="text-right px-3 py-3 font-bold">{fm(totals.appreciation)}</td>
                 <td className="text-right px-3 py-3 font-bold">{fm(totals.mort)}/mo</td>
                 <td className="text-right px-3 py-3 font-bold">{fm(totals.equity)}</td>
                 <td className="px-3"></td>
@@ -1397,13 +1447,13 @@ function Dashboard({propertyId,propertyData:prop,allProperties=[],onSwitchProper
         </div>
 
         {/* Revenue distribution */}
-        {portData.length>1&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
+        {viewData.length>1&&<div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 mb-5">
           <h3 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-3">{lang==='es'?'Distribución de Revenue':'Revenue Distribution'}</h3>
           <div className="h-8 rounded-lg overflow-hidden flex mb-3">
-            {portData.filter(p=>p.allRev>0).map((p,i)=>{const pct=totals.rev>0?(p.allRev/totals.rev*100):0;return<div key={p.id} className="relative" style={{width:pct+'%',background:C[i%C.length]}}><div className="absolute inset-0 flex items-center justify-center"><span className="text-[8px] font-bold text-white truncate px-1">{pct.toFixed(0)}%</span></div></div>})}
+            {viewData.filter(p=>p.allRev>0).map((p,i)=>{const pct=totals.rev>0?(p.allRev/totals.rev*100):0;return<div key={p.id} className="relative" style={{width:pct+'%',background:C[i%C.length]}}><div className="absolute inset-0 flex items-center justify-center"><span className="text-[8px] font-bold text-white truncate px-1">{pct.toFixed(0)}%</span></div></div>})}
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-            {portData.filter(p=>p.allRev>0).map((p,i)=><div key={p.id} className="flex items-center gap-2">
+            {viewData.filter(p=>p.allRev>0).map((p,i)=><div key={p.id} className="flex items-center gap-2">
               <div className="w-3 h-3 rounded-sm shrink-0" style={{background:C[i%C.length]}}/>
               <span className="text-[11px] text-slate-600 truncate">{p.name}</span>
               <span className="text-[11px] font-bold text-slate-800 ml-auto">{fm(p.allRev)}</span>
