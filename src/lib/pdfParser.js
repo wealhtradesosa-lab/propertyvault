@@ -350,6 +350,22 @@ function parseAirbnbAnnual(t) {
     const totalRev = results.reduce((s, r) => s + r.revenue, 0);
     results.forEach(r => { r.reservations = totalRev > 0 ? Math.round(totalRes * (r.revenue / totalRev)) : Math.round(totalRes / results.length); });
   }
+  // FALLBACK: single-month report
+  if (results.length === 0) {
+    const hdr = t.match(/\d+\s*de\s*(\w+)\s*de\s*(\d{4})\s*[–-]\s*\d+\s*de\s*(\w+)\s*de\s*(\d{4})/i);
+    if (hdr) {
+      const endMonth = allMonthMap[hdr[3].toLowerCase()];
+      const endYear = parseInt(hdr[4]);
+      const summary = t.match(/Ingresos\s+\$([\d,]+\.\d{2})\s*USD[\s\S]*?\$([\d,]+\.\d{2})\s*USD\s*$/m);
+      if (endMonth && summary) {
+        const revenue = parseFloat(summary[1].replace(/,/g, ''));
+        const net = parseFloat(summary[2].replace(/,/g, ''));
+        if (revenue > 0) {
+          results.push(result({ year: endYear, month: endMonth, revenue, commission: Math.max(0, revenue - net), net, nights: nights(t), reservations: reservations(t), format: 'Airbnb Annual' }));
+        }
+      }
+    }
+  }
   if (results.length === 0) return { error: 'Airbnb Annual: no monthly data found' };
   return results; // Returns ARRAY
 }
